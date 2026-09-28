@@ -50,6 +50,17 @@ func _ready() -> void:
 
 	sel = _open("res://scenes/episode_select.tscn")
 	await _snap("episode_select_unlocked")
+	sel.queue_free()
+
+	StoryRunner.prepare("ep_test2", false)
+	play = _open("res://scenes/main_play.tscn")
+	await _frames(3)
+	await _snap("npc1_left")                       # 첫 NPC → 왼쪽
+	await _advance(play)
+	await _snap("npc2_right")                      # 두 번째 NPC → 오른쪽, NPC 1은 회색
+	await _advance(play)
+	await _snap("protagonist_no_tail")             # 주인공: 초상화·이름·꼬리 없음
+	play.queue_free()
 
 	SaveManager.delete_all()
 	print("[ui_smoke] 스크린샷 %d장 → %s" % [_shot, ProjectSettings.globalize_path("user://ui_smoke")])

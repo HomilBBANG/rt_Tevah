@@ -5,12 +5,15 @@ extends Control
 ##   system    — 획득·버림 등 시스템 메시지 (검은 상자, 가운데 정렬)
 ##   situation — 화자 없는 노드 (밝은 상자)
 ##   dialogue  — 화자 있는 노드 (초상화 + 말풍선, 직전 대사는 회색으로 위에)
+##               주인공은 얼굴·이름이 나오지 않는다 (꼬리 없는 말풍선).
+##               NPC는 먼저 말한 쪽이 왼쪽, 나중에 등장한 쪽이 오른쪽.
 ## 마지막 페이지에서 선택지를 띄우고, 선택지 없는 노드면 다음 클릭에 continue_story().
 
 const ChoiceButton = preload("res://ui/choice_button.gd")
 
-# 말풍선 위치 (기획서 3~4페이지 기준, 화면 비율). 꼬리 방향에 따라 좌우로 약간 이동.
-const BUBBLE_X := {"left": [0.266, 0.676], "right": [0.287, 0.697]}
+# 말풍선 위치 (기획서 기준, 화면 비율). 꼬리 방향에 따라 좌우로 약간 이동. none = 주인공(꼬리 없음)
+const BUBBLE_X := {"left": [0.266, 0.676], "right": [0.287, 0.697], "none": [0.287, 0.697]}
+const SIDES := ["left", "right"]
 const BUBBLE_Y := [0.68, 0.83]
 const PREV_BUBBLE_Y := [0.485, 0.635]
 
@@ -21,7 +24,9 @@ var _pending_msgs: PackedStringArray = []
 var _ended := false
 var _cur_line := {}             # 지금 말풍선의 대사 {text, speaker_id, side}
 var _prev_line := {}            # 직전 대사 (회색)
-var _right_char := ""           # 오른쪽 초상화에 서 있는 캐릭터
+var _slots := ["", ""]          # 초상화 자리 [왼쪽, 오른쪽] 에 선 NPC char_id
+var _slot_spoke := [0, 0]       # 각 자리가 마지막으로 말한 순번
+var _line_no := 0
 
 
 func _ready() -> void:
@@ -109,13 +114,14 @@ func _show_page(p: Dictionary) -> void:
 	var is_dialogue: bool = p.kind == "dialogue"
 	%Bubble.visible = is_dialogue
 	%PrevBubble.visible = false
-	%Portrait.visible = is_dialogue
+	%PortraitLeft.visible = false
+	%PortraitRight.visible = false
 	match p.kind:
 		"situation":
 			%SituationText.text = p.text
 			_cur_line = {}
 			_prev_line = {}
-			_right_char = ""
+			_slots = ["", ""]
 		"system":
 			%SystemText.text = p.text
 		"dialogue":
@@ -138,26 +144,41 @@ func _show_page(p: Dictionary) -> void:
 
 
 func _show_dialogue(p: Dictionary) -> void:
-	# 주인공은 얼굴이 나오지 않는다: 주인공 대사는 왼쪽 꼬리 말풍선만, 상대는 오른쪽에 초상화와 함께.
-	# TODO(기획 확인): 주인공 외 화자가 둘 이상일 때는 오른쪽 자리에 마지막 화자만 세운다.
 	var protagonist: String = DataLoader.episodes.get(GameState.episode_id, {}).get("protagonist_id", "")
-	var side := "left" if p.speaker_id == protagonist else "right"
-	if side == "right":
-		_right_char = p.speaker_id
+	var side := "none"
+	if p.speaker_id != protagonist:
+		var i := _slots.find(p.speaker_id)
+		if i == -1:
+			i = _slots.find("")
+		if i == -1:
+			# TODO(기획 확인): 세 번째 NPC가 말하면 더 오래 말하지 않은 쪽 자리를 넘겨준다.
+			i = 0 if _slot_spoke[0] <= _slot_spoke[1] else 1
+		_slots[i] = p.speaker_id
+		_line_no += 1
+		_slot_spoke[i] = _line_no
+		side = SIDES[i]
 	var line := {"text": p.text, "speaker_id": p.speaker_id, "side": side}
 	# 같은 노드를 다시 보여줄 때(아이템 사용 후 등)는 대사 기록을 밀지 않는다
 	if not _cur_line.is_empty() and _cur_line != line:
 		_prev_line = _cur_line
 	_cur_line = line
 
-	%Portrait.show_character(DataLoader.character_name(_right_char), side == "right")
-	_place(%Bubble, BUBBLE_X[side], BUBBLE_Y)
-	%Bubble.show_line(p.text, side, false, DataLoader.character_name(p.speaker_id), DataLoader.character_color(p.speaker_id))
+	# 초상화: 다른 NPC가 말할 때만 회색. 주인공이 말할 때는 둘 다 그대로.
+	var portraits := [%PortraitLeft, %PortraitRight]
+	for j in 2:
+		portraits[j].show_character(DataLoader.character_name(_slots[j]), side == "none" or side == SIDES[j])
+	_show_line(%Bubble, line, BUBBLE_Y, false)
 	if not _prev_line.is_empty():
-		_place(%PrevBubble, BUBBLE_X[_prev_line.side], PREV_BUBBLE_Y)
-		%PrevBubble.show_line(_prev_line.text, _prev_line.side, true,
-			DataLoader.character_name(_prev_line.speaker_id), DataLoader.character_color(_prev_line.speaker_id))
+		_show_line(%PrevBubble, _prev_line, PREV_BUBBLE_Y, true)
 		%PrevBubble.visible = true
+
+
+func _show_line(bubble: Control, line: Dictionary, y: Array, dimmed: bool) -> void:
+	_place(bubble, BUBBLE_X[line.side], y)
+	var is_npc: bool = line.side != "none"
+	bubble.show_line(line.text, line.side, dimmed,
+		DataLoader.character_name(line.speaker_id) if is_npc else "",
+		DataLoader.character_color(line.speaker_id) if is_npc else "")
 
 
 func _place(c: Control, x: Array, y: Array) -> void:

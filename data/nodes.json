@@ -62,5 +62,21 @@
   "text": "시간 초과 노드 (에피소드 2)",
   "next_node": "END:end_t2_timeout",
   "on_enter": ""
+ },
+ {
+  "node_id": "t2_npc1",
+  "episode_id": "ep_test2",
+  "speaker_id": "char_npc",
+  "text": "노드 N1 (NPC 1 대사)",
+  "next_node": "t2_npc2",
+  "on_enter": ""
+ },
+ {
+  "node_id": "t2_npc2",
+  "episode_id": "ep_test2",
+  "speaker_id": "char_npc2",
+  "text": "노드 N2 (NPC 2 대사)",
+  "next_node": "t2_a",
+  "on_enter": ""
  }
 ]

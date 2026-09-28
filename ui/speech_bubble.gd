@@ -1,5 +1,5 @@
 extends Control
-## 말풍선: 둥근 사각형 + 화자 쪽(왼쪽/오른쪽 위)으로 뻗는 꼬리.
+## 말풍선: 둥근 사각형 + 화자 쪽(왼쪽/오른쪽 위)으로 뻗는 꼬리. tail_side = "none" 이면 꼬리 없음(주인공).
 ## dimmed = 지나간 대사 (회색). 화자 이름표는 말풍선 위 테두리에 걸쳐 꼬리 쪽 모서리에 붙는다.
 
 const FILL := Color("f2f2f2")
@@ -60,7 +60,9 @@ func _draw() -> void:
 	draw_style_box(sb, Rect2(Vector2.ZERO, size))
 	var w := size.x
 	var tail: PackedVector2Array
-	if tail_side == "left":
+	if tail_side == "none":
+		return
+	elif tail_side == "left":
 		tail = [Vector2(1, 18), Vector2(-22, 6), Vector2(1, 42)]
 	else:
 		tail = [Vector2(w - 1, 18), Vector2(w + 22, 6), Vector2(w - 1, 42)]

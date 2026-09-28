@@ -123,7 +123,10 @@ func _run() -> void:
 
 	ending = ""
 	await StoryRunner.start_episode("ep_test2")
-	check(node_id == "t2_a" and GameState.item_count("knife") == 0, "ep_test2 시작 (인벤토리 초기화)")
+	check(node_id == "t2_npc1" and GameState.item_count("knife") == 0, "ep_test2 시작 (인벤토리 초기화)")
+	await StoryRunner.continue_story()
+	await StoryRunner.continue_story()
+	check(node_id == "t2_a", "NPC 2인 대화 후 t2_a")
 	await StoryRunner.choose("c2_a1")
 	check(ending == "end_t2_clear", "ep_test2 클리어")
 
