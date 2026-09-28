@@ -153,10 +153,11 @@ func _show_dialogue(p: Dictionary) -> void:
 	%PortraitLeft.show_character(DataLoader.character_name(protagonist), side == "left")
 	%PortraitRight.show_character(DataLoader.character_name(_right_char), side == "right")
 	_place(%Bubble, BUBBLE_X[side], BUBBLE_Y)
-	%Bubble.show_line(p.text, side, false)
+	%Bubble.show_line(p.text, side, false, DataLoader.character_name(p.speaker_id), DataLoader.character_color(p.speaker_id))
 	if not _prev_line.is_empty():
 		_place(%PrevBubble, BUBBLE_X[_prev_line.side], PREV_BUBBLE_Y)
-		%PrevBubble.show_line(_prev_line.text, _prev_line.side, true)
+		%PrevBubble.show_line(_prev_line.text, _prev_line.side, true,
+			DataLoader.character_name(_prev_line.speaker_id), DataLoader.character_color(_prev_line.speaker_id))
 		%PrevBubble.visible = true
 
 

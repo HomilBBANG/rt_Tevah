@@ -4,16 +4,19 @@
   "name": "주인공 1",
   "traits": [
    "tester"
-  ]
+  ],
+  "name_color": "#D81B4A"
  },
  {
   "char_id": "char_t2",
   "name": "주인공 2",
-  "traits": []
+  "traits": [],
+  "name_color": ""
  },
  {
   "char_id": "char_npc",
   "name": "NPC 1",
-  "traits": []
+  "traits": [],
+  "name_color": "#F2C200"
  }
 ]

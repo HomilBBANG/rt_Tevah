@@ -37,7 +37,13 @@ SCHEMA = {
     "Config": ("key", ["key", "value"], {"value": (float, None)}),
 }
 
+# 없어도 되는 열 (시트에 없으면 빈 값으로 본다)
+OPTIONAL = {
+    "Characters": ["name_color"],   # 대화 이름표 색 (#RRGGBB). 비우면 기본색
+}
+
 ID_RE = re.compile(r"^[A-Za-z0-9_]+$")
+COLOR_RE = re.compile(r"^#?[0-9A-Fa-f]{6}$")
 
 
 class Report:
@@ -195,14 +201,15 @@ def read_sheets(path, rep):
             rep.err(sheet, f"열 없음: {', '.join(missing)}")
             data[sheet] = []
             continue
-        idx = {c: header.index(c) for c in cols}
+        opt = OPTIONAL.get(sheet, [])
+        idx = {c: header.index(c) for c in cols + opt if c in header}
         out = []
         for rn, row in enumerate(rows[1:], start=2):
-            vals = {c: (row[idx[c]] if idx[c] < len(row) else None) for c in cols}
+            vals = {c: (row[idx[c]] if c in idx and idx[c] < len(row) else None) for c in cols + opt}
             if all(cell_str(v) == "" for v in vals.values()):
                 continue
             rec = {"_row": rn}
-            for c in cols:
+            for c in cols + opt:
                 if c in numeric:
                     typ, default = numeric[c]
                     s = cell_str(vals[c])
@@ -305,6 +312,8 @@ def validate(d, rep):
 
     # Characters
     for c in d["Characters"]:
+        if c["name_color"] and not COLOR_RE.match(c["name_color"]):
+            rep.err(f"Characters {c['_row']}행", f"name_color 는 #RRGGBB 형식: '{c['name_color']}'")
         for t in split_list(c["traits"]):
             if not ID_RE.match(t):
                 rep.err(f"Characters {c['_row']}행", f"능력 이름 '{t}' 에는 영문·숫자·_ 만")

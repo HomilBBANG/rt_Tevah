@@ -64,6 +64,11 @@ func character_name(char_id: String) -> String:
 	return characters.get(char_id, {}).get("name", char_id)
 
 
+## 대화 이름표 색 (#RRGGBB). 지정 안 됐으면 ""
+func character_color(char_id: String) -> String:
+	return characters.get(char_id, {}).get("name_color", "")
+
+
 func item_name(item_id: String) -> String:
 	return items.get(item_id, {}).get("name", item_id)
 
