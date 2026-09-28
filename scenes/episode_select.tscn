@@ -1,0 +1,53 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/episode_select.gd" id="1"]
+
+[node name="EpisodeSelect" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Center"]
+custom_minimum_size = Vector2(480, 0)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="Label" parent="Center/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "에피소드 선택"
+horizontal_alignment = 1
+
+[node name="List" type="VBoxContainer" parent="Center/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HSeparator" type="HSeparator" parent="Center/VBox"]
+layout_mode = 2
+
+[node name="Buttons" type="HBoxContainer" parent="Center/VBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="BackButton" type="Button" parent="Center/VBox/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "뒤로"
+
+[node name="ResetButton" type="Button" parent="Center/VBox/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "저장 전부 삭제"
