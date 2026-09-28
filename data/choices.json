@@ -1,0 +1,172 @@
+[
+ {
+  "choice_id": "c_a1",
+  "node_id": "t1_a",
+  "text": "선택지 1 (일반)",
+  "condition": "",
+  "show_mode": "",
+  "cost": "",
+  "effects": "",
+  "next_node": "t1_b"
+ },
+ {
+  "choice_id": "c_a2",
+  "node_id": "t1_a",
+  "text": "선택지 2 (칼 필요, gray)",
+  "condition": "has:knife",
+  "show_mode": "gray",
+  "cost": "",
+  "effects": "",
+  "next_node": "t1_c"
+ },
+ {
+  "choice_id": "c_a3",
+  "node_id": "t1_a",
+  "text": "선택지 3 (칼 필요, hide)",
+  "condition": "has:knife",
+  "show_mode": "hide",
+  "cost": "",
+  "effects": "",
+  "next_node": "t1_c"
+ },
+ {
+  "choice_id": "c_a4",
+  "node_id": "t1_a",
+  "text": "선택지 4 (대가형)",
+  "condition": "",
+  "show_mode": "",
+  "cost": "체력 -10, 시간 -10",
+  "effects": "stat:hp-10;stat:time-10",
+  "next_node": "t1_d"
+ },
+ {
+  "choice_id": "c_b1",
+  "node_id": "t1_b",
+  "text": "탐색 (spot_b)",
+  "condition": "",
+  "show_mode": "",
+  "cost": "시간 -10",
+  "effects": "loot:spot_b",
+  "next_node": "t1_b"
+ },
+ {
+  "choice_id": "c_b2",
+  "node_id": "t1_b",
+  "text": "빈 곳 탐색 (spot_empty)",
+  "condition": "",
+  "show_mode": "",
+  "cost": "시간 -5",
+  "effects": "loot:spot_empty",
+  "next_node": "t1_b"
+ },
+ {
+  "choice_id": "c_b3",
+  "node_id": "t1_b",
+  "text": "잡동사니 9개 줍기 (인벤토리 초과)",
+  "condition": "",
+  "show_mode": "",
+  "cost": "",
+  "effects": "item:+junk*9",
+  "next_node": "t1_b"
+ },
+ {
+  "choice_id": "c_b4",
+  "node_id": "t1_b",
+  "text": "노드 A로",
+  "condition": "",
+  "show_mode": "",
+  "cost": "",
+  "effects": "",
+  "next_node": "t1_a"
+ },
+ {
+  "choice_id": "c_d1",
+  "node_id": "t1_d",
+  "text": "정상 클리어",
+  "condition": "",
+  "show_mode": "",
+  "cost": "",
+  "effects": "",
+  "next_node": "END:end_t1_clear"
+ },
+ {
+  "choice_id": "c_d2",
+  "node_id": "t1_d",
+  "text": "플래그 조건 클리어 (flag:used_knife)",
+  "condition": "flag:used_knife",
+  "show_mode": "gray",
+  "cost": "",
+  "effects": "",
+  "next_node": "END:end_t1_good"
+ },
+ {
+  "choice_id": "c_d3",
+  "node_id": "t1_d",
+  "text": "능력 조건 (trait:tester) → 알약 획득",
+  "condition": "trait:tester",
+  "show_mode": "hide",
+  "cost": "",
+  "effects": "item:+pill",
+  "next_node": "t1_d"
+ },
+ {
+  "choice_id": "c_d4",
+  "node_id": "t1_d",
+  "text": "복합 조건 (stat:hp<=50 | has:pill)",
+  "condition": "stat:hp<=50 | has:pill",
+  "show_mode": "gray",
+  "cost": "체력 +5",
+  "effects": "stat:hp+5",
+  "next_node": "t1_d"
+ },
+ {
+  "choice_id": "c_d5",
+  "node_id": "t1_d",
+  "text": "사망 테스트",
+  "condition": "",
+  "show_mode": "",
+  "cost": "체력 -999",
+  "effects": "stat:hp-999",
+  "next_node": "t1_d"
+ },
+ {
+  "choice_id": "c_d6",
+  "node_id": "t1_d",
+  "text": "광기 테스트",
+  "condition": "",
+  "show_mode": "",
+  "cost": "정신력 -999",
+  "effects": "stat:sanity-999",
+  "next_node": "t1_d"
+ },
+ {
+  "choice_id": "c_d7",
+  "node_id": "t1_d",
+  "text": "시간 초과 테스트",
+  "condition": "",
+  "show_mode": "",
+  "cost": "시간 -999",
+  "effects": "stat:time-999",
+  "next_node": "t1_d"
+ },
+ {
+  "choice_id": "c2_a1",
+  "node_id": "t2_a",
+  "text": "클리어",
+  "condition": "",
+  "show_mode": "",
+  "cost": "",
+  "effects": "",
+  "next_node": "END:end_t2_clear"
+ },
+ {
+  "choice_id": "c2_a2",
+  "node_id": "t2_a",
+  "text": "시간 초과 테스트",
+  "condition": "",
+  "show_mode": "",
+  "cost": "시간 -999",
+  "effects": "stat:time-999",
+  "next_node": "t2_a"
+ }
+]

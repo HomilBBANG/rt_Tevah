@@ -1,0 +1,22 @@
+[
+ {
+  "episode_id": "ep_test1",
+  "title": "테스트 에피소드 1",
+  "protagonist_id": "char_t1",
+  "start_node": "t1_intro",
+  "unlock_condition": "",
+  "timeout_node": "t1_timeout",
+  "death_ending": "end_t1_death",
+  "madness_ending": "end_t1_madness"
+ },
+ {
+  "episode_id": "ep_test2",
+  "title": "테스트 에피소드 2",
+  "protagonist_id": "char_t2",
+  "start_node": "t2_a",
+  "unlock_condition": "wflag:ep_test1_clear",
+  "timeout_node": "t2_timeout",
+  "death_ending": "end_t2_death",
+  "madness_ending": "end_t2_madness"
+ }
+]

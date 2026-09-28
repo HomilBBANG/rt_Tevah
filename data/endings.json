@@ -1,0 +1,53 @@
+[
+ {
+  "ending_id": "end_t1_clear",
+  "episode_id": "ep_test1",
+  "world_flags_set": [
+   "ep_test1_clear"
+  ]
+ },
+ {
+  "ending_id": "end_t1_good",
+  "episode_id": "ep_test1",
+  "world_flags_set": [
+   "ep_test1_clear"
+  ]
+ },
+ {
+  "ending_id": "end_t1_timeout",
+  "episode_id": "ep_test1",
+  "world_flags_set": []
+ },
+ {
+  "ending_id": "end_t1_death",
+  "episode_id": "ep_test1",
+  "world_flags_set": []
+ },
+ {
+  "ending_id": "end_t1_madness",
+  "episode_id": "ep_test1",
+  "world_flags_set": []
+ },
+ {
+  "ending_id": "end_t2_clear",
+  "episode_id": "ep_test2",
+  "world_flags_set": [
+   "ep_test2_clear"
+  ]
+ },
+ {
+  "ending_id": "end_t2_timeout",
+  "episode_id": "ep_test2",
+  "world_flags_set": []
+ },
+ {
+  "ending_id": "end_t2_death",
+  "episode_id": "ep_test2",
+  "world_flags_set": []
+ },
+ {
+  "ending_id": "end_t2_madness",
+  "episode_id": "ep_test2",
+  "world_flags_set": []
+ }
+]

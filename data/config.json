@@ -1,0 +1,9 @@
+{
+ "inventory_slots": 8,
+ "hp_start": 100,
+ "hp_max": 100,
+ "sanity_start": 100,
+ "sanity_max": 100,
+ "time_start": 120,
+ "time_max": 120
+}

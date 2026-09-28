@@ -1,0 +1,19 @@
+[
+ {
+  "char_id": "char_t1",
+  "name": "주인공 1",
+  "traits": [
+   "tester"
+  ]
+ },
+ {
+  "char_id": "char_t2",
+  "name": "주인공 2",
+  "traits": []
+ },
+ {
+  "char_id": "char_npc",
+  "name": "NPC 1",
+  "traits": []
+ }
+]
