@@ -436,7 +436,7 @@ def export(d):
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     for name, obj in out.items():
         (OUT_DIR / f"{name}.json").write_text(json.dumps(obj, ensure_ascii=False, indent=1) + "\n",
-                                              encoding="utf-8")
+                                              encoding="utf-8", newline="\n")
     return out
 
 
