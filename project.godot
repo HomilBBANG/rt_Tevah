@@ -13,6 +13,14 @@ config_version=5
 config/name="Tevah_STG"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
+run/main_scene="res://scenes/title.tscn"
+
+[autoload]
+
+DataLoader="*res://autoload/data_loader.gd"
+GameState="*res://autoload/game_state.gd"
+SaveManager="*res://autoload/save_manager.gd"
+StoryRunner="*res://autoload/story_runner.gd"
 
 [display]
 
