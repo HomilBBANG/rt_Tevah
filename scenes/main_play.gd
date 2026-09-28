@@ -109,8 +109,7 @@ func _show_page(p: Dictionary) -> void:
 	var is_dialogue: bool = p.kind == "dialogue"
 	%Bubble.visible = is_dialogue
 	%PrevBubble.visible = false
-	%PortraitLeft.visible = is_dialogue
-	%PortraitRight.visible = is_dialogue
+	%Portrait.visible = is_dialogue
 	match p.kind:
 		"situation":
 			%SituationText.text = p.text
@@ -139,7 +138,8 @@ func _show_page(p: Dictionary) -> void:
 
 
 func _show_dialogue(p: Dictionary) -> void:
-	# TODO(기획 확인): 주인공은 왼쪽, 그 밖의 화자는 오른쪽에 세운다.
+	# 주인공은 얼굴이 나오지 않는다: 주인공 대사는 왼쪽 꼬리 말풍선만, 상대는 오른쪽에 초상화와 함께.
+	# TODO(기획 확인): 주인공 외 화자가 둘 이상일 때는 오른쪽 자리에 마지막 화자만 세운다.
 	var protagonist: String = DataLoader.episodes.get(GameState.episode_id, {}).get("protagonist_id", "")
 	var side := "left" if p.speaker_id == protagonist else "right"
 	if side == "right":
@@ -150,8 +150,7 @@ func _show_dialogue(p: Dictionary) -> void:
 		_prev_line = _cur_line
 	_cur_line = line
 
-	%PortraitLeft.show_character(DataLoader.character_name(protagonist), side == "left")
-	%PortraitRight.show_character(DataLoader.character_name(_right_char), side == "right")
+	%Portrait.show_character(DataLoader.character_name(_right_char), side == "right")
 	_place(%Bubble, BUBBLE_X[side], BUBBLE_Y)
 	%Bubble.show_line(p.text, side, false, DataLoader.character_name(p.speaker_id), DataLoader.character_color(p.speaker_id))
 	if not _prev_line.is_empty():

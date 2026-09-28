@@ -53,17 +53,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="PortraitLeft" type="Control" parent="."]
-unique_name_in_owner = true
-visible = false
-layout_mode = 1
-anchor_left = 0.03
-anchor_top = 0.36
-anchor_right = 0.27
-anchor_bottom = 0.894
-script = ExtResource("4")
-
-[node name="PortraitRight" type="Control" parent="."]
+[node name="Portrait" type="Control" parent="."]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
