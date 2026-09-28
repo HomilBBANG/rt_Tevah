@@ -1,7 +1,29 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scenes/main_play.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/inventory.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://ui/letterbox.tscn" id="3"]
+[ext_resource type="Script" path="res://ui/portrait_slot.gd" id="4"]
+[ext_resource type="Script" path="res://ui/speech_bubble.gd" id="5"]
+
+[sub_resource type="StyleBoxFlat" id="situation_box"]
+content_margin_left = 26.0
+content_margin_top = 20.0
+content_margin_right = 26.0
+content_margin_bottom = 16.0
+bg_color = Color(0.949, 0.949, 0.949, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.12, 0.16, 0.2, 1)
+
+[sub_resource type="StyleBoxFlat" id="system_box"]
+content_margin_left = 26.0
+content_margin_top = 16.0
+content_margin_right = 26.0
+content_margin_bottom = 16.0
+bg_color = Color(0, 0, 0, 0.94)
 
 [node name="MainPlay" type="Control"]
 layout_mode = 3
@@ -12,66 +34,158 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="Margin" type="MarginContainer" parent="."]
+[node name="Scene" type="ColorRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 20
-theme_override_constants/margin_right = 32
-theme_override_constants/margin_bottom = 20
+mouse_filter = 2
+color = Color(0.105, 0.118, 0.157, 1)
 
-[node name="VBox" type="VBoxContainer" parent="Margin"]
+[node name="ClickCatcher" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PortraitLeft" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchor_left = 0.03
+anchor_top = 0.36
+anchor_right = 0.27
+anchor_bottom = 0.894
+script = ExtResource("4")
+
+[node name="PortraitRight" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchor_left = 0.73
+anchor_top = 0.36
+anchor_right = 0.97
+anchor_bottom = 0.894
+script = ExtResource("4")
+
+[node name="SituationBox" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchor_left = 0.305
+anchor_top = 0.667
+anchor_right = 0.705
+anchor_bottom = 0.88
+mouse_filter = 2
+theme_override_styles/panel = SubResource("situation_box")
+
+[node name="SituationText" type="Label" parent="SituationBox"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 12
+size_flags_vertical = 0
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 20
+autowrap_mode = 3
 
-[node name="TopBar" type="HBoxContainer" parent="Margin/VBox"]
+[node name="SystemBox" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchor_left = 0.305
+anchor_top = 0.667
+anchor_right = 0.705
+anchor_bottom = 0.88
+mouse_filter = 2
+theme_override_styles/panel = SubResource("system_box")
+
+[node name="SystemText" type="Label" parent="SystemBox"]
+unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
 
-[node name="Stats" type="Label" parent="Margin/VBox/TopBar"]
+[node name="PrevBubble" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchor_left = 0.266
+anchor_top = 0.485
+anchor_right = 0.676
+anchor_bottom = 0.635
+script = ExtResource("5")
+
+[node name="Bubble" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchor_left = 0.266
+anchor_top = 0.68
+anchor_right = 0.676
+anchor_bottom = 0.83
+script = ExtResource("5")
+
+[node name="Choices" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_left = 0.305
+anchor_top = 0.13
+anchor_right = 0.705
+anchor_bottom = 0.13
+theme_override_constants/separation = 6
+
+[node name="Letterbox" parent="." instance=ExtResource("3")]
+layout_mode = 1
+
+[node name="TopHud" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchor_left = 0.02
+anchor_right = 0.98
+anchor_bottom = 0.106
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="Stats" type="Label" parent="TopHud"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.72, 0.72, 0.72, 1)
+theme_override_font_sizes/font_size = 16
 
-[node name="InventoryButton" type="Button" parent="Margin/VBox/TopBar"]
+[node name="InventoryButton" type="Button" parent="TopHud"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_vertical = 4
+flat = true
 text = "인벤토리"
 
-[node name="MenuButton" type="Button" parent="Margin/VBox/TopBar"]
+[node name="MenuButton" type="Button" parent="TopHud"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_vertical = 4
+flat = true
 text = "에피소드 선택"
 
-[node name="HSeparator" type="HSeparator" parent="Margin/VBox"]
-layout_mode = 2
-
-[node name="Speaker" type="Label" parent="Margin/VBox"]
+[node name="AdvanceHint" type="Label" parent="."]
 unique_name_in_owner = true
-modulate = Color(1, 0.85, 0.55, 1)
-layout_mode = 2
-theme_override_font_sizes/font_size = 18
-
-[node name="Text" type="RichTextLabel" parent="Margin/VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_font_sizes/normal_font_size = 20
-selection_enabled = true
-
-[node name="Messages" type="Label" parent="Margin/VBox"]
-unique_name_in_owner = true
-modulate = Color(0.65, 0.85, 1, 1)
-layout_mode = 2
-autowrap_mode = 3
-
-[node name="Choices" type="VBoxContainer" parent="Margin/VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
+visible = false
+layout_mode = 1
+anchor_left = 0.7
+anchor_top = 0.894
+anchor_right = 0.98
+anchor_bottom = 1.0
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 15
+text = "클릭 또는 Space ▶"
+horizontal_alignment = 2
+vertical_alignment = 1
 
 [node name="Inventory" parent="." instance=ExtResource("2")]
 unique_name_in_owner = true

@@ -23,22 +23,27 @@ func _ready() -> void:
 	StoryRunner.prepare("ep_test1", false)
 	var play := _open("res://scenes/main_play.tscn")
 	await _frames(3)
-	await _snap("intro")
-	await _press(play, "계속")
-	await _snap("node_a")
+	await _snap("system_message")                  # 2페이지: 시스템 메시지 (도입 노드 on_enter 획득)
+	await _advance(play)
+	await _snap("situation")                       # 1페이지: 상황 묘사
+	await _advance(play)
+	await _snap("dialogue_npc_with_choices")       # 3페이지: 대화 (오른쪽 화자) + 선택지
 	await _press(play, "선택지 1 (일반)")
 	await _press(play, "탐색 (spot_b)  [시간 -10]")
+	await _advance(play)
 	await _snap("after_loot")
 	await _press(play, "잡동사니 9개 줍기 (인벤토리 초과)")
 	await _snap("inventory_full")
 	await _press(play, "잡동사니(테스트) 포기")
+	await _advance(play)
 	await _press(play, "인벤토리 (8/8)")
 	await _press(play, "칼(테스트) x1")
 	await _snap("inventory_browse")
 	await _press(play, "닫기")
 	await _press(play, "노드 A로")
-	await _snap("node_a_with_knife")
-	await _press(play, "선택지 4 (대가형)  [체력 -10, 시간 -10]")
+	await _press(play, "선택지 2 (칼 필요, gray)")
+	await _snap("dialogue_two_lines")              # 4페이지: 직전 대사 회색 + 새 대사
+	await _advance(play)
 	await _press(play, "정상 클리어")
 	await _snap("ending")
 	play.queue_free()
@@ -66,6 +71,11 @@ func _press(root: Node, text: String) -> void:
 		print("[ui_smoke] 비활성 버튼: " + text)
 	else:
 		b.pressed.emit()
+	await _frames(3)
+
+
+func _advance(play: Node) -> void:
+	play.advance()
 	await _frames(3)
 
 

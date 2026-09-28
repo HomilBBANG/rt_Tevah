@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scenes/title.gd" id="1"]
+[ext_resource type="PackedScene" path="res://ui/letterbox.tscn" id="2"]
 
 [node name="Title" type="Control"]
 layout_mode = 3
@@ -44,3 +45,6 @@ text = "시작"
 unique_name_in_owner = true
 layout_mode = 2
 text = "종료"
+
+[node name="Letterbox" parent="." instance=ExtResource("2")]
+layout_mode = 1

@@ -1,6 +1,14 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scenes/inventory.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="panel"]
+bg_color = Color(0.03, 0.03, 0.04, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.4, 0.4, 0.42, 1)
 
 [node name="Inventory" type="Control"]
 layout_mode = 3
@@ -30,6 +38,7 @@ grow_vertical = 2
 
 [node name="Panel" type="PanelContainer" parent="Center"]
 layout_mode = 2
+theme_override_styles/panel = SubResource("panel")
 
 [node name="Margin" type="MarginContainer" parent="Center/Panel"]
 layout_mode = 2
