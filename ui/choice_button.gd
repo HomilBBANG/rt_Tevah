@@ -1,5 +1,6 @@
 extends Button
 ## 선택지 버튼: "텍스트  [대가]" 표시, 조건 미충족이면 회색(비활성).
+## 종류 표시: item → "[아이템]", dice → "[판정 65%] … (능력치 A +4 · 목표 12)"
 
 
 func _init() -> void:
@@ -21,7 +22,15 @@ func _init() -> void:
 
 func setup(entry: Dictionary) -> void:
 	var c: Dictionary = entry.choice
-	text = c.text if c.cost == "" else "%s  [%s]" % [c.text, c.cost]
+	var label: String = c.text
+	match c.get("type", "normal"):
+		"item":
+			label = "[아이템] " + label
+		"dice":
+			var d: Dictionary = entry.dice
+			label = "[판정 %d%%] %s   (%s %s%d · 목표 %d)" % [roundi(d.chance * 100), label,
+				d.ability_name, "+" if d.mod >= 0 else "", d.mod, d.dc]
+	text = label if c.cost == "" else "%s  [%s]" % [label, c.cost]
 	disabled = not entry.enabled
 
 

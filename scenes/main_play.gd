@@ -2,6 +2,7 @@ extends Control
 ## 플레이 화면. 게임 로직 없음: StoryRunner·GameState 시그널을 그리고 입력만 돌려준다.
 ##
 ## 한 번의 행동 결과를 "페이지" 순서로 보여준다 (클릭/Space 로 넘김):
+##   dice      — 주사위 판정 연출 (굴리는 중에 클릭하면 바로 결과)
 ##   system    — 획득·버림 등 시스템 메시지 (검은 상자, 가운데 정렬)
 ##   situation — 화자 없는 노드 (밝은 상자)
 ##   dialogue  — 화자 있는 노드 (초상화 + 말풍선, 직전 대사는 회색으로 위에)
@@ -21,6 +22,7 @@ var _pages: Array = []          # [{kind, text, speaker_id}]
 var _page_i := -1
 var _choices: Array = []
 var _pending_msgs: PackedStringArray = []
+var _pending_dice := {}
 var _ended := false
 var _cur_line := {}             # 지금 말풍선의 대사 {text, speaker_id, side}
 var _prev_line := {}            # 직전 대사 (회색)
@@ -33,7 +35,10 @@ func _ready() -> void:
 	StoryRunner.node_shown.connect(_on_node_shown)
 	StoryRunner.choices_shown.connect(_on_choices_shown)
 	StoryRunner.message.connect(func(t): _pending_msgs.append(t))
-	StoryRunner.messages_cleared.connect(func(): _pending_msgs.clear())
+	StoryRunner.messages_cleared.connect(func():
+		_pending_msgs.clear()
+		_pending_dice = {})
+	StoryRunner.dice_rolled.connect(func(r): _pending_dice = r)
 	StoryRunner.ending_reached.connect(_on_ending)
 	StoryRunner.inventory_full.connect(%Inventory.open_discard)
 	GameState.stats_changed.connect(_update_status)
@@ -56,6 +61,9 @@ func _unhandled_input(event: InputEvent) -> void:
 ## 다음 페이지로. 마지막 페이지이고 선택지 없는 노드면 스토리를 진행.
 func advance() -> void:
 	if StoryRunner.busy or %Choices.get_child_count() > 0:
+		return
+	if %DicePanel.is_rolling:
+		%DicePanel.skip()
 		return
 	if _page_i < _pages.size() - 1:
 		_next_page()
@@ -94,6 +102,9 @@ func _on_ending(ending_id: String) -> void:
 
 
 func _flush_messages() -> void:
+	if not _pending_dice.is_empty():
+		_pages.append({"kind": "dice", "result": _pending_dice, "text": "", "speaker_id": ""})
+		_pending_dice = {}
 	if not _pending_msgs.is_empty():
 		_pages.append({"kind": "system", "text": "\n".join(_pending_msgs), "speaker_id": ""})
 		_pending_msgs.clear()
@@ -111,6 +122,7 @@ func _show_page(p: Dictionary) -> void:
 	_clear_choices()
 	%SituationBox.visible = p.kind == "situation"
 	%SystemBox.visible = p.kind == "system"
+	%DicePanel.visible = p.kind == "dice"
 	var is_dialogue: bool = p.kind == "dialogue"
 	%Bubble.visible = is_dialogue
 	%PrevBubble.visible = false
@@ -124,6 +136,8 @@ func _show_page(p: Dictionary) -> void:
 			_slots = ["", ""]
 		"system":
 			%SystemText.text = p.text
+		"dice":
+			%DicePanel.play(p.result)
 		"dialogue":
 			_show_dialogue(p)
 

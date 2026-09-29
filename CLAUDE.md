@@ -88,3 +88,16 @@ tools/
 - 작은 단계로 나눠 커밋: 변환 스크립트 → DataLoader → GameState → 조건·효과 파서(단위 테스트 포함) → StoryRunner → UI → 세이브.
 - 조건·효과 파서는 GDScript 테스트 씬이나 GUT로 케이스별 검증.
 - 기획상 모호한 부분은 임의로 정하지 말고 질문하거나 TODO로 남긴다.
+
+## 주사위 판정 (추가)
+로그라이크·주사위 중심 구조로 확장 중. 이번 범위는 **대화 선택지 3종 + d20 판정 + 보정**까지. 로그라이크 구조(런·영구 성장)는 기획이 정리되면 다음 단계.
+
+- 선택지 `type`: `normal`(주사위 없음) / `item`(주사위 없음, condition 의 `has:` 충족 시 반드시 성공) / `dice`
+- `dice` 판정: **d20 + 보정치 ≥ dc** 이면 성공. 성공 확률 = `(21 − (dc − 보정치)) / 20` 을 선택지에 표시.
+  - 성공 → `effects`·`next_node`, 실패 → `fail_effects`·`fail_next`
+- 보정치 = 능력치 + 소지 아이템 `dice_bonus` + 선택지 `mod`(상황 보정)
+  - 능력치: `Abilities` 시트(ability_id, name), 캐릭터별 기본값 `Characters.abilities` (`stat_a=3, stat_b=1`)
+  - 육성: 효과 `abil:stat_a+1` (에피소드 안에서 유지), 조건 `abil:stat_a>=3`
+  - 아이템: `Items.dice_bonus` (`stat_a+2` 또는 `all+1`), 소지 중이면 개수와 무관하게 1번 적용
+- 추가 열·시트는 모두 선택(없어도 변환됨). 변환기가 check/dc/실패 출구 누락과 없는 ability_id 를 오류로 잡는다.
+- 미정(TODO): 1·20 대실패/대성공, 능력치 영구 성장, 에피소드 간 인계.

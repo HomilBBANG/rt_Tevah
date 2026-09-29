@@ -1,10 +1,11 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scenes/main_play.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/inventory.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://ui/letterbox.tscn" id="3"]
 [ext_resource type="Script" path="res://ui/portrait_slot.gd" id="4"]
 [ext_resource type="Script" path="res://ui/speech_bubble.gd" id="5"]
+[ext_resource type="Script" path="res://ui/dice_panel.gd" id="6"]
 
 [sub_resource type="StyleBoxFlat" id="situation_box"]
 content_margin_left = 26.0
@@ -131,6 +132,16 @@ anchor_top = 0.68
 anchor_right = 0.676
 anchor_bottom = 0.83
 script = ExtResource("5")
+
+[node name="DicePanel" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchor_left = 0.3
+anchor_top = 0.2
+anchor_right = 0.7
+anchor_bottom = 0.64
+script = ExtResource("6")
 
 [node name="Choices" type="VBoxContainer" parent="."]
 unique_name_in_owner = true

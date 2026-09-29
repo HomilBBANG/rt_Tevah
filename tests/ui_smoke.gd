@@ -41,9 +41,19 @@ func _ready() -> void:
 	await _snap("inventory_browse")
 	await _press(play, "닫기")
 	await _press(play, "노드 A로")
-	await _press(play, "선택지 2 (칼 필요, gray)")
+	await _press(play, "[아이템] 선택지 2 (칼 필요, gray)")
 	await _snap("dialogue_two_lines")              # 4페이지: 직전 대사 회색 + 새 대사
 	await _advance(play)
+	await _press(play, "판정 테스트로")
+	await _snap("dice_choices")                    # 판정 선택지: 확률·보정 표시
+	StoryRunner.forced_rolls = [15]
+	await _press_prefix(play, "[판정")
+	await _snap("dice_rolling")
+	await get_tree().create_timer(1.2).timeout
+	await _snap("dice_result")
+	await _advance(play)
+	await _advance(play)
+	await _press(play, "노드 D로")
 	await _press(play, "정상 클리어")
 	await _snap("ending")
 	play.queue_free()
@@ -88,6 +98,14 @@ func _press(root: Node, text: String) -> void:
 func _advance(play: Node) -> void:
 	play.advance()
 	await _frames(3)
+
+
+func _press_prefix(root: Node, prefix: String) -> void:
+	for c in root.find_children("*", "Button", true, false):
+		if c.text.begins_with(prefix) and c.is_visible_in_tree():
+			await _press(root, c.text)
+			return
+	print("[ui_smoke] 버튼 없음: " + prefix + "…")
 
 
 func _find_button(root: Node, text: String) -> Button:
