@@ -116,6 +116,22 @@ func _run() -> void:
 	check(not last_dice.success and node_id == "t1_dice_fail" and GameState.get_stat("hp") == hp - 5,
 		"판정 실패: 7 + 4 = 11 < 12 → fail_effects·fail_next")
 	await StoryRunner.continue_story()
+	# 대성공·대실패: 판정 B (보정 -5, 목표 10) 는 20 이면 합계 15 여도 성공, 판정 A 는 1 이면 무조건 실패
+	StoryRunner.forced_rolls = [20]
+	await StoryRunner.choose("c_e2")
+	check(last_dice.success and last_dice.critical == "success" and node_id == "t1_dice_ok", "20 → 대성공")
+	await StoryRunner.continue_story()
+	StoryRunner.forced_rolls = [1]
+	await StoryRunner.choose("c_e1")
+	check(not last_dice.success and last_dice.critical == "fail" and node_id == "t1_dice_fail", "1 → 대실패")
+	await StoryRunner.continue_story()
+	StoryRunner.forced_rolls = [12]
+	await StoryRunner.choose("c_e1")
+	check(last_dice.success and last_dice.critical == "", "일반 판정은 critical 없음")
+	await StoryRunner.continue_story()
+	var impossible := StoryRunner.dice_preview({"check": "stat_a", "dc": 99, "mod": 0})
+	var certain := StoryRunner.dice_preview({"check": "stat_a", "dc": 1, "mod": 0})
+	check(is_equal_approx(impossible.chance, 0.05) and is_equal_approx(certain.chance, 0.95), "확률 5%~95% 로 제한")
 	await StoryRunner.choose("c_e3")
 	check(GameState.get_ability("stat_a") == 4 and _enabled("c_e4"), "능력치 성장 abil:stat_a+1 → 조건 충족")
 	check(is_equal_approx(_dice("c_e1").chance, 0.7), "성장 후 판정 A 70%")

@@ -17,7 +17,8 @@ signal messages_cleared
 signal ending_reached(ending_id: String)
 ## 인벤토리가 가득 참: UI는 버릴 칸을 고르게 하고 choose_discard(slot 또는 -1)을 호출해야 한다.
 signal inventory_full(item_id: String, amount: int)
-## 주사위 판정 결과 (dice_preview() 내용 + roll, total, success). 효과 적용 전에 발신.
+## 주사위 판정 결과 (dice_preview() 내용 + roll, total, success, critical). 효과 적용 전에 발신.
+## critical: "success"(20, 대성공) / "fail"(1, 대실패) / "" — 1·20 은 합계와 무관하게 결과가 정해진다.
 signal dice_rolled(result: Dictionary)
 signal _discard_chosen(slot: int)
 
@@ -81,7 +82,8 @@ func choose(choice_id: String) -> void:
 		var result := dice_preview(c)
 		result.roll = _roll()
 		result.total = result.roll + result.mod
-		result.success = result.total >= result.dc
+		result.critical = "success" if result.roll == DICE_SIDES else ("fail" if result.roll == 1 else "")
+		result.success = result.critical == "success" or (result.critical == "" and result.total >= result.dc)
 		dice_rolled.emit(result)
 		if not result.success:
 			effects = c.fail_effects
@@ -113,9 +115,9 @@ func dice_preview(c: Dictionary) -> Dictionary:
 	for p in parts:
 		mod += p.value
 	var dc := int(c.get("dc", 0))
-	# TODO(기획 확인): 1·20 대실패/대성공 규칙 없음. 필요하면 여기와 choose() 에 추가.
+	# 1(대실패)·20(대성공) 때문에 확률은 항상 1/20 ~ 19/20
 	var need := dc - mod   # 이 값 이상이 나와야 성공
-	var chance := clampf(float(DICE_SIDES + 1 - need) / DICE_SIDES, 0.0, 1.0)
+	var chance := clampf(float(DICE_SIDES + 1 - need) / DICE_SIDES, 1.0 / DICE_SIDES, (DICE_SIDES - 1.0) / DICE_SIDES)
 	return {"ability": ability, "ability_name": DataLoader.ability_name(ability), "dc": dc,
 		"mod": mod, "parts": parts, "chance": chance}
 

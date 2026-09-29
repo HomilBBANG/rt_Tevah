@@ -73,7 +73,10 @@ func _show_result() -> void:
 	for p in _result.parts:
 		line += "  %s  %s %d" % ["+" if p.value >= 0 else "−", p.label, absi(p.value)]
 	_detail.text = "%s   =   %d" % [line, _result.total]
-	_outcome.text = "성공" if _result.success else "실패"
+	match _result.get("critical", ""):
+		"success": _outcome.text = "대성공!"
+		"fail": _outcome.text = "대실패!"
+		_: _outcome.text = "성공" if _result.success else "실패"
 	_outcome.add_theme_color_override("font_color", SUCCESS_COLOR if _result.success else FAIL_COLOR)
 	queue_redraw()
 	finished.emit()

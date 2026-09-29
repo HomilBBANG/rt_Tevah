@@ -46,7 +46,7 @@ func _ready() -> void:
 	await _advance(play)
 	await _press(play, "판정 테스트로")
 	await _snap("dice_choices")                    # 판정 선택지: 확률·보정 표시
-	StoryRunner.forced_rolls = [15]
+	StoryRunner.forced_rolls = [20]
 	await _press_prefix(play, "[판정")
 	await _snap("dice_rolling")
 	await get_tree().create_timer(1.2).timeout
