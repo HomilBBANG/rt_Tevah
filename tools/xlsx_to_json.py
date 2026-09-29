@@ -19,6 +19,7 @@ OUT_DIR = ROOT / "data"
 
 STATS = {"hp", "sanity", "time"}
 SHOW_MODES = {"", "hide", "gray"}
+CHOICE_TYPES = {"", "normal", "item", "dice"}
 REQUIRED_CONFIG = ["inventory_slots", "hp_start", "hp_max", "sanity_start", "sanity_max", "time_start", "time_max"]
 
 # 시트 → (ID 열, 열 목록, 숫자 열 {이름: (타입, 기본값)})
@@ -35,15 +36,27 @@ SCHEMA = {
     "Characters": ("char_id", ["char_id", "name", "traits"], {}),
     "Endings": ("ending_id", ["ending_id", "episode_id", "world_flags_set"], {}),
     "Config": ("key", ["key", "value"], {"value": (float, None)}),
+    "Abilities": ("ability_id", ["ability_id", "name"], {}),
 }
+
+# 없어도 되는 시트 (없으면 빈 시트로 본다)
+OPTIONAL_SHEETS = {"Abilities"}
 
 # 없어도 되는 열 (시트에 없으면 빈 값으로 본다)
 OPTIONAL = {
-    "Characters": ["name_color"],   # 대화 이름표 색 (#RRGGBB). 비우면 기본색
+    "Characters": ["name_color",    # 대화 이름표 색 (#RRGGBB). 비우면 기본색
+                   "abilities"],    # 능력치 기본값 "stat_a=3, stat_b=1" (없는 능력치는 0)
+    "Items": ["dice_bonus"],        # 소지 시 판정 보정 "stat_a+2, all+1"
+    # 선택지 종류: normal(기본) / item / dice
+    # dice: check=능력치, dc=목표값, mod=상황 보정, 실패 시 fail_effects·fail_next
+    "Choices": ["type", "check", "dc", "mod", "fail_effects", "fail_next"],
 }
 
 ID_RE = re.compile(r"^[A-Za-z0-9_]+$")
 COLOR_RE = re.compile(r"^#?[0-9A-Fa-f]{6}$")
+INT_RE = re.compile(r"^-?\d+$")
+ABIL_VALUE_RE = re.compile(r"^([A-Za-z0-9_]+)\s*=\s*(-?\d+)$")
+BONUS_RE = re.compile(r"^([A-Za-z0-9_]+)\s*([+-]\d+)$")
 
 
 class Report:
@@ -56,7 +69,7 @@ class Report:
 
 # ---------------------------------------------------------------- 조건·효과 문법
 # 런타임 파서(core/expr.gd)와 같은 문법. 한쪽을 바꾸면 다른 쪽도 맞춰야 한다.
-ATOM_RE = re.compile(r"(has|flag|wflag|stat|trait):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\d+(?:\.\d+)?))?")
+ATOM_RE = re.compile(r"(has|flag|wflag|stat|trait|abil):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\d+(?:\.\d+)?))?")
 
 
 class ExprError(Exception):
@@ -84,6 +97,8 @@ def parse_condition(text):
                     raise ExprError(f"알 수 없는 스탯 '{ident}' (가능: {', '.join(sorted(STATS))})")
                 if not op:
                     raise ExprError(f"'{m.group(0)}': stat 조건에는 비교식이 필요 (예: stat:hp>=10)")
+            elif kind == "abil" and not op:
+                raise ExprError(f"'{m.group(0)}': abil 조건에는 비교식이 필요 (예: abil:stat_a>=3)")
             elif kind in ("flag", "wflag", "trait") and op:
                 raise ExprError(f"'{m.group(0)}': {kind} 조건에는 비교식을 쓸 수 없음")
             tokens.append((kind, ident))
@@ -139,6 +154,7 @@ def parse_condition(text):
 EFFECT_RES = [
     ("item", re.compile(r"^item:([+-])([A-Za-z0-9_]+)(?:\*(\d+))?$")),
     ("stat", re.compile(r"^stat:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
+    ("abil", re.compile(r"^abil:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
     ("simple", re.compile(r"^(setflag|clearflag|setwflag|loot|goto):([A-Za-z0-9_]+)$")),
 ]
 
@@ -161,6 +177,8 @@ def parse_effects(text):
             elif kind == "stat":
                 if m.group(1) not in STATS:
                     raise ExprError(f"'{e}': 알 수 없는 스탯 '{m.group(1)}'")
+            elif kind == "abil":
+                refs.append(("abil", m.group(1)))
             else:
                 refs.append((m.group(1), m.group(2)))
             break
@@ -187,7 +205,8 @@ def read_sheets(path, rep):
     data = {}
     for sheet, (id_col, cols, numeric) in SCHEMA.items():
         if sheet not in wb.sheetnames:
-            rep.err(sheet, "시트가 없음")
+            if sheet not in OPTIONAL_SHEETS:
+                rep.err(sheet, "시트가 없음")
             data[sheet] = []
             continue
         rows = list(wb[sheet].iter_rows(values_only=True))
@@ -253,7 +272,7 @@ def validate(d, rep):
 
     eps, nodes, choices = index("Episodes"), index("Nodes"), index("Choices")
     items, loots, chars, endings = index("Items"), index("Loot"), index("Characters"), index("Endings")
-    config = index("Config")
+    config, abils = index("Config"), index("Abilities")
     spots = {r["spot_id"] for r in d["Loot"] if r["spot_id"]}
     choices_by_node = {}
     for c in d["Choices"]:
@@ -265,6 +284,8 @@ def validate(d, rep):
                 rep.err(where, f"없는 item_id '{rid}'")
             elif kind == "has" and rid not in items:
                 rep.err(where, f"없는 item_id '{rid}'")
+            elif kind == "abil" and rid not in abils:
+                rep.err(where, f"없는 ability_id '{rid}' (Abilities 시트)")
             elif kind == "loot" and rid not in spots:
                 rep.err(where, f"없는 spot_id '{rid}' (Loot 시트)")
             elif kind == "goto":
@@ -291,6 +312,8 @@ def validate(d, rep):
             for kind, rid in parse_condition(text):
                 if kind == "has" and rid not in items:
                     rep.err(where, f"조건의 없는 item_id '{rid}'")
+                elif kind == "abil" and rid not in abils:
+                    rep.err(where, f"조건의 없는 ability_id '{rid}'")
         except ExprError as e:
             rep.err(where, f"조건 문법 오류: {e}")
 
@@ -317,6 +340,12 @@ def validate(d, rep):
         for t in split_list(c["traits"]):
             if not ID_RE.match(t):
                 rep.err(f"Characters {c['_row']}행", f"능력 이름 '{t}' 에는 영문·숫자·_ 만")
+        for a in split_list(c["abilities"]):
+            m = ABIL_VALUE_RE.match(a)
+            if not m:
+                rep.err(f"Characters {c['_row']}행", f"abilities 는 '능력치=숫자' 형식: '{a}'")
+            elif m.group(1) not in abils:
+                rep.err(f"Characters {c['_row']}행", f"없는 ability_id '{m.group(1)}'")
 
     # Items
     for it in d["Items"]:
@@ -324,6 +353,12 @@ def validate(d, rep):
         if it["stack_max"] is not None and it["stack_max"] < 1:
             rep.err(w, "stack_max 는 1 이상")
         check_effects(w, it["use_effects"], None)
+        for b in split_list(it["dice_bonus"]):
+            m = BONUS_RE.match(b)
+            if not m:
+                rep.err(w, f"dice_bonus 는 '능력치+숫자' 또는 'all+숫자' 형식: '{b}'")
+            elif m.group(1) != "all" and m.group(1) not in abils:
+                rep.err(w, f"dice_bonus 의 없는 ability_id '{m.group(1)}'")
 
     # Loot
     for lo in d["Loot"]:
@@ -394,6 +429,30 @@ def validate(d, rep):
             rep.err(w, f"show_mode 는 hide 또는 gray: '{c['show_mode']}'")
         check_cond(w, c["condition"])
         gotos = check_effects(w, c["effects"], ep)
+        ctype = c["type"]
+        if ctype not in CHOICE_TYPES:
+            rep.err(w, f"type 은 normal / item / dice: '{ctype}'")
+        if ctype == "item" and "has:" not in c["condition"]:
+            rep.err(w, "item 선택지는 condition 에 has:아이템 이 필요")
+        if c["mod"] and not INT_RE.match(c["mod"]):
+            rep.err(w, f"mod 는 정수: '{c['mod']}'")
+        if ctype == "dice":
+            if c["check"] not in abils:
+                rep.err(w, f"dice 선택지의 check 는 Abilities 의 ability_id: '{c['check']}'")
+            if not INT_RE.match(c["dc"]):
+                rep.err(w, f"dice 선택지의 dc(목표값)는 정수: '{c['dc']}'")
+            fail_gotos = check_effects(w + " fail_effects", c["fail_effects"], ep)
+            if c["fail_next"]:
+                check_target(w + " fail_next", c["fail_next"], ep)
+                if not c["fail_next"].startswith("END:"):
+                    edges[c["node_id"]].add(c["fail_next"])
+            elif not fail_gotos:
+                rep.err(w, "실패 출구 없음 (fail_next 도 fail_effects 의 goto 도 없음)")
+            edges[c["node_id"]].update(fail_gotos)
+        else:
+            for col in ("check", "dc", "mod", "fail_effects", "fail_next"):
+                if c[col]:
+                    rep.err(w, f"{col} 은 dice 선택지에서만 쓸 수 있음 (type='{ctype or 'normal'}')")
         if c["next_node"]:
             check_target(w + " next_node", c["next_node"], ep)
             if not c["next_node"].startswith("END:"):
@@ -431,13 +490,26 @@ def export(d):
     def clean(rows):
         return [{k: v for k, v in r.items() if k != "_row"} for r in rows]
 
+    def abil_values(text):
+        return {m.group(1): int(m.group(2)) for m in (ABIL_VALUE_RE.match(a) for a in split_list(text))}
+
+    def bonuses(text):
+        return [{"ability": m.group(1), "value": int(m.group(2))}
+                for m in (BONUS_RE.match(b) for b in split_list(text))]
+
+    def choice(r):
+        return dict(r, type=r["type"] or "normal", dc=int(r["dc"]) if r["dc"] else 0,
+                    mod=int(r["mod"]) if r["mod"] else 0)
+
     out = {
         "episodes": clean(d["Episodes"]),
         "nodes": clean(d["Nodes"]),
-        "choices": clean(d["Choices"]),
-        "items": clean(d["Items"]),
+        "choices": [choice(r) for r in clean(d["Choices"])],
+        "items": [dict(r, dice_bonus=bonuses(r["dice_bonus"])) for r in clean(d["Items"])],
         "loot": clean(d["Loot"]),
-        "characters": [dict(r, traits=split_list(r["traits"])) for r in clean(d["Characters"])],
+        "characters": [dict(r, traits=split_list(r["traits"]), abilities=abil_values(r["abilities"]))
+                       for r in clean(d["Characters"])],
+        "abilities": clean(d["Abilities"]),
         "endings": [dict(r, world_flags_set=split_list(r["world_flags_set"])) for r in clean(d["Endings"])],
         "config": {r["key"]: (int(r["value"]) if float(r["value"]).is_integer() else r["value"])
                    for r in d["Config"]},

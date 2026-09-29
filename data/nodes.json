@@ -78,5 +78,29 @@
   "text": "노드 N2 (NPC 2 대사)",
   "next_node": "t2_a",
   "on_enter": ""
+ },
+ {
+  "node_id": "t1_e",
+  "episode_id": "ep_test1",
+  "speaker_id": "",
+  "text": "노드 E (주사위 판정 테스트)",
+  "next_node": "",
+  "on_enter": ""
+ },
+ {
+  "node_id": "t1_dice_ok",
+  "episode_id": "ep_test1",
+  "speaker_id": "",
+  "text": "판정 성공 노드",
+  "next_node": "t1_e",
+  "on_enter": ""
+ },
+ {
+  "node_id": "t1_dice_fail",
+  "episode_id": "ep_test1",
+  "speaker_id": "",
+  "text": "판정 실패 노드",
+  "next_node": "t1_e",
+  "on_enter": ""
  }
 ]

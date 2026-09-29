@@ -1,0 +1,10 @@
+[
+ {
+  "ability_id": "stat_a",
+  "name": "능력치 A"
+ },
+ {
+  "ability_id": "stat_b",
+  "name": "능력치 B"
+ }
+]

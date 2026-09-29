@@ -5,7 +5,8 @@
   "type": "consumable",
   "description": "아이템 설명 1",
   "use_effects": "item:-bandage;stat:hp+20",
-  "stack_max": 5
+  "stack_max": 5,
+  "dice_bonus": []
  },
  {
   "item_id": "knife",
@@ -13,7 +14,13 @@
   "type": "tool",
   "description": "아이템 설명 2",
   "use_effects": "",
-  "stack_max": 1
+  "stack_max": 1,
+  "dice_bonus": [
+   {
+    "ability": "stat_a",
+    "value": 1
+   }
+  ]
  },
  {
   "item_id": "junk",
@@ -21,7 +28,8 @@
   "type": "junk",
   "description": "아이템 설명 3",
   "use_effects": "",
-  "stack_max": 1
+  "stack_max": 1,
+  "dice_bonus": []
  },
  {
   "item_id": "pill",
@@ -29,6 +37,7 @@
   "type": "consumable",
   "description": "아이템 설명 4",
   "use_effects": "item:-pill;stat:sanity+10",
-  "stack_max": 3
+  "stack_max": 3,
+  "dice_bonus": []
  }
 ]

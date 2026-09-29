@@ -7,7 +7,13 @@
   "show_mode": "",
   "cost": "",
   "effects": "",
-  "next_node": "t1_b"
+  "next_node": "t1_b",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_a2",
@@ -17,7 +23,13 @@
   "show_mode": "gray",
   "cost": "",
   "effects": "",
-  "next_node": "t1_c"
+  "next_node": "t1_c",
+  "type": "item",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_a3",
@@ -27,7 +39,13 @@
   "show_mode": "hide",
   "cost": "",
   "effects": "",
-  "next_node": "t1_c"
+  "next_node": "t1_c",
+  "type": "item",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_a4",
@@ -37,7 +55,13 @@
   "show_mode": "",
   "cost": "체력 -10, 시간 -10",
   "effects": "stat:hp-10;stat:time-10",
-  "next_node": "t1_d"
+  "next_node": "t1_d",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_b1",
@@ -47,7 +71,13 @@
   "show_mode": "",
   "cost": "시간 -10",
   "effects": "loot:spot_b",
-  "next_node": "t1_b"
+  "next_node": "t1_b",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_b2",
@@ -57,7 +87,13 @@
   "show_mode": "",
   "cost": "시간 -5",
   "effects": "loot:spot_empty",
-  "next_node": "t1_b"
+  "next_node": "t1_b",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_b3",
@@ -67,7 +103,13 @@
   "show_mode": "",
   "cost": "",
   "effects": "item:+junk*9",
-  "next_node": "t1_b"
+  "next_node": "t1_b",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_b4",
@@ -77,7 +119,13 @@
   "show_mode": "",
   "cost": "",
   "effects": "",
-  "next_node": "t1_a"
+  "next_node": "t1_a",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_d1",
@@ -87,7 +135,13 @@
   "show_mode": "",
   "cost": "",
   "effects": "",
-  "next_node": "END:end_t1_clear"
+  "next_node": "END:end_t1_clear",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_d2",
@@ -97,7 +151,13 @@
   "show_mode": "gray",
   "cost": "",
   "effects": "",
-  "next_node": "END:end_t1_good"
+  "next_node": "END:end_t1_good",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_d3",
@@ -107,7 +167,13 @@
   "show_mode": "hide",
   "cost": "",
   "effects": "item:+pill",
-  "next_node": "t1_d"
+  "next_node": "t1_d",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_d4",
@@ -117,7 +183,13 @@
   "show_mode": "gray",
   "cost": "체력 +5",
   "effects": "stat:hp+5",
-  "next_node": "t1_d"
+  "next_node": "t1_d",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_d5",
@@ -127,7 +199,13 @@
   "show_mode": "",
   "cost": "체력 -999",
   "effects": "stat:hp-999",
-  "next_node": "t1_d"
+  "next_node": "t1_d",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_d6",
@@ -137,7 +215,13 @@
   "show_mode": "",
   "cost": "정신력 -999",
   "effects": "stat:sanity-999",
-  "next_node": "t1_d"
+  "next_node": "t1_d",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c_d7",
@@ -147,7 +231,13 @@
   "show_mode": "",
   "cost": "시간 -999",
   "effects": "stat:time-999",
-  "next_node": "t1_d"
+  "next_node": "t1_d",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c2_a1",
@@ -157,7 +247,13 @@
   "show_mode": "",
   "cost": "",
   "effects": "",
-  "next_node": "END:end_t2_clear"
+  "next_node": "END:end_t2_clear",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  },
  {
   "choice_id": "c2_a2",
@@ -167,6 +263,108 @@
   "show_mode": "",
   "cost": "시간 -999",
   "effects": "stat:time-999",
-  "next_node": "t2_a"
+  "next_node": "t2_a",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
+ },
+ {
+  "choice_id": "c_d8",
+  "node_id": "t1_d",
+  "text": "판정 테스트로",
+  "condition": "",
+  "show_mode": "",
+  "cost": "",
+  "effects": "",
+  "next_node": "t1_e",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
+ },
+ {
+  "choice_id": "c_e1",
+  "node_id": "t1_e",
+  "text": "판정 A (능력치 A, 목표 12)",
+  "condition": "",
+  "show_mode": "",
+  "cost": "",
+  "effects": "setflag:dice_ok",
+  "next_node": "t1_dice_ok",
+  "type": "dice",
+  "check": "stat_a",
+  "dc": 12,
+  "mod": 0,
+  "fail_effects": "stat:hp-5",
+  "fail_next": "t1_dice_fail"
+ },
+ {
+  "choice_id": "c_e2",
+  "node_id": "t1_e",
+  "text": "판정 B (능력치 B, 목표 10, 상황 보정 -5)",
+  "condition": "",
+  "show_mode": "",
+  "cost": "",
+  "effects": "",
+  "next_node": "t1_dice_ok",
+  "type": "dice",
+  "check": "stat_b",
+  "dc": 10,
+  "mod": -5,
+  "fail_effects": "",
+  "fail_next": "t1_dice_fail"
+ },
+ {
+  "choice_id": "c_e3",
+  "node_id": "t1_e",
+  "text": "능력치 A 성장 (+1)",
+  "condition": "",
+  "show_mode": "",
+  "cost": "",
+  "effects": "abil:stat_a+1",
+  "next_node": "t1_e",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
+ },
+ {
+  "choice_id": "c_e4",
+  "node_id": "t1_e",
+  "text": "능력치 조건 (abil:stat_a>=4)",
+  "condition": "abil:stat_a>=4",
+  "show_mode": "gray",
+  "cost": "",
+  "effects": "",
+  "next_node": "t1_e",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
+ },
+ {
+  "choice_id": "c_e5",
+  "node_id": "t1_e",
+  "text": "노드 D로",
+  "condition": "",
+  "show_mode": "",
+  "cost": "",
+  "effects": "",
+  "next_node": "t1_d",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  }
 ]
