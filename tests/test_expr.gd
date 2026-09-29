@@ -12,9 +12,11 @@ class FakeCtx:
 	var flags := ["door_open"]
 	var wflags := ["ep1_clear"]
 	var traits := ["medic"]
+	var abilities := {"stat_a": 3}
 
 	func item_count(id: String) -> int: return items.get(id, 0)
 	func get_stat(name: String) -> int: return stats.get(name, 0)
+	func get_ability(id: String) -> int: return abilities.get(id, 0)
 	func has_flag(name: String) -> bool: return name in flags
 	func has_wflag(name: String) -> bool: return name in wflags
 	func has_trait(name: String) -> bool: return name in traits
@@ -45,6 +47,9 @@ func _ready() -> void:
 	cond(ctx, "stat:hp>-1", true)
 	cond(ctx, "trait:medic", true)
 	cond(ctx, "trait:hacker", false)
+	cond(ctx, "abil:stat_a>=3", true)
+	cond(ctx, "abil:stat_a>3", false)
+	cond(ctx, "abil:unknown==0", true)
 	# --- 조건: 연산자
 	cond(ctx, "!has:rope", true)
 	cond(ctx, "!!has:rope", false)
@@ -71,6 +76,7 @@ func _ready() -> void:
 	cond_err(ctx, "has:knife flag:door_open")
 	cond_err(ctx, "has:knife-1")
 	cond_err(ctx, "!")
+	cond_err(ctx, "abil:stat_a")
 
 	# --- 효과
 	eff("item:+bandage", [{"type": "item", "id": "bandage", "amount": 1}], 0)
@@ -82,6 +88,10 @@ func _ready() -> void:
 	eff("setflag:x; clearflag:y ;setwflag:z", [
 		{"type": "setflag", "id": "x"}, {"type": "clearflag", "id": "y"}, {"type": "setwflag", "id": "z"}], 0)
 	eff("loot:spot_1;goto:node_2", [{"type": "loot", "id": "spot_1"}, {"type": "goto", "id": "node_2"}], 0)
+	eff("abil:stat_a+1;abil:stat_b=4", [
+		{"type": "abil", "ability": "stat_a", "op": "+", "value": 1},
+		{"type": "abil", "ability": "stat_b", "op": "=", "value": 4}], 0)
+	eff("abil:stat_a", [], 1)
 	eff("", [], 0)
 	eff(";;", [], 0)
 	eff("item:+", [], 1)

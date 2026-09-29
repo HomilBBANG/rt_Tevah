@@ -1,6 +1,7 @@
 extends Node
 ## 게임 상태: 스탯·인벤토리·에피소드 플래그(에피소드마다 초기화)와 월드 플래그(영구).
-## 조건 해석기(core/expr.gd)의 컨텍스트 역할도 한다: item_count / get_stat / has_flag / has_wflag / has_trait.
+## 조건 해석기(core/expr.gd)의 컨텍스트 역할도 한다:
+## item_count / get_stat / get_ability / has_flag / has_wflag / has_trait.
 
 signal stats_changed
 signal inventory_changed
@@ -15,6 +16,7 @@ var stats := {}               # name -> int
 var inventory: Array = []     # 칸 목록: [{ "id": String, "count": int }, ...]
 var ep_flags := {}            # name -> true
 var traits: Array = []        # 현재 주인공 능력
+var abilities := {}           # 주사위 능력치 ability_id -> int (주인공 기본값 + 에피소드 중 성장)
 var timed_out := false        # 시간 초과 노드로 이미 보냈는지 (중복 이동 방지)
 
 # --- 월드 상태 (월드 파일에 저장)
@@ -31,7 +33,12 @@ func reset_for_episode(ep: Dictionary) -> void:
 	inventory = []
 	ep_flags = {}
 	timed_out = false
-	traits = DataLoader.characters.get(ep.protagonist_id, {}).get("traits", [])
+	var protagonist: Dictionary = DataLoader.characters.get(ep.protagonist_id, {})
+	traits = protagonist.get("traits", [])
+	# TODO(기획 확인): 능력치 성장은 에피소드 안에서만 유지. 영구 성장(로그라이크)은 다음 단계.
+	abilities = {}
+	for id in protagonist.get("abilities", {}):
+		abilities[id] = int(protagonist.abilities[id])
 	stats_changed.emit()
 	inventory_changed.emit()
 	flags_changed.emit()
@@ -57,6 +64,22 @@ func change_stat(name: String, op: String, value: int) -> void:
 		"-": v -= value
 		"=": v = value
 	stats[name] = clampi(v, 0, stat_max(name))
+	stats_changed.emit()
+
+
+# ---------------------------------------------------------------- 능력치
+func get_ability(id: String) -> int:
+	return int(abilities.get(id, 0))
+
+
+## op: "+", "-", "="
+func change_ability(id: String, op: String, value: int) -> void:
+	var v := get_ability(id)
+	match op:
+		"+": v += value
+		"-": v -= value
+		"=": v = value
+	abilities[id] = v
 	stats_changed.emit()
 
 
@@ -155,6 +178,7 @@ func episode_to_dict() -> Dictionary:
 		"stats": stats.duplicate(),
 		"inventory": inventory.duplicate(true),
 		"ep_flags": ep_flags.keys(),
+		"abilities": abilities.duplicate(),
 		"timed_out": timed_out,
 	}
 
@@ -172,6 +196,9 @@ func episode_from_dict(d: Dictionary) -> void:
 	for f in d.get("ep_flags", []):
 		ep_flags[f] = true
 	timed_out = d.get("timed_out", false)
+	var saved_abilities: Dictionary = d.get("abilities", {})
+	for id in saved_abilities:
+		abilities[id] = int(saved_abilities[id])
 	stats_changed.emit()
 	inventory_changed.emit()
 	flags_changed.emit()

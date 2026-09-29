@@ -8,6 +8,7 @@ var node_id := ""
 var entries: Array = []
 var messages: Array[String] = []
 var ending := ""
+var last_dice := {}
 var discard_answers: Array[int] = []
 var full_events := 0
 
@@ -24,6 +25,7 @@ func _ready() -> void:
 	StoryRunner.message.connect(func(t): messages.append(t))
 	StoryRunner.messages_cleared.connect(func(): messages.clear())
 	StoryRunner.ending_reached.connect(func(id): ending = id)
+	StoryRunner.dice_rolled.connect(func(r): last_dice = r)
 	StoryRunner.inventory_full.connect(_on_full)
 	await _run()
 	SaveManager.delete_all()
@@ -94,6 +96,35 @@ func _run() -> void:
 	check(GameState.item_count("pill") == 0 and node_id == "t1_d", "알약 사용 → 소모")
 	check(not _enabled("c_d4"), "알약 소모 후 복합조건 다시 비활성")
 
+	# ---------- 주사위 판정 (칼 소지 중: 능력치 A 3 + 칼 1)
+	await StoryRunner.choose("c_d8")
+	check(node_id == "t1_e", "판정 테스트 노드")
+	var d1 := _dice("c_e1")
+	check(d1.mod == 4 and d1.parts.size() == 2 and is_equal_approx(d1.chance, 0.65),
+		"판정 A 미리보기: 보정 +4 (능력치 3 + 칼 1), 성공 65%% (%s)" % [d1])
+	var d2 := _dice("c_e2")
+	check(d2.mod == -5 and is_equal_approx(d2.chance, 0.3), "판정 B 미리보기: 상황 보정 -5, 성공 30%% (%s)" % [d2])
+	check(not _enabled("c_e4"), "abil 조건 (능력치 A >= 4) 비활성")
+	StoryRunner.forced_rolls = [8]
+	await StoryRunner.choose("c_e1")
+	check(last_dice.roll == 8 and last_dice.total == 12 and last_dice.success, "판정 성공: 8 + 4 = 12 >= 12")
+	check(node_id == "t1_dice_ok" and GameState.has_flag("dice_ok"), "성공 → effects·next_node")
+	await StoryRunner.continue_story()
+	var hp := GameState.get_stat("hp")
+	StoryRunner.forced_rolls = [7]
+	await StoryRunner.choose("c_e1")
+	check(not last_dice.success and node_id == "t1_dice_fail" and GameState.get_stat("hp") == hp - 5,
+		"판정 실패: 7 + 4 = 11 < 12 → fail_effects·fail_next")
+	await StoryRunner.continue_story()
+	await StoryRunner.choose("c_e3")
+	check(GameState.get_ability("stat_a") == 4 and _enabled("c_e4"), "능력치 성장 abil:stat_a+1 → 조건 충족")
+	check(is_equal_approx(_dice("c_e1").chance, 0.7), "성장 후 판정 A 70%")
+	var snap := GameState.episode_to_dict()
+	GameState.reset_for_episode(DataLoader.episodes.ep_test1)
+	StoryRunner.prepare("ep_test1", true)
+	await StoryRunner.launch()
+	check(GameState.get_ability("stat_a") == 4 and GameState.episode_to_dict() == snap, "능력치 성장 저장·재개")
+
 	# ---------- 대가형 · 사망
 	await _fresh_to_d()
 	check(GameState.get_stat("hp") == 90 and GameState.get_stat("time") == 110, "대가형 선택지 (체력·시간 -10)")
@@ -136,6 +167,13 @@ func _fresh_to_d() -> void:
 	await StoryRunner.start_episode("ep_test1")
 	await StoryRunner.continue_story()
 	await StoryRunner.choose("c_a4")
+
+
+func _dice(choice_id: String) -> Dictionary:
+	for e in entries:
+		if e.choice.choice_id == choice_id:
+			return e.get("dice", {})
+	return {}
 
 
 func _ids() -> Array:

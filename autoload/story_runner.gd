@@ -7,7 +7,8 @@ const WorldContext = preload("res://core/world_context.gd")
 
 ## 노드 표시: node(Dictionary), 화자 이름
 signal node_shown(node: Dictionary, speaker_name: String)
-## 선택지 목록: [{ "choice": Dictionary, "enabled": bool }] — hide 조건 미충족은 빠져 있음.
+## 선택지 목록: [{ "choice": Dictionary, "enabled": bool, "dice": Dictionary }] — hide 조건 미충족은 빠져 있음.
+## dice 는 type=dice 선택지에만 있음 (dice_preview() 결과).
 ## 선택지가 없는 노드면 빈 배열 (UI는 '계속' 버튼을 띄운다)
 signal choices_shown(entries: Array)
 ## 시스템 메시지 (획득·버림 등)
@@ -16,9 +17,15 @@ signal messages_cleared
 signal ending_reached(ending_id: String)
 ## 인벤토리가 가득 참: UI는 버릴 칸을 고르게 하고 choose_discard(slot 또는 -1)을 호출해야 한다.
 signal inventory_full(item_id: String, amount: int)
+## 주사위 판정 결과 (dice_preview() 내용 + roll, total, success). 효과 적용 전에 발신.
+signal dice_rolled(result: Dictionary)
 signal _discard_chosen(slot: int)
 
+const DICE_SIDES := 20
+
 var busy := false    # 효과 처리 중 (입력 무시)
+## 테스트용: 비어 있지 않으면 주사위 대신 앞에서부터 꺼내 쓴다.
+var forced_rolls: Array[int] = []
 var ended := false
 
 var _pending_episode := ""
@@ -68,11 +75,55 @@ func choose(choice_id: String) -> void:
 		return
 	busy = true
 	messages_cleared.emit()
-	var redirect := await _apply_effects(Expr.parse_effects(c.effects))
+	var effects: String = c.effects
+	var next: String = c.next_node
+	if c.get("type", "normal") == "dice":
+		var result := dice_preview(c)
+		result.roll = _roll()
+		result.total = result.roll + result.mod
+		result.success = result.total >= result.dc
+		dice_rolled.emit(result)
+		if not result.success:
+			effects = c.fail_effects
+			next = c.fail_next
+	var redirect := await _apply_effects(Expr.parse_effects(effects))
 	if not ended:
 		var forced := _check_stats()
-		await _goto(forced if forced != "" else (redirect if redirect != "" else c.next_node))
+		await _goto(forced if forced != "" else (redirect if redirect != "" else next))
 	busy = false
+
+
+## dice 선택지의 판정 정보: 능력치, 목표값, 보정치 내역, 성공 확률.
+## { ability, ability_name, dc, mod, parts: [{label, value}], chance: 0.0~1.0 }
+func dice_preview(c: Dictionary) -> Dictionary:
+	var ability: String = c.get("check", "")
+	var parts := []
+	parts.append({"label": DataLoader.ability_name(ability), "value": GameState.get_ability(ability)})
+	var seen := {}
+	for slot in GameState.inventory:
+		if seen.has(slot.id):
+			continue
+		seen[slot.id] = true
+		for b in DataLoader.items.get(slot.id, {}).get("dice_bonus", []):
+			if b.ability == ability or b.ability == "all":
+				parts.append({"label": DataLoader.item_name(slot.id), "value": int(b.value)})
+	if int(c.get("mod", 0)) != 0:
+		parts.append({"label": "상황", "value": int(c.mod)})
+	var mod := 0
+	for p in parts:
+		mod += p.value
+	var dc := int(c.get("dc", 0))
+	# TODO(기획 확인): 1·20 대실패/대성공 규칙 없음. 필요하면 여기와 choose() 에 추가.
+	var need := dc - mod   # 이 값 이상이 나와야 성공
+	var chance := clampf(float(DICE_SIDES + 1 - need) / DICE_SIDES, 0.0, 1.0)
+	return {"ability": ability, "ability_name": DataLoader.ability_name(ability), "dc": dc,
+		"mod": mod, "parts": parts, "chance": chance}
+
+
+func _roll() -> int:
+	if not forced_rolls.is_empty():
+		return forced_rolls.pop_front()
+	return randi_range(1, DICE_SIDES)
 
 
 ## 선택지 없는 노드에서 '계속'
@@ -184,7 +235,10 @@ func _show_current() -> void:
 		var mode: String = c.show_mode if c.show_mode != "" else "gray"
 		if not ok and mode == "hide":
 			continue
-		entries.append({"choice": c, "enabled": ok})
+		var entry := {"choice": c, "enabled": ok}
+		if c.get("type", "normal") == "dice":
+			entry.dice = dice_preview(c)
+		entries.append(entry)
 	choices_shown.emit(entries)
 
 
@@ -210,6 +264,9 @@ func _apply_effects(effects: Array) -> String:
 						push_warning("[StoryRunner] %s 를 %d개 빼려 했으나 %d개만 있었음" % [e.id, -e.amount, removed])
 			"stat":
 				GameState.change_stat(e.stat, e.op, e.value)
+			"abil":
+				GameState.change_ability(e.ability, e.op, e.value)
+				message.emit("%s %s%d" % [DataLoader.ability_name(e.ability), "" if e.op == "=" else e.op, e.value])
 			"setflag":
 				GameState.set_flag(e.id, true)
 			"clearflag":

@@ -11,6 +11,7 @@ var items := {}            # item_id -> Dictionary
 var loot_by_spot := {}     # spot_id -> Array[Dictionary]
 var characters := {}       # char_id -> Dictionary
 var endings := {}          # ending_id -> Dictionary
+var abilities := {}        # ability_id -> Dictionary
 var config := {}           # key -> number
 
 
@@ -27,6 +28,7 @@ func load_all() -> void:
 	loot_by_spot.clear()
 	characters.clear()
 	endings.clear()
+	abilities.clear()
 
 	for ep in _read_list("episodes"):
 		episodes[ep.episode_id] = ep
@@ -50,6 +52,9 @@ func load_all() -> void:
 		characters[ch.char_id] = ch
 	for en in _read_list("endings"):
 		endings[en.ending_id] = en
+	if FileAccess.file_exists(DATA_DIR + "abilities.json"):
+		for ab in _read_list("abilities"):
+			abilities[ab.ability_id] = ab
 	var cfg = _read("config")
 	config = cfg if cfg is Dictionary else {}
 
@@ -67,6 +72,10 @@ func character_name(char_id: String) -> String:
 ## 대화 이름표 색 (#RRGGBB). 지정 안 됐으면 ""
 func character_color(char_id: String) -> String:
 	return characters.get(char_id, {}).get("name_color", "")
+
+
+func ability_name(ability_id: String) -> String:
+	return abilities.get(ability_id, {}).get("name", ability_id)
 
 
 func item_name(item_id: String) -> String:
