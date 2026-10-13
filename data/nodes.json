@@ -102,5 +102,45 @@
   "text": "판정 실패 노드",
   "next_node": "t1_e",
   "on_enter": ""
+ },
+ {
+  "node_id": "fd_npc1_a",
+  "episode_id": "",
+  "speaker_id": "char_npc",
+  "text": "필드 대화 노드 1 (NPC 1)",
+  "next_node": "",
+  "on_enter": ""
+ },
+ {
+  "node_id": "fd_npc1_b",
+  "episode_id": "",
+  "speaker_id": "char_t1",
+  "text": "필드 대화 노드 2 (주인공)",
+  "next_node": "EXIT",
+  "on_enter": ""
+ },
+ {
+  "node_id": "fd_npc1_fail",
+  "episode_id": "",
+  "speaker_id": "char_npc",
+  "text": "필드 대화 노드 3 (판정 실패)",
+  "next_node": "EXIT",
+  "on_enter": ""
+ },
+ {
+  "node_id": "fd_npc2_a",
+  "episode_id": "",
+  "speaker_id": "char_npc2",
+  "text": "필드 대화 노드 4 (NPC 2)",
+  "next_node": "",
+  "on_enter": ""
+ },
+ {
+  "node_id": "fd_npc2_b",
+  "episode_id": "",
+  "speaker_id": "char_npc2",
+  "text": "필드 대화 노드 5 (flag:showed_knife 일 때만)",
+  "next_node": "EXIT",
+  "on_enter": ""
  }
 ]

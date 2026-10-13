@@ -24,6 +24,20 @@
   ],
   "objects": [
    {
+    "object_id": "fo_npc1",
+    "map_id": "test_field",
+    "marker": "n",
+    "type": "npc",
+    "ref": "fd_npc1_a",
+    "name": "NPC 1",
+    "text": "",
+    "patrol": "",
+    "x": 10,
+    "y": 1,
+    "patrol_dir": "",
+    "patrol_len": 0
+   },
+   {
     "object_id": "fo_enemy1",
     "map_id": "test_field",
     "marker": "a",
@@ -64,6 +78,20 @@
     "y": 8,
     "patrol_dir": "down",
     "patrol_len": 3
+   },
+   {
+    "object_id": "fo_npc2",
+    "map_id": "test_field",
+    "marker": "m",
+    "type": "npc",
+    "ref": "fd_npc2_a",
+    "name": "NPC 2",
+    "text": "",
+    "patrol": "",
+    "x": 10,
+    "y": 9,
+    "patrol_dir": "",
+    "patrol_len": 0
    },
    {
     "object_id": "fo_look2",

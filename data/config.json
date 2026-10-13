@@ -18,5 +18,6 @@
  "field_enemy_chase_speed": 3.2,
  "field_enemy_sight": 5,
  "field_enemy_lose_sight": 8,
- "field_flee_grace": 3
+ "field_flee_grace": 3,
+ "protagonist_id": "char_t1"
 }

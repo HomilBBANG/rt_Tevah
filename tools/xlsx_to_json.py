@@ -36,7 +36,7 @@ SCHEMA = {
              {"amount": (int, 1), "chance": (float, 100.0), "time_cost": (int, 0)}),
     "Characters": ("char_id", ["char_id", "name", "traits"], {}),
     "Endings": ("ending_id", ["ending_id", "episode_id", "world_flags_set"], {}),
-    "Config": ("key", ["key", "value"], {"value": (float, None)}),
+    "Config": ("key", ["key", "value"], {}),   # 값은 숫자 또는 문자열(예: protagonist_id)
     "Abilities": ("ability_id", ["ability_id", "name"], {}),
     # ---- 전투 (기획서 §7–9)
     "PlayerParts": ("part_id", ["part_id", "name", "key", "hp", "vital"], {"hp": (int, None)}),
@@ -52,7 +52,7 @@ SCHEMA = {
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
 OPTIONAL_SHEETS = {"Abilities", "PlayerParts", "Enemies", "EnemyParts", "EnemyAttacks", "FieldObjects"}
-FIELD_TYPES = {"enemy", "investigate"}
+FIELD_TYPES = {"enemy", "investigate", "npc"}
 PATROL_RE = re.compile(r"^(up|down|left|right)\s+(\d+)$")
 MAP_FIXED = {"#", ".", " ", "P"}   # 벽 / 바닥 / 빈칸(벽 취급) / 시작 위치
 # ID 중복 검사를 여러 열 조합으로 하는 시트
@@ -72,6 +72,7 @@ OPTIONAL = {
 }
 
 ID_RE = re.compile(r"^[A-Za-z0-9_]+$")
+EXIT = "EXIT"   # 필드 대화 끝 → 필드로 복귀
 COLOR_RE = re.compile(r"^#?[0-9A-Fa-f]{6}$")
 INT_RE = re.compile(r"^-?\d+$")
 ABIL_VALUE_RE = re.compile(r"^([A-Za-z0-9_]+)\s*=\s*(-?\d+)$")
@@ -313,18 +314,24 @@ def validate(d, rep):
                 check_target(where, rid, episode, allow_end=False)
 
     def check_target(where, target, episode, allow_end=True):
+        if target == EXIT:
+            if episode != "" or not allow_end:
+                rep.err(where, "EXIT 는 필드 대화(episode_id 가 빈 노드)의 next_node·fail_next 에서만")
+            return
         if target.startswith("END:"):
             eid = target[4:]
-            if not allow_end:
+            if episode == "":
+                rep.err(where, f"필드 대화에서는 END: 대신 EXIT 로 대화를 끝낸다 ('{target}')")
+            elif not allow_end:
                 rep.err(where, f"goto 에는 END: 를 쓸 수 없음 ('{target}'), next_node 를 쓸 것")
             elif eid not in endings:
                 rep.err(where, f"없는 ending_id '{eid}'")
-            elif episode and endings[eid]["episode_id"] != episode:
+            elif episode is not None and endings[eid]["episode_id"] != episode:
                 rep.err(where, f"엔딩 '{eid}' 는 다른 에피소드({endings[eid]['episode_id']}) 소속")
         elif target not in nodes:
             rep.err(where, f"없는 node_id '{target}'")
-        elif episode and nodes[target]["episode_id"] != episode:
-            rep.err(where, f"노드 '{target}' 는 다른 에피소드({nodes[target]['episode_id']}) 소속")
+        elif episode is not None and nodes[target]["episode_id"] != episode:
+            rep.err(where, f"노드 '{target}' 는 {_scope(nodes[target]['episode_id'])} 소속 (여기는 {_scope(episode)})")
 
     def check_cond(where, text):
         if not text:
@@ -353,6 +360,13 @@ def validate(d, rep):
     for key in REQUIRED_CONFIG:
         if key not in config:
             rep.err("Config", f"키 없음: {key}")
+        elif not is_number(config[key]["value"]):
+            rep.err("Config", f"{key} 는 숫자여야 함: '{config[key]['value']}'")
+    for key, r in config.items():
+        if r["value"] == "":
+            rep.err(f"Config {r['_row']}행", f"{key} 값이 비어 있음")
+    if "protagonist_id" in config and config["protagonist_id"]["value"] not in chars:
+        rep.err("Config", f"protagonist_id 는 Characters 의 char_id: '{config['protagonist_id']['value']}'")
 
     # Characters
     for c in d["Characters"]:
@@ -429,7 +443,7 @@ def validate(d, rep):
         nid = n["node_id"]
         w = f"Nodes {n['_row']}행 ({nid})"
         ep = n["episode_id"]
-        if ep not in eps:
+        if ep != "" and ep not in eps:
             rep.err(w, f"없는 episode_id '{ep}'")
         if n["speaker_id"] and n["speaker_id"] not in chars:
             rep.err(w, f"없는 speaker_id '{n['speaker_id']}'")
@@ -439,7 +453,7 @@ def validate(d, rep):
             if not n["next_node"].startswith("END:"):
                 out.add(n["next_node"])
         elif nid not in choices_by_node and not out:
-            rep.err(w, "출구 없음 (선택지·next_node·END 모두 없음)")
+            rep.err(w, "출구 없음 (선택지·next_node·END/EXIT 모두 없음)")
         edges[nid] = out
 
     for c in d["Choices"]:
@@ -493,11 +507,14 @@ def validate(d, rep):
         except ExprError:
             pass
 
-    # 도달성: 에피소드 시작 노드 + 시간 초과 노드에서 BFS
+    # 도달성: 에피소드 시작 노드 + 시간 초과 노드, 필드 대화는 FieldObjects 의 npc 시작 노드에서 BFS
     reached = set()
-    for ep in d["Episodes"]:
-        q = deque(x for x in (ep["start_node"], ep["timeout_node"]) if x in nodes)
-        q.extend(g for g in item_gotos if g in nodes and nodes[g]["episode_id"] == ep["episode_id"])
+    roots = [[ep["start_node"], ep["timeout_node"]] +
+             [g for g in item_gotos if g in nodes and nodes[g]["episode_id"] == ep["episode_id"]]
+             for ep in d["Episodes"]]
+    roots.append([o["ref"] for o in d["FieldObjects"] if o["type"] == "npc"])
+    for root in roots:
+        q = deque(x for x in root if x in nodes)
         while q:
             nid = q.popleft()
             if nid in reached:
@@ -505,8 +522,28 @@ def validate(d, rep):
             reached.add(nid)
             q.extend(x for x in edges.get(nid, ()) if x in nodes)
     for n in d["Nodes"]:
-        if n["node_id"] not in reached and n["episode_id"] in eps:
-            rep.err(f"Nodes {n['_row']}행 ({n['node_id']})", "시작 노드에서 도달할 수 없음")
+        if n["node_id"] not in reached and (n["episode_id"] in eps or n["episode_id"] == ""):
+            rep.err(f"Nodes {n['_row']}행 ({n['node_id']})",
+                    "시작 노드에서 도달할 수 없음" if n["episode_id"] else "어떤 NPC(FieldObjects)에서도 도달할 수 없는 필드 대화")
+
+
+def _scope(episode):
+    return "필드 대화" if episode == "" else f"에피소드 {episode}"
+
+
+def is_number(text):
+    try:
+        float(text)
+        return True
+    except ValueError:
+        return False
+
+
+def config_value(text):
+    if not is_number(text):
+        return text
+    v = float(text)
+    return int(v) if v.is_integer() else v
 
 
 def is_true(text):
@@ -583,6 +620,7 @@ def read_maps(rep):
 
 def validate_field(d, maps, rep, enemies):
     spots = {r["spot_id"] for r in d["Loot"] if r["spot_id"]}
+    nodes = {n["node_id"]: n for n in d["Nodes"]}
     for mid, m in maps.items():
         starts = sum(ln.count("P") for ln in m["lines"])
         if starts != 1:
@@ -601,9 +639,11 @@ def validate_field(d, maps, rep, enemies):
             if n != 1:
                 rep.err(w, f"맵 {m['file']} 에 marker '{mk}' 가 정확히 1개여야 함 (지금 {n}개)")
         if o["type"] not in FIELD_TYPES:
-            rep.err(w, f"type 은 enemy / investigate: '{o['type']}'")
+            rep.err(w, f"type 은 enemy / investigate / npc: '{o['type']}'")
         elif o["type"] == "enemy" and o["ref"] not in enemies:
             rep.err(w, f"enemy 의 ref 는 Enemies 의 enemy_id: '{o['ref']}'")
+        elif o["type"] == "npc" and (o["ref"] not in nodes or nodes[o["ref"]]["episode_id"] != ""):
+            rep.err(w, f"npc 의 ref 는 필드 대화 시작 노드 (Nodes 에서 episode_id 를 비운 노드): '{o['ref']}'")
         elif o["type"] == "investigate" and o["ref"] and o["ref"] not in spots:
             rep.err(w, f"investigate 의 ref 는 Loot 의 spot_id (없으면 비움): '{o['ref']}'")
         if o["patrol"]:
@@ -678,8 +718,7 @@ def export(d, maps):
                     for e in clean(d["Enemies"])],
         "maps": export_maps(d, maps),
         "endings": [dict(r, world_flags_set=split_list(r["world_flags_set"])) for r in clean(d["Endings"])],
-        "config": {r["key"]: (int(r["value"]) if float(r["value"]).is_integer() else r["value"])
-                   for r in d["Config"]},
+        "config": {r["key"]: config_value(r["value"]) for r in d["Config"]},
     }
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     for name, obj in out.items():
