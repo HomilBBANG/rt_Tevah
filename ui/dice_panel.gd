@@ -24,16 +24,16 @@ func _init() -> void:
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(PRESET_FULL_RECT)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", 17)
 	box.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(box)
 	resized.connect(queue_redraw)
-	_title = _label(box, 20, Color("dddddd"))
-	_die = _label(box, 64, Color.WHITE)
-	_die.custom_minimum_size = Vector2(0, 110)
+	_title = _label(box, 33, Color("dddddd"))
+	_die = _label(box, 107, Color.WHITE)
+	_die.custom_minimum_size = Vector2(0, 183)
 	_die.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_detail = _label(box, 18, Color("bbbbbb"))
-	_outcome = _label(box, 28, Color.WHITE)
+	_detail = _label(box, 30, Color("bbbbbb"))
+	_outcome = _label(box, 47, Color.WHITE)
 
 
 func play(result: Dictionary) -> void:
@@ -85,17 +85,17 @@ func _show_result() -> void:
 func _draw() -> void:
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0, 0, 0, 0.9)
-	bg.set_corner_radius_all(10)
+	bg.set_corner_radius_all(17)
 	bg.border_color = Color("555555")
-	bg.set_border_width_all(1)
+	bg.set_border_width_all(2)
 	draw_style_box(bg, Rect2(Vector2.ZERO, size))
 	# 주사위 칸
-	var die_size := 96.0
+	var die_size := 160.0
 	var center := _die.get_global_rect().get_center() - get_global_rect().position
 	var die := StyleBoxFlat.new()
 	die.bg_color = Color(0.16, 0.16, 0.18)
-	die.set_corner_radius_all(14)
-	die.set_border_width_all(2)
+	die.set_corner_radius_all(23)
+	die.set_border_width_all(3)
 	die.border_color = Color("888888") if is_rolling or _result.is_empty() else \
 		(SUCCESS_COLOR if _result.success else FAIL_COLOR)
 	draw_style_box(die, Rect2(center - Vector2(die_size, die_size) / 2, Vector2(die_size, die_size)))

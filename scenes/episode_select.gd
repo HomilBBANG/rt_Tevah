@@ -16,7 +16,7 @@ func _build() -> void:
 	for id in DataLoader.episode_order:
 		var ep: Dictionary = DataLoader.episodes[id]
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
+		row.add_theme_constant_override("separation", 13)
 		var label := Label.new()
 		label.text = ep.title
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL

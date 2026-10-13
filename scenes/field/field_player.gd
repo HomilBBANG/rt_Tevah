@@ -2,7 +2,7 @@ extends CharacterBody2D
 ## 탐험 중 플레이어 (아트 전 placeholder: 원 + 바라보는 방향 표시)
 
 var field: Node          # field.gd
-var radius := 14.0
+var radius := 23.0
 var speed := 192.0
 var facing := Vector2.DOWN
 
@@ -21,5 +21,5 @@ func _physics_process(_delta: float) -> void:
 
 func _draw() -> void:
 	draw_circle(Vector2.ZERO, radius, Color("e8dcc8"))
-	draw_circle(Vector2.ZERO, radius, Color("3a3a3a"), false, 2.0, true)
-	draw_line(Vector2.ZERO, facing * radius * 0.9, Color("3a3a3a"), 3.0, true)
+	draw_circle(Vector2.ZERO, radius, Color("3a3a3a"), false, 3.0, true)
+	draw_line(Vector2.ZERO, facing * radius * 0.9, Color("3a3a3a"), 5.0, true)

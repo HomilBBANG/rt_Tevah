@@ -8,22 +8,22 @@
 [ext_resource type="Script" path="res://ui/dice_panel.gd" id="6"]
 
 [sub_resource type="StyleBoxFlat" id="situation_box"]
-content_margin_left = 26.0
-content_margin_top = 20.0
-content_margin_right = 26.0
-content_margin_bottom = 16.0
+content_margin_left = 43.0
+content_margin_top = 33.0
+content_margin_right = 43.0
+content_margin_bottom = 27.0
 bg_color = Color(0.949, 0.949, 0.949, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
 border_color = Color(0.12, 0.16, 0.2, 1)
 
 [sub_resource type="StyleBoxFlat" id="system_box"]
-content_margin_left = 26.0
-content_margin_top = 16.0
-content_margin_right = 26.0
-content_margin_bottom = 16.0
+content_margin_left = 43.0
+content_margin_top = 27.0
+content_margin_right = 43.0
+content_margin_bottom = 27.0
 bg_color = Color(0, 0, 0, 0.94)
 
 [node name="MainPlay" type="Control"]
@@ -90,7 +90,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 0
 theme_override_colors/font_color = Color(0, 0, 0, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 33
 autowrap_mode = 3
 
 [node name="SystemBox" type="PanelContainer" parent="."]
@@ -108,7 +108,7 @@ theme_override_styles/panel = SubResource("system_box")
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 33
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
@@ -150,7 +150,7 @@ anchor_left = 0.305
 anchor_top = 0.13
 anchor_right = 0.705
 anchor_bottom = 0.13
-theme_override_constants/separation = 6
+theme_override_constants/separation = 10
 
 [node name="Letterbox" parent="." instance=ExtResource("3")]
 layout_mode = 1
@@ -160,7 +160,7 @@ layout_mode = 1
 anchor_left = 0.02
 anchor_right = 0.98
 anchor_bottom = 0.106
-theme_override_constants/separation = 8
+theme_override_constants/separation = 13
 alignment = 1
 
 [node name="Stats" type="Label" parent="TopHud"]
@@ -168,7 +168,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.72, 0.72, 0.72, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 27
 
 [node name="InventoryButton" type="Button" parent="TopHud"]
 unique_name_in_owner = true
@@ -193,7 +193,7 @@ anchor_top = 0.894
 anchor_right = 0.98
 anchor_bottom = 1.0
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 25
 text = "클릭 또는 Space ▶"
 horizontal_alignment = 2
 vertical_alignment = 1

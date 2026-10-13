@@ -21,13 +21,13 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="VBox" type="VBoxContainer" parent="Center"]
-custom_minimum_size = Vector2(320, 0)
+custom_minimum_size = Vector2(533, 0)
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 27
 
 [node name="TitleLabel" type="Label" parent="Center/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 53
 text = "Tevah"
 horizontal_alignment = 1
 
@@ -50,7 +50,7 @@ text = "이어하기"
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 23
 horizontal_alignment = 1
 
 [node name="HSeparator" type="HSeparator" parent="Center/VBox"]
@@ -59,7 +59,7 @@ layout_mode = 2
 [node name="TestLabel" type="Label" parent="Center/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 23
 text = "프로토타입 테스트"
 horizontal_alignment = 1
 

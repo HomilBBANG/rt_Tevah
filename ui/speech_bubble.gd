@@ -4,7 +4,7 @@ extends Control
 
 const FILL := Color("f2f2f2")
 const DIM_FILL := Color("808080")
-const RADIUS := 16
+const RADIUS := 27
 const DEFAULT_NAME_COLOR := Color("f2f2f2")
 
 var tail_side := "left"
@@ -17,24 +17,24 @@ func _init() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 	_label = Label.new()
 	_label.set_anchors_preset(PRESET_FULL_RECT)
-	_label.offset_left = 36
-	_label.offset_top = 22
-	_label.offset_right = -24
-	_label.offset_bottom = -12
+	_label.offset_left = 60
+	_label.offset_top = 37
+	_label.offset_right = -40
+	_label.offset_bottom = -20
 	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label.add_theme_color_override("font_color", Color.BLACK)
-	_label.add_theme_font_size_override("font_size", 20)
+	_label.add_theme_font_size_override("font_size", 33)
 	add_child(_label)
 
 	_name = Label.new()
 	_name.anchor_right = 1.0
-	_name.offset_top = -20
-	_name.offset_bottom = 12
-	_name.offset_left = 22
-	_name.offset_right = -22
-	_name.add_theme_font_size_override("font_size", 24)
+	_name.offset_top = -33
+	_name.offset_bottom = 20
+	_name.offset_left = 37
+	_name.offset_right = -37
+	_name.add_theme_font_size_override("font_size", 40)
 	_name.add_theme_color_override("font_outline_color", Color(0.08, 0.08, 0.08))
-	_name.add_theme_constant_override("outline_size", 8)
+	_name.add_theme_constant_override("outline_size", 13)
 	add_child(_name)
 
 
@@ -63,7 +63,7 @@ func _draw() -> void:
 	if tail_side == "none":
 		return
 	elif tail_side == "left":
-		tail = [Vector2(1, 18), Vector2(-22, 6), Vector2(1, 42)]
+		tail = [Vector2(2, 30), Vector2(-37, 10), Vector2(2, 70)]
 	else:
-		tail = [Vector2(w - 1, 18), Vector2(w + 22, 6), Vector2(w - 1, 42)]
+		tail = [Vector2(w - 2, 30), Vector2(w + 37, 10), Vector2(w - 2, 70)]
 	draw_colored_polygon(tail, fill)

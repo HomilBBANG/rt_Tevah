@@ -79,14 +79,14 @@ func _draw() -> void:
 		var fill := Color(0.12, 0.12, 0.13) if p.broken else Color(0.32, 0.30, 0.30).lerp(Color(0.55, 0.16, 0.16), 1.0 - ratio)
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = fill
-		sb.set_corner_radius_all(6)
-		sb.set_border_width_all(1)
+		sb.set_corner_radius_all(10)
+		sb.set_border_width_all(2)
 		sb.border_color = Color("777777")
 		if id == highlight:
-			sb.set_border_width_all(4)
+			sb.set_border_width_all(7)
 			sb.border_color = HIGHLIGHT
 		elif id == _hover:
-			sb.set_border_width_all(3)
+			sb.set_border_width_all(5)
 			sb.border_color = Color.WHITE
 		elif selectable and not p.broken:
 			sb.border_color = Color("cccccc")
@@ -94,12 +94,12 @@ func _draw() -> void:
 		var lines := [p.name, "절단" if p.broken and not p.get("vital", false) else ("파괴" if p.broken else "%d/%d" % [p.hp, p.max_hp])]
 		if show_hit_chance and not p.broken:
 			lines.append("명중 %d%%" % roundi(p.hit_chance))
-		var fs := 15
-		var y := r.get_center().y - (lines.size() * (fs + 2)) / 2.0 + fs
+		var fs := 25
+		var y := r.get_center().y - (lines.size() * (fs + 3)) / 2.0 + fs
 		for line in lines:
 			var tw := _font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 			draw_string(_font, Vector2(r.get_center().x - tw / 2.0, y), line, HORIZONTAL_ALIGNMENT_LEFT, -1, fs,
 				Color("777777") if p.broken else Color.WHITE)
-			y += fs + 2
+			y += fs + 3
 		if p.broken:
-			draw_line(r.position + Vector2(6, 6), r.end - Vector2(6, 6), Color("884444"), 2)
+			draw_line(r.position + Vector2(10, 10), r.end - Vector2(10, 10), Color("884444"), 3)

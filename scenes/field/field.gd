@@ -403,8 +403,8 @@ func _show_sleep_picker(a: Dictionary) -> void:
 	%CampActions.add_child(q)
 	var grid := GridContainer.new()
 	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 6)
-	grid.add_theme_constant_override("v_separation", 6)
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
 	for h in range(1, DataLoader.get_config_int("sleep_max_hours", 12) + 1):
 		var b := ChoiceButton.new()
 		b.text = "%d시간" % h

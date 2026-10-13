@@ -12,7 +12,7 @@
  "combat_defend_mult": 0.5,
  "combat_flee_chance": 50,
  "combat_feint_switch": 0.55,
- "field_tile": 48,
+ "field_tile": 80,
  "field_player_speed": 4,
  "field_enemy_speed": 2,
  "field_enemy_chase_speed": 3.2,

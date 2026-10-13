@@ -48,7 +48,7 @@ func _refresh() -> void:
 	for i in GameState.slot_count():
 		var b := Button.new()
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.custom_minimum_size = Vector2(200, 34)
+		b.custom_minimum_size = Vector2(333, 57)
 		if i < inv.size():
 			b.text = "%s%s x%d" % ["▶ " if i == _selected else "", DataLoader.item_name(inv[i].id), inv[i].count]
 			b.pressed.connect(_on_slot.bind(i))

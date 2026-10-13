@@ -6,8 +6,8 @@ extends Button
 func _init() -> void:
 	alignment = HORIZONTAL_ALIGNMENT_LEFT
 	autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	custom_minimum_size.y = 34
-	add_theme_font_size_override("font_size", 17)
+	custom_minimum_size.y = 57
+	add_theme_font_size_override("font_size", 28)
 	add_theme_color_override("font_color", Color("eeeeee"))
 	add_theme_color_override("font_hover_color", Color.WHITE)
 	add_theme_color_override("font_focus_color", Color.WHITE)
@@ -38,9 +38,9 @@ func _box(bg: Color, border: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
 	sb.border_color = border
-	sb.set_border_width_all(1)
-	sb.content_margin_left = 14
-	sb.content_margin_right = 14
-	sb.content_margin_top = 5
-	sb.content_margin_bottom = 5
+	sb.set_border_width_all(2)
+	sb.content_margin_left = 23
+	sb.content_margin_right = 23
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
 	return sb

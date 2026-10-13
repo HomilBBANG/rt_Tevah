@@ -13,12 +13,12 @@ func _init() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 	_label = Label.new()
 	_label.set_anchors_preset(PRESET_BOTTOM_WIDE)
-	_label.offset_top = -40
-	_label.offset_bottom = -12
+	_label.offset_top = -67
+	_label.offset_bottom = -20
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.add_theme_font_size_override("font_size", 18)
+	_label.add_theme_font_size_override("font_size", 30)
 	_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	_label.add_theme_constant_override("outline_size", 6)
+	_label.add_theme_constant_override("outline_size", 10)
 	add_child(_label)
 
 

@@ -5,7 +5,7 @@ extends CharacterBody2D
 
 var field: Node          # field.gd
 var data := {}           # FieldObjects 행 + x, y
-var radius := 15.0
+var radius := 25.0
 var patrol_speed := 96.0
 var chase_speed := 154.0
 var sight := 240.0
@@ -72,11 +72,11 @@ func _draw() -> void:
 	# 시야 범위 (외워서 피할 수 있도록 보여 줌)
 	if state != "chase":
 		draw_circle(Vector2.ZERO, sight, Color(1, 0.3, 0.3, 0.06))
-		draw_arc(Vector2.ZERO, sight, 0, TAU, 64, Color(1, 0.3, 0.3, 0.18), 1.0, true)
+		draw_arc(Vector2.ZERO, sight, 0, TAU, 64, Color(1, 0.3, 0.3, 0.18), 2.0, true)
 	var col := Color("b84a4a") if grace == 0.0 else Color("6a5050")
 	draw_circle(Vector2.ZERO, radius, col)
-	draw_circle(Vector2.ZERO, radius, Color("2a1010"), false, 2.0, true)
+	draw_circle(Vector2.ZERO, radius, Color("2a1010"), false, 3.0, true)
 	if state == "chase":
 		var f := ThemeDB.fallback_font
-		draw_string_outline(f, Vector2(-5, -radius - 6), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, 5, Color.BLACK)
-		draw_string(f, Vector2(-5, -radius - 6), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color("ff6a4a"))
+		draw_string_outline(f, Vector2(-8, -radius - 10), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, 40, 8, Color.BLACK)
+		draw_string(f, Vector2(-8, -radius - 10), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, 40, Color("ff6a4a"))

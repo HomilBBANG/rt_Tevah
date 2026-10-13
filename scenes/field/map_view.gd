@@ -19,7 +19,7 @@ func _draw() -> void:
 			var r := Rect2(x * tile, y * tile, tile, tile)
 			if row[x] == "#":
 				draw_rect(r, WALL)
-				draw_rect(r, WALL_EDGE, false, 1.0)
+				draw_rect(r, WALL_EDGE, false, 2.0)
 			else:
 				draw_rect(r, FLOOR if (x + y) % 2 == 0 else FLOOR_ALT)
 	for s in spots:
@@ -28,10 +28,10 @@ func _draw() -> void:
 			"camp":
 				var k := tile * 0.36
 				draw_colored_polygon(PackedVector2Array([c + Vector2(0, -k), c + Vector2(k, k * 0.8), c + Vector2(-k, k * 0.8)]), Color("5fae6a"))
-				draw_line(c + Vector2(0, -k), c + Vector2(0, k * 0.8), Color("2c5a33"), 2.0)
+				draw_line(c + Vector2(0, -k), c + Vector2(0, k * 0.8), Color("2c5a33"), 3.0)
 			"exit":
 				draw_rect(Rect2(c - Vector2(tile * 0.3, tile * 0.42), Vector2(tile * 0.6, tile * 0.84)), Color("8a6a44"))
-				draw_circle(c + Vector2(tile * 0.16, 0), 3.0, Color("e8d0a0"))
+				draw_circle(c + Vector2(tile * 0.16, 0), 5.0, Color("e8d0a0"))
 			_:
 				var k := tile * 0.18
 				var pts := PackedVector2Array([c + Vector2(0, -k), c + Vector2(k, 0), c + Vector2(0, k), c + Vector2(-k, 0)])
