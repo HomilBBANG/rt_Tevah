@@ -37,10 +37,23 @@ SCHEMA = {
     "Endings": ("ending_id", ["ending_id", "episode_id", "world_flags_set"], {}),
     "Config": ("key", ["key", "value"], {"value": (float, None)}),
     "Abilities": ("ability_id", ["ability_id", "name"], {}),
+    # ---- 전투 (기획서 §7–9)
+    "PlayerParts": ("part_id", ["part_id", "name", "key", "hp", "vital"], {"hp": (int, None)}),
+    "Enemies": ("enemy_id", ["enemy_id", "name"], {}),
+    "EnemyParts": ("part_id", ["enemy_id", "part_id", "name", "hp", "hit_chance", "vital"],
+                   {"hp": (int, None), "hit_chance": (float, None)}),
+    "EnemyAttacks": ("attack_id", ["attack_id", "enemy_id", "name", "part", "pattern", "targets", "windup",
+                                   "damage", "weight"],
+                     {"windup": (float, None), "damage": (int, None), "weight": (int, 1)}),
 }
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
-OPTIONAL_SHEETS = {"Abilities"}
+OPTIONAL_SHEETS = {"Abilities", "PlayerParts", "Enemies", "EnemyParts", "EnemyAttacks"}
+# ID 중복 검사를 여러 열 조합으로 하는 시트
+DUP_KEYS = {"EnemyParts": ("enemy_id", "part_id")}
+DODGE_KEYS = {"W", "A", "S", "D"}
+ATTACK_PATTERNS = {"normal", "quick", "combo", "feint"}
+TRUE_WORDS = {"y", "yes", "true", "1", "o", "v"}
 
 # 없어도 되는 열 (시트에 없으면 빈 값으로 본다)
 OPTIONAL = {
@@ -263,7 +276,7 @@ def validate(d, rep):
         id_col = SCHEMA[sheet][0]
         seen = {}
         for r in d[sheet]:
-            rid = r[id_col]
+            rid = tuple(r[c] for c in DUP_KEYS[sheet]) if sheet in DUP_KEYS else r[id_col]
             if rid in seen:
                 rep.err(f"{sheet} {r['_row']}행", f"ID 중복 '{rid}' ({seen[rid]['_row']}행과 겹침)")
             else:
@@ -273,6 +286,8 @@ def validate(d, rep):
     eps, nodes, choices = index("Episodes"), index("Nodes"), index("Choices")
     items, loots, chars, endings = index("Items"), index("Loot"), index("Characters"), index("Endings")
     config, abils = index("Config"), index("Abilities")
+    pparts, enemies, eparts, eattacks = index("PlayerParts"), index("Enemies"), index("EnemyParts"), \
+        index("EnemyAttacks")
     spots = {r["spot_id"] for r in d["Loot"] if r["spot_id"]}
     choices_by_node = {}
     for c in d["Choices"]:
@@ -359,6 +374,9 @@ def validate(d, rep):
                 rep.err(w, f"dice_bonus 는 '능력치+숫자' 또는 'all+숫자' 형식: '{b}'")
             elif m.group(1) != "all" and m.group(1) not in abils:
                 rep.err(w, f"dice_bonus 의 없는 ability_id '{m.group(1)}'")
+
+    # 전투
+    validate_combat(d, rep, pparts, enemies, eparts)
 
     # Loot
     for lo in d["Loot"]:
@@ -485,6 +503,66 @@ def validate(d, rep):
             rep.err(f"Nodes {n['_row']}행 ({n['node_id']})", "시작 노드에서 도달할 수 없음")
 
 
+def is_true(text):
+    return str(text).strip().lower() in TRUE_WORDS
+
+
+def parse_strikes(pattern, targets):
+    """공격 대상 → [{telegraph, target}]. combo: 'head,torso' / feint: 'torso>head' (전조 → 실제)."""
+    if pattern == "feint":
+        a, _, b = targets.partition(">")
+        return [{"telegraph": a.strip(), "target": b.strip()}]
+    return [{"telegraph": t, "target": t} for t in split_list(targets)]
+
+
+def validate_combat(d, rep, pparts, enemies, eparts):
+    if d["PlayerParts"]:
+        if not any(is_true(p["vital"]) for p in d["PlayerParts"]):
+            rep.err("PlayerParts", "vital(파괴 시 사망) 부위가 하나 이상 필요")
+    for p in d["PlayerParts"]:
+        w = f"PlayerParts {p['_row']}행 ({p['part_id']})"
+        if p["key"].upper() not in DODGE_KEYS:
+            rep.err(w, f"key 는 W/A/S/D: '{p['key']}'")
+        if p["hp"] is not None and p["hp"] < 1:
+            rep.err(w, "hp 는 1 이상")
+    for p in d["EnemyParts"]:
+        w = f"EnemyParts {p['_row']}행 ({p['enemy_id']}.{p['part_id']})"
+        if p["enemy_id"] not in enemies:
+            rep.err(w, f"없는 enemy_id '{p['enemy_id']}'")
+        if p["hp"] is not None and p["hp"] < 1:
+            rep.err(w, "hp 는 1 이상")
+        if p["hit_chance"] is not None and not (0 <= p["hit_chance"] <= 100):
+            rep.err(w, "hit_chance 는 0~100 (%)")
+    for e in d["Enemies"]:
+        own = [p for p in d["EnemyParts"] if p["enemy_id"] == e["enemy_id"]]
+        if not any(is_true(p["vital"]) for p in own):
+            rep.err(f"Enemies {e['_row']}행 ({e['enemy_id']})", "vital(파괴 시 사망) 부위가 하나 이상 필요")
+        if not any(a["enemy_id"] == e["enemy_id"] for a in d["EnemyAttacks"]):
+            rep.err(f"Enemies {e['_row']}행 ({e['enemy_id']})", "공격(EnemyAttacks)이 하나도 없음")
+    for a in d["EnemyAttacks"]:
+        w = f"EnemyAttacks {a['_row']}행 ({a['attack_id']})"
+        if a["enemy_id"] not in enemies:
+            rep.err(w, f"없는 enemy_id '{a['enemy_id']}'")
+        if a["part"] and (a["enemy_id"], a["part"]) not in eparts:
+            rep.err(w, f"part '{a['part']}' 는 {a['enemy_id']} 의 EnemyParts 에 없음")
+        if a["pattern"] not in ATTACK_PATTERNS:
+            rep.err(w, f"pattern 은 normal / quick / combo / feint: '{a['pattern']}'")
+            continue
+        if a["pattern"] == "feint" and ">" not in a["targets"]:
+            rep.err(w, "feint 의 targets 는 '전조부위>실제부위' 형식 (예: torso>head)")
+            continue
+        strikes = parse_strikes(a["pattern"], a["targets"])
+        if not strikes:
+            rep.err(w, "targets 가 비어 있음")
+        if a["pattern"] in ("normal", "quick") and len(strikes) > 1:
+            rep.err(w, "여러 부위를 연속으로 치려면 pattern 을 combo 로")
+        for t in dict.fromkeys(x for st in strikes for x in (st["telegraph"], st["target"])):
+            if t not in pparts:
+                rep.err(w, f"targets 의 없는 PlayerParts part_id '{t}'")
+        if a["windup"] is not None and a["windup"] <= 0:
+            rep.err(w, "windup(전조 시간, 초)은 0보다 커야 함")
+
+
 # ---------------------------------------------------------------- 출력
 def export(d):
     def clean(rows):
@@ -510,6 +588,13 @@ def export(d):
         "characters": [dict(r, traits=split_list(r["traits"]), abilities=abil_values(r["abilities"]))
                        for r in clean(d["Characters"])],
         "abilities": clean(d["Abilities"]),
+        "player_parts": [dict(r, key=r["key"].upper(), vital=is_true(r["vital"])) for r in clean(d["PlayerParts"])],
+        "enemies": [dict(e,
+                         parts=[dict(p, vital=is_true(p["vital"])) for p in clean(d["EnemyParts"])
+                                if p["enemy_id"] == e["enemy_id"]],
+                         attacks=[dict(a, strikes=parse_strikes(a["pattern"], a["targets"]))
+                                  for a in clean(d["EnemyAttacks"]) if a["enemy_id"] == e["enemy_id"]])
+                    for e in clean(d["Enemies"])],
         "endings": [dict(r, world_flags_set=split_list(r["world_flags_set"])) for r in clean(d["Endings"])],
         "config": {r["key"]: (int(r["value"]) if float(r["value"]).is_integer() else r["value"])
                    for r in d["Config"]},

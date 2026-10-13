@@ -5,5 +5,11 @@
  "sanity_start": 100,
  "sanity_max": 100,
  "time_start": 120,
- "time_max": 120
+ "time_max": 120,
+ "combat_perfect_window": 0.08,
+ "combat_normal_window": 0.2,
+ "combat_player_damage": 10,
+ "combat_defend_mult": 0.5,
+ "combat_flee_chance": 50,
+ "combat_feint_switch": 0.55
 }

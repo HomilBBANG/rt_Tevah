@@ -1,0 +1,114 @@
+[
+ {
+  "enemy_id": "enemy_test",
+  "name": "적 A (테스트)",
+  "parts": [
+   {
+    "enemy_id": "enemy_test",
+    "part_id": "head",
+    "name": "머리",
+    "hp": 10,
+    "hit_chance": 50.0,
+    "vital": true
+   },
+   {
+    "enemy_id": "enemy_test",
+    "part_id": "torso",
+    "name": "몸통",
+    "hp": 30,
+    "hit_chance": 90.0,
+    "vital": true
+   },
+   {
+    "enemy_id": "enemy_test",
+    "part_id": "left_arm",
+    "name": "왼팔",
+    "hp": 15,
+    "hit_chance": 70.0,
+    "vital": false
+   },
+   {
+    "enemy_id": "enemy_test",
+    "part_id": "right_arm",
+    "name": "오른팔",
+    "hp": 15,
+    "hit_chance": 70.0,
+    "vital": false
+   }
+  ],
+  "attacks": [
+   {
+    "attack_id": "atk_normal",
+    "enemy_id": "enemy_test",
+    "name": "일반 공격 (테스트)",
+    "part": "right_arm",
+    "pattern": "normal",
+    "targets": "torso",
+    "windup": 1.2,
+    "damage": 10,
+    "weight": 3,
+    "strikes": [
+     {
+      "telegraph": "torso",
+      "target": "torso"
+     }
+    ]
+   },
+   {
+    "attack_id": "atk_quick",
+    "enemy_id": "enemy_test",
+    "name": "속공 (테스트)",
+    "part": "left_arm",
+    "pattern": "quick",
+    "targets": "left_arm",
+    "windup": 0.6,
+    "damage": 8,
+    "weight": 2,
+    "strikes": [
+     {
+      "telegraph": "left_arm",
+      "target": "left_arm"
+     }
+    ]
+   },
+   {
+    "attack_id": "atk_combo",
+    "enemy_id": "enemy_test",
+    "name": "연속 공격 (테스트)",
+    "part": "right_arm",
+    "pattern": "combo",
+    "targets": "head, right_leg",
+    "windup": 1.0,
+    "damage": 6,
+    "weight": 2,
+    "strikes": [
+     {
+      "telegraph": "head",
+      "target": "head"
+     },
+     {
+      "telegraph": "right_leg",
+      "target": "right_leg"
+     }
+    ]
+   },
+   {
+    "attack_id": "atk_feint",
+    "enemy_id": "enemy_test",
+    "name": "기만 공격 (테스트)",
+    "part": "head",
+    "pattern": "feint",
+    "targets": "torso>head",
+    "windup": 1.4,
+    "damage": 12,
+    "weight": 1,
+    "strikes": [
+     {
+      "telegraph": "torso",
+      "target": "head"
+     }
+    ]
+   }
+  ]
+ }
+]

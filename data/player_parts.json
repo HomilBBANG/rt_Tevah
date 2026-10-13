@@ -1,0 +1,44 @@
+[
+ {
+  "part_id": "head",
+  "name": "머리",
+  "key": "W",
+  "hp": 20,
+  "vital": true
+ },
+ {
+  "part_id": "torso",
+  "name": "몸통",
+  "key": "S",
+  "hp": 50,
+  "vital": true
+ },
+ {
+  "part_id": "left_arm",
+  "name": "왼팔",
+  "key": "A",
+  "hp": 25,
+  "vital": false
+ },
+ {
+  "part_id": "right_arm",
+  "name": "오른팔",
+  "key": "D",
+  "hp": 25,
+  "vital": false
+ },
+ {
+  "part_id": "left_leg",
+  "name": "왼다리",
+  "key": "A",
+  "hp": 25,
+  "vital": false
+ },
+ {
+  "part_id": "right_leg",
+  "name": "오른다리",
+  "key": "D",
+  "hp": 25,
+  "vital": false
+ }
+]
