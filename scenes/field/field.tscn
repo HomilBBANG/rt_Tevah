@@ -199,10 +199,18 @@ theme_override_font_sizes/font_size = 43
 text = "사망"
 horizontal_alignment = 1
 
+[node name="DeathMessage" type="Label" parent="HUD/DeathPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
+theme_override_font_sizes/font_size = 28
+horizontal_alignment = 1
+autowrap_mode = 3
+
 [node name="NewRunButton" type="Button" parent="HUD/DeathPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "새 회차 (베이스캠프에서 다시)"
+text = "처음부터"
 
 [node name="Inventory" parent="HUD" instance=ExtResource("4")]
 unique_name_in_owner = true

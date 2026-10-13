@@ -15,10 +15,11 @@ func _ready() -> void:
 	SaveManager.save_dir = "user://test_saves/"
 	SaveManager.delete_all()
 	SaveManager.begin_run()
+	FieldScript.next_map_id = "basecamp"   # 새 회차는 test_field 한복판에서 시작하지만, 여기서는 베이스캠프부터 본다
 	f = load("res://scenes/field/field.tscn").instantiate()
 	add_child(f)
 	await _wait(0.3)
-	check(f.map.map_id == "basecamp", "새 회차는 베이스캠프에서")
+	check(f.map.map_id == "basecamp", "베이스캠프 열기")
 	await _snap("basecamp")
 
 	# 고양이 루틴: 06:00-12:00, 20:00-23:00. 지금 08:00 → 와 있음. (9,2) 아래에서 말 걸어 저장

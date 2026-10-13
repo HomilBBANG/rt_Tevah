@@ -94,9 +94,17 @@ func begin_run() -> void:
 	save_world()
 
 
-## 사망: 회차 저장을 지워 죽음을 되돌릴 수 없게 한다
+## 부활 없는 사망: 회차 저장을 지워 죽음을 되돌릴 수 없게 한다 (게임 처음부터)
 func end_run() -> void:
+	GameState.death_count += 1
 	delete_run_save()
+	save_world()
+
+
+## 부활(초월체·아이템): 저장은 그대로, 사망 횟수만 센다. 모두 유지한 채 베이스캠프에서 깨어남.
+func revive_run() -> void:
+	GameState.death_count += 1
+	GameState.restore_after_revival()
 	save_world()
 
 

@@ -45,6 +45,7 @@ var _near_spot := {}
 var _collecting := false         # StoryRunner 메시지를 모으는 중 (조사·거점 행동)
 var _collected: PackedStringArray = []
 var _toast_t := 0.0
+var _death_revival := {}        # 사망 패널: 적용된 부활 규칙 (비면 처음부터)
 var _sleep_pick := {}            # 잠잘 시간 고르는 중: { action, hours }
 var _sleep_value: Label
 var _sleep_wake: Label
@@ -140,7 +141,10 @@ func _build_actors() -> void:
 	player.speed = cfg.call("field_player_speed", 4)
 	player.collision_layer = ACTOR_LAYER
 	player.collision_mask = WALL_LAYER | NPC_LAYER
-	player.position = _tile_center(map.start[0], map.start[1])
+	# 새 회차는 맵 한복판(S)에서 깨어나고, 그 밖에는 P(출구로 들어온 곳·베이스캠프에서 깨어나는 곳)
+	var spawn: Array = map.get("run_start", map.start) if GameState.wake_at_run_start else map.start
+	GameState.wake_at_run_start = false
+	player.position = _tile_center(spawn[0], spawn[1])
 	_add_circle_shape(player, player.radius)
 	var cam := Camera2D.new()
 	# 위아래 검은 띠(화면의 10.6%)에 맵 가장자리가 가려지지 않게 그만큼 더 움직이게 둔다
@@ -565,16 +569,35 @@ func _on_combat_finished(outcome: String) -> void:
 			_combat_enemy.state = "return"
 			frozen = false
 		_:
-			# 사망: 회차 종료. 저장은 지워져 되돌릴 수 없다 (§11, §13). TODO: 사망·부활 연출
-			SaveManager.end_run()
-			%DeathText.text = "사망\n%d번째 회차가 끝났다." % GameState.run_count
-			%DeathPanel.visible = true
+			_on_death()
 	_combat_enemy = null
 
 
+## 사망 (§11): 부활 수단(초월체·아이템)이 있으면 모두 유지한 채 베이스캠프에서 깨어나고, 없으면 게임 처음부터.
+## TODO: 사망·부활 연출 (지금은 패널 하나)
+func _on_death() -> void:
+	frozen = true
+	var revival := GameState.find_revival()
+	if revival.is_empty():
+		SaveManager.end_run()
+		%DeathMessage.text = ""
+		%NewRunButton.text = "처음부터"
+		_death_revival = {}
+	else:
+		await _run_effects(revival.effects)   # 예: 부활 아이템 소모, 보호 플래그 해제
+		%DeathMessage.text = revival.text
+		%NewRunButton.text = "깨어난다"
+		_death_revival = revival
+	%DeathPanel.visible = true
+
+
 func _new_run() -> void:
-	SaveManager.begin_run()
 	%DeathPanel.visible = false
+	if _death_revival.is_empty():
+		SaveManager.begin_run()
+	else:
+		SaveManager.revive_run()
+		_death_revival = {}
 	load_map(GameState.current_map)
 
 

@@ -104,17 +104,42 @@ func _ready() -> void:
 	check(f.enemies.size() == 1 and GameState.player_body.left_arm.broken, "승리 → 적 제거, 왼팔 절단 유지")
 	check("왼팔 절단" in f.get_node("%Body").text, "HUD 부상 표시: %s" % f.get_node("%Body").text)
 
-	# 사망 → 처음부터 패널
+	# 부활 아이템을 가진 채 사망 → 모두 유지한 채 베이스캠프에서 깨어남
+	GameState.add_item("charm", 1)
+	var items_before := GameState.inventory.size()
+	_teleport_to(f.enemies[0])
+	await _wait_until(func(): return f._combat_ui != null, 2.0)
+	await _end_combat("lose", func(c): c.player_parts.head.hp = 0; c.player_parts.head.broken = true)
+	await _wait(0.2)
+	check(f.get_node("%DeathPanel").visible and f.get_node("%NewRunButton").text == "깨어난다", "부적으로 부활 → '깨어난다'")
+	check("부활 텍스트 1" in f.get_node("%DeathMessage").text, "부활 문구 표시")
+	var clock_before := GameState.clock   # 사망 패널 동안 시간 멈춤
+	await _snap("revive")
+	f.get_node("%NewRunButton").pressed.emit()
+	await _wait(0.2)
+	check(f.map.map_id == "basecamp" and GameState.run_count == 1, "베이스캠프에서 깨어남, 회차 그대로")
+	check(GameState.item_count("charm") == 0 and GameState.inventory.size() == items_before - 1, "부적만 소모, 소지품 유지")
+	check(GameState.player_body.left_arm.broken and not GameState.player_body.head.broken, "잘린 왼팔 유지, 머리 회복")
+	check(absf(GameState.clock - clock_before) < 1.0, "시간 유지 (깨어난 뒤 흐른 몇 초 제외)")
+	var start: Array = f.map.start
+	check(f.player.position.distance_to(Vector2((start[0] + 0.5) * f.tile, (start[1] + 0.5) * f.tile)) < 1.0, "베이스캠프 P 위치")
+
+	# 부활 수단 없이 사망 → 게임 처음부터 (맵 한복판 S)
+	f.load_map("test_field")
+	await _wait(0.2)
 	_teleport_to(f.enemies[0])
 	await _wait_until(func(): return f._combat_ui != null, 2.0)
 	await _end_combat("lose", func(_c): pass)
-	check(f.get_node("%DeathPanel").visible and not SaveManager.has_run_save(), "사망 → 회차 종료 패널, 저장 없음")
+	await _wait(0.2)
+	check(f.get_node("%DeathPanel").visible and f.get_node("%NewRunButton").text == "처음부터" and not SaveManager.has_run_save(),
+		"부활 수단 없음 → '처음부터', 저장 없음")
 	await _snap("dead")
-
 	f.get_node("%NewRunButton").pressed.emit()
 	await _wait(0.2)
-	check(GameState.run_count == 2 and GameState.current_map == "basecamp" and not GameState.player_body.left_arm.broken,
-		"새 회차 → 2회차, 베이스캠프, 몸 새로")
+	var rs: Array = f.map.run_start
+	check(GameState.run_count == 2 and f.map.map_id == "test_field" and not GameState.player_body.left_arm.broken
+		and GameState.inventory.is_empty(), "처음부터 → 2회차, 소지품·몸 새로")
+	check(f.player.position.distance_to(Vector2((rs[0] + 0.5) * f.tile, (rs[1] + 0.5) * f.tile)) < 1.0, "맵 한복판(S)에서 깨어남")
 	SaveManager.delete_all()
 	print("[field_smoke] 스크린샷 %d장, 실패 %d → %s" % [_shot, _fail, ProjectSettings.globalize_path("user://field_smoke")])
 	get_tree().quit(1 if _fail > 0 else 0)

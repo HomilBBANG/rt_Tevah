@@ -14,7 +14,8 @@ func _ready() -> void:
 
 	# ---------- 새 회차
 	SaveManager.begin_run()
-	check(GameState.run_count == 1 and GameState.current_map == "basecamp", "새 회차: 1회차, 베이스캠프에서 시작")
+	check(GameState.run_count == 1 and GameState.current_map == "test_field" and GameState.wake_at_run_start,
+		"새 회차: 1회차, 맵 한복판(test_field 의 S)에서 시작")
 	check(GameState.day() == 1 and GameState.clock_text() == "08:00", "1일차 08:00")
 	check(GameState.get_survival("hunger") == 80.0 and GameState.get_survival("mental") == 100.0, "생존 파라미터 시작값")
 	check(GameState.player_body.size() == 6 and not GameState.player_body.head.broken, "몸 상태 새로")
@@ -98,12 +99,42 @@ func _ready() -> void:
 	check(GameState.field_has("test_field", "removed", "fo_enemy1") and GameState.player_body.left_arm.broken,
 		"처치한 적·절단 상태 유지")
 
+	# ---------- 부활 규칙 (Revivals: 위에서부터 먼저 맞는 것)
+	GameState.inventory = []
+	check(GameState.find_revival().is_empty(), "부활 수단 없음")
+	GameState.add_item("charm", 1)
+	GameState.set_flag("hana_protect", true)
+	check(GameState.find_revival().revive_id == "rv_charm", "아이템과 초월체 둘 다 → 위쪽 행(부적) 먼저")
+	GameState.remove_item("charm", 1)
+	check(GameState.find_revival().revive_id == "rv_hana", "초월체 보호만 있으면 초월체로 부활")
+	GameState.set_flag("hana_protect", false)
+
+	# ---------- 부활: 모두 유지한 채 베이스캠프에서 깨어남, 저장 유지
+	GameState.current_map = "test_field"
+	GameState.add_item("charm", 1)
+	GameState.add_item("water", 1)
+	GameState.player_body.head.hp = 0
+	GameState.player_body.head.broken = true
+	var clock_before := GameState.clock
+	var deaths := GameState.death_count
+	var runs := GameState.run_count
+	var rv := GameState.find_revival()
+	await StoryRunner.run_effects(rv.effects)
+	SaveManager.revive_run()
+	check(GameState.current_map == "basecamp" and not GameState.wake_at_run_start, "부활 → 베이스캠프(P)에서 깨어남")
+	check(GameState.item_count("charm") == 0 and GameState.item_count("water") == 1, "부적만 소모, 소지품 유지")
+	check(GameState.clock == clock_before and GameState.has_flag("showed_knife"), "시간·플래그 유지")
+	check(GameState.player_body.head.hp == GameState.player_body.head.max_hp and GameState.player_body.left_arm.broken,
+		"치명 부위만 회복, 잘린 왼팔은 그대로")
+	check(SaveManager.has_run_save() and GameState.death_count == deaths + 1 and GameState.run_count == runs,
+		"저장 유지, 사망 횟수 +1, 회차는 그대로")
+
 	# ---------- 사망 → 저장 삭제, 회차 수 유지
 	SaveManager.end_run()
-	check(not SaveManager.has_run_save(), "사망 → 회차 저장 삭제 (되돌릴 수 없음)")
+	check(not SaveManager.has_run_save() and GameState.death_count == deaths + 2, "부활 없는 사망 → 회차 저장 삭제 (되돌릴 수 없음)")
 	GameState.world_from_dict({})
 	SaveManager.load_world()
-	check(GameState.run_count == 1, "회차 수는 월드에 남음")
+	check(GameState.run_count == 1 and GameState.death_count == deaths + 2, "회차 수·사망 횟수는 월드에 남음")
 	SaveManager.begin_run()
 	check(GameState.run_count == 2 and GameState.item_count("food") == 0, "2회차: 소지품 초기화")
 

@@ -11,6 +11,7 @@ signal clock_changed
 
 const STATS := ["hp", "sanity", "time"]
 const Combat = preload("res://core/combat/combat.gd")
+const Expr = preload("res://core/expr.gd")
 
 # --- 에피소드 상태 (에피소드 진행 파일에 저장)
 var episode_id := ""
@@ -29,10 +30,12 @@ var clock := 0.0              # 회차 시작부터 흐른 게임 시간 (분). 
 var survival := {}            # param_id -> float (0 ~ max, 높을수록 좋음)
 var player_body := {}         # 전투 부위 상태 (부상·절단), 전투 사이에 이어짐
 var field_state := {}         # map_id -> { "removed": [object_id], "done": [object_id] }
+var wake_at_run_start := false   # 다음 맵 로드 때 그 맵의 S(회차 시작 위치)에서 깨어남 (저장 안 함)
 
 # --- 월드 상태 (월드 파일에 저장, 회차가 바뀌어도 유지)
 var world_flags := {}         # name -> true
-var run_count := 0            # 지금까지 시작한 회차 수 (초월적 존재의 부활 인식용, §11)
+var run_count := 0            # 지금까지 시작한 회차 수 (처음부터 다시 시작한 횟수)
+var death_count := 0          # 지금까지 죽은 횟수 (부활 포함). 초월적 존재의 반복 부활 인식용 (§11)
 
 
 func reset_for_episode(ep: Dictionary) -> void:
@@ -71,6 +74,7 @@ func reset_run() -> void:
 		survival[p.param_id] = float(p.start)
 	player_body = Combat.fresh_player_parts()
 	field_state = {}
+	wake_at_run_start = true
 	survival_changed.emit()
 	clock_changed.emit()
 	stats_changed.emit()
@@ -140,6 +144,27 @@ func day() -> int:
 func clock_text() -> String:
 	var m := int(clock) % 1440
 	return "%02d:%02d" % [m / 60, m % 60]
+
+
+# ---------------------------------------------------------------- 부활 (§11)
+## 사망 순간 적용할 부활 규칙: Revivals 에서 condition 이 참인 첫 행. 없으면 {} (게임 처음부터).
+## 영구 능력치 강화는 없다 — 부활은 '그 회차를 이어 가는 것'.
+func find_revival() -> Dictionary:
+	for r in DataLoader.revivals:
+		if Expr.evaluate(r.condition, self):
+			return r
+	return {}
+
+
+## 부활하면 모두 유지한 채 베이스캠프에서 깨어난다.
+## TODO(기획 확인): 그대로 두면 바로 다시 죽으므로 치명 부위(머리·몸통)만 최대 HP로 회복. 잘린 팔다리는 그대로 (§9: 거래로만 복구).
+func restore_after_revival() -> void:
+	for p in player_body.values():
+		if p.vital:
+			p.hp = p.max_hp
+			p.broken = false
+	current_map = DataLoader.get_config_str("basecamp_map", current_map)
+	wake_at_run_start = false
 
 
 ## 맵 위 물체 상태 (처치한 적·조사한 곳). kind: "removed" / "done"
@@ -315,7 +340,7 @@ func episode_from_dict(d: Dictionary) -> void:
 
 
 func world_to_dict() -> Dictionary:
-	return {"world_flags": world_flags.keys(), "run_count": run_count}
+	return {"world_flags": world_flags.keys(), "run_count": run_count, "death_count": death_count}
 
 
 func world_from_dict(d: Dictionary) -> void:
@@ -323,6 +348,7 @@ func world_from_dict(d: Dictionary) -> void:
 	for f in d.get("world_flags", []):
 		world_flags[f] = true
 	run_count = int(d.get("run_count", 0))
+	death_count = int(d.get("death_count", 0))
 	flags_changed.emit()
 
 
