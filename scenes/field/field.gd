@@ -45,6 +45,9 @@ var _near_spot := {}
 var _collecting := false         # StoryRunner 메시지를 모으는 중 (조사·거점 행동)
 var _collected: PackedStringArray = []
 var _toast_t := 0.0
+var _sleep_pick := {}            # 잠잘 시간 고르는 중: { action, hours }
+var _sleep_value: Label
+var _sleep_wake: Label
 
 
 func _ready() -> void:
@@ -251,6 +254,9 @@ func _physics_process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not _sleep_pick.is_empty():
+		_sleep_picker_input(event)
+		return
 	if event.is_action_pressed("inventory") and not frozen:
 		_open_inventory()
 	elif not event.is_action_pressed("interact"):
@@ -398,25 +404,97 @@ func _show_sleep_picker(a: Dictionary) -> void:
 	for c in %CampActions.get_children():
 		%CampActions.remove_child(c)
 		c.queue_free()
+	var max_h := DataLoader.get_config_int("sleep_max_hours", 12)
+	_sleep_pick = {"action": a, "hours": clampi(DataLoader.get_config_int("sleep_default_hours", 8), 1, max_h)}
 	var q := Label.new()
-	q.text = "몇 시간 잘까?  (지금 %d일차 %s)" % [GameState.day(), GameState.clock_text()]
+	q.text = "몇 시간 잘까?"
 	%CampActions.add_child(q)
-	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 10)
-	grid.add_theme_constant_override("v_separation", 10)
-	for h in range(1, DataLoader.get_config_int("sleep_max_hours", 12) + 1):
-		var b := ChoiceButton.new()
-		b.text = "%d시간" % h
-		b.alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(sleep_hours.bind(a, h))
-		grid.add_child(b)
-	%CampActions.add_child(grid)
-	var cancel := ChoiceButton.new()
-	cancel.text = "취소"
-	cancel.pressed.connect(_build_camp_buttons)
-	%CampActions.add_child(cancel)
+	# ◀  8시간  ▶
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 27)
+	row.add_child(_picker_button("◀", _change_sleep.bind(-1), 90))
+	_sleep_value = Label.new()
+	_sleep_value.custom_minimum_size.x = 260
+	_sleep_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sleep_value.add_theme_font_size_override("font_size", 53)
+	row.add_child(_sleep_value)
+	row.add_child(_picker_button("▶", _change_sleep.bind(1), 90))
+	%CampActions.add_child(row)
+	_sleep_wake = Label.new()
+	_sleep_wake.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sleep_wake.add_theme_color_override("font_color", Color("bbbbbb"))
+	%CampActions.add_child(_sleep_wake)
+	var hint := Label.new()
+	hint.text = "← → 시간 조절    E / Space 잠들기    Esc 취소"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_font_size_override("font_size", 22)
+	hint.add_theme_color_override("font_color", Color("888888"))
+	%CampActions.add_child(hint)
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 13)
+	var go := _picker_button("잠들기", _confirm_sleep, 0)
+	go.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var cancel := _picker_button("취소", _cancel_sleep, 0)
+	cancel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	buttons.add_child(go)
+	buttons.add_child(cancel)
+	%CampActions.add_child(buttons)
+	_refresh_sleep_picker()
+
+
+func _picker_button(text: String, on_press: Callable, width: int) -> Button:
+	var b := ChoiceButton.new()
+	b.text = text
+	b.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.focus_mode = Control.FOCUS_NONE   # Space/Enter 는 _sleep_picker_input 이 받는다
+	if width > 0:
+		b.custom_minimum_size.x = width
+	b.pressed.connect(on_press)
+	return b
+
+
+## 잠잘 시간 고르는 중의 키 입력: ← → (A D, 패드 좌우) 조절, E/Space/Enter 잠들기, Esc 취소
+func _sleep_picker_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_left", true) or event.is_action_pressed("move_left", true):
+		_change_sleep(-1)
+	elif event.is_action_pressed("ui_right", true) or event.is_action_pressed("move_right", true):
+		_change_sleep(1)
+	elif event.is_action_pressed("interact") or event.is_action_pressed("ui_accept"):
+		_confirm_sleep()
+	elif event.is_action_pressed("ui_cancel"):
+		_cancel_sleep()
+	else:
+		return
+	get_viewport().set_input_as_handled()
+
+
+func _change_sleep(delta: int) -> void:
+	if _sleep_pick.is_empty():
+		return
+	_sleep_pick.hours = clampi(_sleep_pick.hours + delta, 1, DataLoader.get_config_int("sleep_max_hours", 12))
+	_refresh_sleep_picker()
+
+
+func _refresh_sleep_picker() -> void:
+	var h: int = _sleep_pick.hours
+	_sleep_value.text = "%d시간" % h
+	var wake := GameState.clock + h * 60.0
+	_sleep_wake.text = "%d일차 %02d:%02d 에 일어남" % [int(wake / 1440.0) + 1, (int(wake) % 1440) / 60, int(wake) % 60]
+
+
+func _confirm_sleep() -> void:
+	if _sleep_pick.is_empty():
+		return
+	var a: Dictionary = _sleep_pick.action
+	var h: int = _sleep_pick.hours
+	_sleep_pick = {}
+	await sleep_hours(a, h)
+
+
+func _cancel_sleep() -> void:
+	_sleep_pick = {}
+	_build_camp_buttons()
 
 
 ## hours 시간 잔다: 1시간마다 시간이 흐르고 effects 적용. 자고 나면 저장 (베이스캠프 §13).
@@ -433,6 +511,7 @@ func sleep_hours(a: Dictionary, hours: int) -> void:
 
 
 func _close_camp() -> void:
+	_sleep_pick = {}
 	%CampPanel.visible = false
 	frozen = false
 

@@ -52,9 +52,15 @@ func _ready() -> void:
 	check(is_equal_approx(GameState.clock - t0, 30.0) and GameState.get_survival("hygiene") == 100.0, "씻기: 30분, 위생 회복")
 	check(_find_button(f, "저장").text == "", "따로 '저장' 버튼은 없음 (잠·고양이로만)")
 	await _press_button("잠자기  (1시간 단위)")
-	check(_find_button(f, "12시간").is_inside_tree() and not _find_button(f, "13시간").is_inside_tree(), "1~12시간 고르기")
+	check(f._sleep_pick.hours == 8 and f._sleep_value.text == "8시간", "처음엔 8시간 (sleep_default_hours)")
+	await _keys("ui_right", 10)
+	check(f._sleep_pick.hours == 12, "→ 로 늘리기, 최대 12시간에서 멈춤")
+	await _keys("ui_left", 20)
+	check(f._sleep_pick.hours == 1 and f._sleep_value.text == "1시간", "← 로 줄이기, 1시간에서 멈춤")
+	await _keys("move_right", 7)
+	check(f._sleep_pick.hours == 8 and "16:" in f._sleep_wake.text, "D 키로도 조절, 일어날 시각 표시: %s" % f._sleep_wake.text)
 	await _snap("sleep_picker")
-	await _press_button("8시간")
+	await _keys("interact", 1)
 	await _wait(0.3)
 	var hhmm := GameState.clock_text()
 	check(hhmm.begins_with("16:"), "8시간 잠 → 16시대 (%s)" % hhmm)
@@ -62,7 +68,9 @@ func _ready() -> void:
 	check(not f.npcs[0].active and not f.npcs[0].node.visible, "16시 → 고양이 떠남 (루틴 밖)")
 	await _snap("camp_menu_cat_gone")
 	await _press_button("잠자기  (1시간 단위)")
-	await _press_button("4시간")
+	await _keys("ui_left", 4)
+	check(f._sleep_pick.hours == 4, "8 → 4시간")
+	await _press_button("잠들기")
 	await _wait(0.3)
 	check(GameState.clock_text().begins_with("20:") and f.npcs[0].active and f.npcs[0].node.visible, "4시간 더 → 20시대, 고양이 돌아옴")
 	var saved_at := GameState.clock_text()
@@ -133,6 +141,18 @@ func _press_button(text: String) -> void:
 	else:
 		b.pressed.emit()
 	await _wait(0.15)
+
+
+## 키를 눌렀다 뗀다 (떼지 않으면 move_* 가 계속 눌린 상태로 남는다)
+func _keys(action: String, times: int) -> void:
+	for i in times:
+		_press(action)
+		await get_tree().process_frame
+		var up := InputEventAction.new()
+		up.action = action
+		up.pressed = false
+		Input.parse_input_event(up)
+		await get_tree().process_frame
 
 
 func _teleport(tx: float, ty: float) -> void:
