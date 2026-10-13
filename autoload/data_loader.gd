@@ -16,6 +16,8 @@ var player_parts: Array = []  # 전투: 플레이어 부위 (엑셀 행 순서)
 var enemies := {}          # 전투: enemy_id -> { name, parts: [...], attacks: [{..., strikes}] }
 var maps := {}             # 탐험: map_id -> { width, height, tiles: [String], start: [x, y], objects: [...] }
 var map_order: Array[String] = []
+var survival: Array = []   # 생존 파라미터 [{ param_id, name, start, max, decay_per_hour, warn }]
+var camp_actions: Array = []  # 베이스캠프 행동 (엑셀 행 순서)
 var config := {}           # key -> number
 
 
@@ -37,6 +39,8 @@ func load_all() -> void:
 	enemies.clear()
 	maps.clear()
 	map_order.clear()
+	survival = []
+	camp_actions = []
 
 	for ep in _read_list("episodes"):
 		episodes[ep.episode_id] = ep
@@ -68,12 +72,20 @@ func load_all() -> void:
 	if FileAccess.file_exists(DATA_DIR + "enemies.json"):
 		for en in _read_list("enemies"):
 			enemies[en.enemy_id] = en
+	if FileAccess.file_exists(DATA_DIR + "survival.json"):
+		survival = _read_list("survival")
+	if FileAccess.file_exists(DATA_DIR + "camp_actions.json"):
+		camp_actions = _read_list("camp_actions")
 	if FileAccess.file_exists(DATA_DIR + "maps.json"):
 		for m in _read_list("maps"):
 			maps[m.map_id] = m
 			map_order.append(m.map_id)
 	var cfg = _read("config")
 	config = cfg if cfg is Dictionary else {}
+
+
+func get_config_str(key: String, default := "") -> String:
+	return str(config.get(key, default))
 
 
 func get_config_int(key: String, default: int) -> int:

@@ -6,6 +6,7 @@ extends RefCounted
 func item_count(_id: String) -> int: return 0
 func get_stat(_name: String) -> int: return 0
 func get_ability(_id: String) -> int: return 0
+func get_survival(_id: String) -> float: return 0.0
 func has_flag(_name: String) -> bool: return false
 func has_wflag(name: String) -> bool: return GameState.has_wflag(name)
 func has_trait(_name: String) -> bool: return false

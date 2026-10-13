@@ -159,7 +159,9 @@ func continue_story() -> void:
 
 
 func use_item(slot: int) -> void:
-	if busy or ended or slot < 0 or slot >= GameState.inventory.size():
+	# 필드에서는 대화 밖에서도(ended) 아이템을 쓸 수 있다
+	var outside := mode == "field" and ended
+	if busy or (ended and not outside) or slot < 0 or slot >= GameState.inventory.size():
 		return
 	var item: Dictionary = DataLoader.items.get(GameState.inventory[slot].id, {})
 	if item.get("use_effects", "") == "":
@@ -168,6 +170,9 @@ func use_item(slot: int) -> void:
 	messages_cleared.emit()
 	message.emit("사용: %s" % item.name)
 	var redirect := await _apply_effects(Expr.parse_effects(item.use_effects))
+	if outside:
+		busy = false
+		return
 	if not ended:
 		var forced := _check_stats()
 		if forced != "" or redirect != "":
@@ -175,6 +180,21 @@ func use_item(slot: int) -> void:
 		else:
 			_show_current()
 			SaveManager.save_episode()
+	busy = false
+
+
+## 탐험 필드에 들어옴: 대화 밖 상태 (아이템 사용·효과 실행 가능)
+func enter_field() -> void:
+	mode = "field"
+	ended = true
+	busy = false
+
+
+## 대화 밖(필드 조사·베이스캠프 행동)에서 효과 실행. goto 는 무시. 메시지는 message 시그널로.
+func run_effects(text: String) -> void:
+	enter_field()
+	busy = true
+	await _apply_effects(Expr.parse_effects(text))
 	busy = false
 
 
@@ -290,6 +310,10 @@ func _apply_effects(effects: Array) -> String:
 						push_warning("[StoryRunner] %s 를 %d개 빼려 했으나 %d개만 있었음" % [e.id, -e.amount, removed])
 			"stat":
 				GameState.change_stat(e.stat, e.op, e.value)
+			"surv":
+				GameState.change_survival(e.param, e.op, e.value)
+				var p := GameState.survival_def(e.param)
+				message.emit("%s %s%d" % [p.get("name", e.param), "" if e.op == "=" else e.op, e.value])
 			"abil":
 				GameState.change_ability(e.ability, e.op, e.value)
 				message.emit("%s %s%d" % [DataLoader.ability_name(e.ability), "" if e.op == "=" else e.op, e.value])
@@ -340,6 +364,9 @@ func _do_loot(spot_id: String) -> void:
 			found = true
 			await _give_item(r.item_id, r.amount)
 	if time_cost > 0:
-		GameState.change_stat("time", "-", time_cost)
+		if mode == "field":
+			GameState.advance_time(time_cost)   # 탐험: 게임 시계가 흐름 (§4)
+		else:
+			GameState.change_stat("time", "-", time_cost)
 	if not found:
 		message.emit("아무것도 찾지 못했다.")

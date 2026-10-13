@@ -17,6 +17,7 @@ class FakeCtx:
 	func item_count(id: String) -> int: return items.get(id, 0)
 	func get_stat(name: String) -> int: return stats.get(name, 0)
 	func get_ability(id: String) -> int: return abilities.get(id, 0)
+	func get_survival(id: String) -> float: return {"hunger": 25.5}.get(id, 0.0)
 	func has_flag(name: String) -> bool: return name in flags
 	func has_wflag(name: String) -> bool: return name in wflags
 	func has_trait(name: String) -> bool: return name in traits
@@ -50,6 +51,9 @@ func _ready() -> void:
 	cond(ctx, "abil:stat_a>=3", true)
 	cond(ctx, "abil:stat_a>3", false)
 	cond(ctx, "abil:unknown==0", true)
+	cond(ctx, "surv:hunger<30", true)
+	cond(ctx, "surv:hunger>=26", false)
+	cond_err(ctx, "surv:hunger")
 	# --- 조건: 연산자
 	cond(ctx, "!has:rope", true)
 	cond(ctx, "!!has:rope", false)
@@ -92,6 +96,9 @@ func _ready() -> void:
 		{"type": "abil", "ability": "stat_a", "op": "+", "value": 1},
 		{"type": "abil", "ability": "stat_b", "op": "=", "value": 4}], 0)
 	eff("abil:stat_a", [], 1)
+	eff("surv:hunger+40;surv:sleep=10", [
+		{"type": "surv", "param": "hunger", "op": "+", "value": 40},
+		{"type": "surv", "param": "sleep", "op": "=", "value": 10}], 0)
 	eff("", [], 0)
 	eff(";;", [], 0)
 	eff("item:+", [], 1)
