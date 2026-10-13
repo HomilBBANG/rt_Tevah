@@ -62,7 +62,8 @@ func _refresh() -> void:
 		%Desc.text = "아이템을 선택하세요." if _mode == "browse" else ""
 	else:
 		%Desc.text = "[%s] %s" % [item.type, item.description]
-	%UseButton.disabled = item.get("use_effects", "") == "" or StoryRunner.ended
+	var story_over := StoryRunner.ended and StoryRunner.mode == "episode"   # 필드에서는 대화 밖에서도 사용 가능
+	%UseButton.disabled = item.get("use_effects", "") == "" or story_over
 
 
 func _on_slot(i: int) -> void:

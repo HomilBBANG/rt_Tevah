@@ -36,20 +36,42 @@ layout_mode = 2
 text = "텍스트 어드벤처 프로토타입"
 horizontal_alignment = 1
 
+[node name="NewRunButton" type="Button" parent="Center/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "새 회차"
+
+[node name="ContinueButton" type="Button" parent="Center/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "이어하기"
+
+[node name="RunInfo" type="Label" parent="Center/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 14
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="Center/VBox"]
+layout_mode = 2
+
+[node name="TestLabel" type="Label" parent="Center/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 14
+text = "프로토타입 테스트"
+horizontal_alignment = 1
+
 [node name="StartButton" type="Button" parent="Center/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "시작"
-
-[node name="FieldButton" type="Button" parent="Center/VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "탐험 테스트"
+text = "에피소드 대화"
 
 [node name="CombatButton" type="Button" parent="Center/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "전투 테스트"
+text = "전투 단독"
 
 [node name="QuitButton" type="Button" parent="Center/VBox"]
 unique_name_in_owner = true

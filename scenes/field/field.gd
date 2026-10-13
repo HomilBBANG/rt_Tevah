@@ -1,16 +1,20 @@
 extends Node2D
-## 탑뷰 탐험 필드 (기획서 §6, §17.2 2단계). 맵은 data/maps.json (tools/maps/*.txt + FieldObjects 시트).
+## 탑뷰 탐험 필드 (기획서 §4–6, §11–13). 맵은 data/maps.json (tools/maps/*.txt + FieldObjects 시트).
 ##
-## 이동 → 적과 닿으면 턴제 전투(화면 위에 겹쳐 띄움) → 승리: 적 제거 / 도주: 잠시 유예 / 사망: 처음부터
-## NPC 에게 말을 걸면 대화 화면(scenes/main_play)을 겹쳐 띄우고 필드 대화를 진행, EXIT 에서 복귀.
-## 플레이어 신체 상태(부상·절단)는 전투 사이에 이어진다 (한 회차 동안).
+## - 이동 중 게임 시계가 실시간으로 흐르고 생존 파라미터가 줄어든다 (전투·대화·메뉴 중에는 멈춤).
+## - 적과 닿으면 턴제 전투(화면 위에 겹쳐 띄움) → 승리: 적 제거 / 도주: 잠시 유예 / 사망: 회차 종료
+## - NPC 에게 말을 걸면 대화 화면(scenes/main_play)을 겹쳐 띄우고 필드 대화 진행, EXIT 에서 복귀.
+## - 베이스캠프 거점(camp)에서 식사·수면·위생·저장. 출구(exit)로 맵 이동.
+## 회차 상태(시계·생존·몸·처치한 적·조사한 곳·소지품)는 GameState 에 있고, 베이스캠프에서만 저장된다.
 ##
-## TODO(다음 단계): 시간 흐름(§4), 생존 파라미터(§5), 맵 이동, 베이스캠프·회차 저장(§11–13)
+## TODO(기획 미확정): 생존 파라미터가 낮을 때의 효과(§5), 탐험 중 종료 처리(§13.2 — 지금은 마지막 저장에서 이어짐),
+##                    사망·부활 연출(§11)
 
-const Combat = preload("res://core/combat/combat.gd")
 const InputActions = preload("res://core/input_actions.gd")
+const Expr = preload("res://core/expr.gd")
 const CombatScene = preload("res://scenes/combat.tscn")
 const DialogueScene = preload("res://scenes/main_play.tscn")
+const ChoiceButton = preload("res://ui/choice_button.gd")
 const NpcScript = preload("res://scenes/field/field_npc.gd")
 const PlayerScript = preload("res://scenes/field/field_player.gd")
 const EnemyScript = preload("res://scenes/field/field_enemy.gd")
@@ -19,8 +23,9 @@ const WALL_LAYER := 1
 const ACTOR_LAYER := 2
 const NPC_LAYER := 4
 const INTERACT_RANGE := 1.1      # 칸
+const TOAST_TIME := 3.0
 
-## 다음에 열 맵 (비어 있으면 첫 번째 맵)
+## 테스트·디버그용: 비어 있지 않으면 이 맵으로 시작
 static var next_map_id := ""
 
 var map := {}
@@ -28,29 +33,62 @@ var tile := 48.0
 var frozen := false
 var player: CharacterBody2D
 var enemies: Array = []
-var spots: Array = []            # 조사 지점 [{ kind: "spot", data, pos, done }]
+var spots: Array = []            # 상호작용 지점 [{ kind: "spot"/"camp"/"exit", data, pos, done }]
 var npcs: Array = []             # NPC [{ kind: "npc", data, pos, node }]
-var player_body := {}            # 전투 사이에 이어지는 부위 상태
 
 var _combat_ui: Node
 var _dialogue_ui: Node
 var _combat_enemy: Node
 var _near_spot := {}
+var _collecting := false         # StoryRunner 메시지를 모으는 중 (조사·거점 행동)
+var _collected: PackedStringArray = []
+var _toast_t := 0.0
 
 
 func _ready() -> void:
 	InputActions.ensure()
-	GameState.reset_run()
-	player_body = Combat.fresh_player_parts()
-	var map_id: String = next_map_id
-	if map_id == "" and not DataLoader.map_order.is_empty():
-		map_id = DataLoader.map_order[0]
+	if GameState.current_map == "":
+		SaveManager.begin_run()          # 타이틀을 거치지 않고 바로 열었을 때
+	if next_map_id != "":
+		GameState.current_map = next_map_id
+		next_map_id = ""
+	StoryRunner.enter_field()
+	StoryRunner.message.connect(_on_story_message)
+	StoryRunner.inventory_full.connect(_on_inventory_full)
+	GameState.survival_changed.connect(_update_hud)
+	GameState.clock_changed.connect(_update_hud)
+	GameState.inventory_changed.connect(_update_hud)
+	%TitleButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
+	%InventoryButton.pressed.connect(_open_inventory)
+	%NewRunButton.pressed.connect(_new_run)
+	%CampClose.pressed.connect(_close_camp)
+	%Inventory.visibility_changed.connect(func(): _set_frozen_by_overlay())
+	load_map(GameState.current_map)
+
+
+func _exit_tree() -> void:
+	for pair in [[StoryRunner.message, _on_story_message], [StoryRunner.inventory_full, _on_inventory_full]]:
+		if pair[0].is_connected(pair[1]):
+			pair[0].disconnect(pair[1])
+
+
+# ---------------------------------------------------------------- 맵 만들기
+## 맵을 (다시) 만든다. 처치한 적·조사한 곳은 GameState.field_state 에서 빠진다.
+func load_map(map_id: String) -> void:
+	for c in %World.get_children():
+		c.queue_free()
+	enemies.clear()
+	spots.clear()
+	npcs.clear()
+	_near_spot = {}
+	%Prompt.visible = false
 	map = DataLoader.maps.get(map_id, {})
 	if map.is_empty():
-		%Message.text = "[오류] 맵 데이터가 없습니다. tools/xlsx_to_json.py 를 실행했는지 확인하세요."
+		%Message.text = "[오류] 맵 '%s' 데이터가 없습니다. tools/xlsx_to_json.py 를 실행했는지 확인하세요." % map_id
 		%MessagePanel.visible = true
 		frozen = true
 		return
+	GameState.current_map = map_id
 	tile = float(DataLoader.config.get("field_tile", 48))
 	_build_walls()
 	_build_actors()
@@ -58,18 +96,15 @@ func _ready() -> void:
 	%MapView.tile = tile
 	%MapView.spots = spots
 	%MapView.queue_redraw()
-	%TitleButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
-	%RestartButton.pressed.connect(func(): get_tree().reload_current_scene())
-	GameState.inventory_changed.connect(_update_hud)
+	frozen = false
 	_update_hud()
 
 
-# ---------------------------------------------------------------- 맵 만들기
 func _build_walls() -> void:
 	var body := StaticBody2D.new()
 	body.collision_layer = WALL_LAYER
 	body.collision_mask = 0
-	add_child(body)
+	%World.add_child(body)
 	# 가로로 이어진 벽을 하나의 사각형으로 합친다
 	for y in map.tiles.size():
 		var row: String = map.tiles[y]
@@ -110,13 +145,17 @@ func _build_actors() -> void:
 	cam.limit_bottom = int(map.height * tile) + bar
 	cam.position_smoothing_enabled = true
 	player.add_child(cam)
-	add_child(player)
+	%World.add_child(player)
+	cam.make_current()
+	cam.reset_smoothing()
 
 	var dirs := {"up": Vector2.UP, "down": Vector2.DOWN, "left": Vector2.LEFT, "right": Vector2.RIGHT}
 	for o in map.objects:
 		var pos := _tile_center(o.x, o.y)
 		match o.type:
 			"enemy":
+				if GameState.field_has(map.map_id, "removed", o.object_id):
+					continue
 				var e := CharacterBody2D.new()
 				e.set_script(EnemyScript)
 				e.field = self
@@ -131,10 +170,12 @@ func _build_actors() -> void:
 				e.position = pos
 				e.setup_patrol(pos, dirs.get(o.patrol_dir, Vector2.ZERO) * tile, int(o.patrol_len))
 				_add_circle_shape(e, e.radius * 0.8)
-				add_child(e)
+				%World.add_child(e)
 				enemies.append(e)
-			"investigate":
-				spots.append({"kind": "spot", "data": o, "pos": pos, "done": false})
+			"investigate", "camp", "exit":
+				var kind: String = "spot" if o.type == "investigate" else o.type
+				spots.append({"kind": kind, "data": o, "pos": pos,
+					"done": GameState.field_has(map.map_id, "done", o.object_id)})
 			"npc":
 				var n := StaticBody2D.new()
 				n.set_script(NpcScript)
@@ -144,7 +185,7 @@ func _build_actors() -> void:
 				n.collision_mask = 0
 				n.position = pos
 				_add_circle_shape(n, n.radius)
-				add_child(n)
+				%World.add_child(n)
 				npcs.append({"kind": "npc", "data": o, "pos": pos, "node": n})
 
 
@@ -161,9 +202,14 @@ func _add_circle_shape(body: Node, r: float) -> void:
 
 
 # ---------------------------------------------------------------- 매 프레임
-func _physics_process(_delta: float) -> void:
-	if frozen or player == null:
+func _physics_process(delta: float) -> void:
+	if _toast_t > 0.0:
+		_toast_t -= delta
+		%Toast.visible = _toast_t > 0.0
+	if frozen or player == null or map.is_empty():
 		return
+	# 탐험 중에는 시간이 실시간으로 흐른다 (§4)
+	GameState.advance_time(delta * float(DataLoader.config.get("time_scale", 1)))
 	for e in enemies:
 		if e.grace == 0.0 and e.global_position.distance_to(player.global_position) < player.radius + e.radius:
 			_start_combat(e)
@@ -172,9 +218,11 @@ func _physics_process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not event.is_action_pressed("interact"):
+	if event.is_action_pressed("inventory") and not frozen:
+		_open_inventory()
+	elif not event.is_action_pressed("interact"):
 		return
-	if %MessagePanel.visible and not %DeathPanel.visible:
+	elif %MessagePanel.visible and not %DeathPanel.visible:
 		close_message()
 	elif not frozen and not _near_spot.is_empty():
 		interact()
@@ -194,47 +242,71 @@ func _update_near_spot() -> void:
 	if best != _near_spot:
 		_near_spot = best
 		%Prompt.visible = not best.is_empty()
-		if best.is_empty():
-			pass
-		elif best.kind == "npc":
-			%Prompt.text = "[E / Space]  대화: %s" % best.data.name
-		else:
-			%Prompt.text = "[E / Space]  조사: %s%s" % [best.data.name, "  (조사함)" if best.done else ""]
+		if not best.is_empty():
+			var verb: String = {"npc": "대화", "camp": "거점", "exit": "이동", "spot": "조사"}[best.kind]
+			%Prompt.text = "[E / Space]  %s: %s%s" % [verb, best.data.name, "  (조사함)" if best.kind == "spot" and best.done else ""]
 
 
-# ---------------------------------------------------------------- 조사
-## 가까운 조사 지점 조사(아이템은 처음 한 번만) 또는 NPC 대화.
+# ---------------------------------------------------------------- 상호작용
 func interact() -> void:
 	if _near_spot.is_empty():
 		return
-	if _near_spot.kind == "npc":
-		_start_dialogue(_near_spot)
-		return
 	var s := _near_spot
+	match s.kind:
+		"npc": _start_dialogue(s)
+		"camp": _open_camp()
+		"exit": load_map(s.data.ref)
+		"spot": await _investigate(s)
+
+
+## 조사: 텍스트 + (처음 한 번) Loot 굴림. 시간은 Loot 의 time_cost 만큼 흐른다.
+func _investigate(s: Dictionary) -> void:
+	frozen = true
 	var lines := PackedStringArray([s.data.text])
 	if not s.done and s.data.ref != "":
+		var got := await _run_effects("loot:" + s.data.ref)
 		lines.append("")
-		lines.append_array(_roll_loot(s.data.ref))
+		lines.append_array(got)
 	s.done = true
+	GameState.field_mark(map.map_id, "done", s.data.object_id)
 	%MapView.queue_redraw()
 	_near_spot = {}
 	show_message("\n".join(lines))
 
 
-## TODO(기획 확인): 인벤토리가 가득 차면 지금은 남는 아이템을 두고 온다 (버릴 아이템 고르기는 대화 화면에만 있음).
-## TODO: Loot 의 time_cost 는 시간 시스템(§4)이 들어오면 적용.
-func _roll_loot(spot_id: String) -> PackedStringArray:
-	var out := PackedStringArray()
-	for r in DataLoader.loot_by_spot.get(spot_id, []):
-		if randf() * 100.0 < float(r.chance):
-			var left := GameState.add_item(r.item_id, r.amount)
-			if r.amount - left > 0:
-				out.append("획득: %s x%d" % [DataLoader.item_name(r.item_id), r.amount - left])
-			if left > 0:
-				out.append("소지품이 가득 차 %s x%d 을(를) 두고 왔다." % [DataLoader.item_name(r.item_id), left])
-	if out.is_empty():
-		out.append("아무것도 찾지 못했다.")
-	return out
+## StoryRunner 로 효과를 실행하고 그동안 나온 메시지를 돌려준다 (가득 차면 버릴 칸 고르기 포함)
+func _run_effects(text: String) -> PackedStringArray:
+	_collecting = true
+	_collected = []
+	await StoryRunner.run_effects(text)
+	_collecting = false
+	return _collected
+
+
+func _on_story_message(text: String) -> void:
+	if _dialogue_ui != null:
+		return
+	if _collecting:
+		_collected.append(text)
+	else:
+		_toast(text)
+
+
+func _on_inventory_full(item_id: String, amount: int) -> void:
+	if _dialogue_ui == null:
+		%Inventory.open_discard(item_id, amount)
+
+
+func _open_inventory() -> void:
+	if not frozen:
+		%Inventory.open_browse()
+
+
+func _set_frozen_by_overlay() -> void:
+	if %Inventory.visible:
+		frozen = true
+	elif not _collecting and not %MessagePanel.visible and not %CampPanel.visible and _combat_ui == null and _dialogue_ui == null:
+		frozen = false
 
 
 func show_message(text: String) -> void:
@@ -246,6 +318,55 @@ func show_message(text: String) -> void:
 
 func close_message() -> void:
 	%MessagePanel.visible = false
+	frozen = false
+
+
+func _toast(text: String) -> void:
+	%Toast.text = text if not %Toast.visible else "%s\n%s" % [%Toast.text, text]
+	%Toast.visible = true
+	_toast_t = TOAST_TIME
+
+
+# ---------------------------------------------------------------- 베이스캠프 (§12)
+func _open_camp() -> void:
+	frozen = true
+	%Prompt.visible = false
+	%CampResult.text = ""
+	_build_camp_buttons()
+	%CampPanel.visible = true
+
+
+func _build_camp_buttons() -> void:
+	for c in %CampActions.get_children():
+		%CampActions.remove_child(c)
+		c.queue_free()
+	for a in DataLoader.camp_actions:
+		var b := ChoiceButton.new()
+		var mins := int(a.minutes)
+		var dur := "" if mins == 0 else ("  (%d시간%s)" % [mins / 60, "" if mins % 60 == 0 else " %d분" % (mins % 60)] if mins >= 60 else "  (%d분)" % mins)
+		b.text = a.name + dur
+		b.disabled = not Expr.evaluate(a.condition, GameState)
+		b.pressed.connect(_do_camp_action.bind(a))
+		%CampActions.add_child(b)
+
+
+func _do_camp_action(a: Dictionary) -> void:
+	if a.kind == "save":
+		# 저장은 베이스캠프에서만 (§13)
+		if map.map_id != DataLoader.get_config_str("basecamp_map"):
+			%CampResult.text = "여기서는 저장할 수 없다."
+			return
+		SaveManager.save_run()
+		%CampResult.text = "저장했다.  (%d일차 %s)" % [GameState.day(), GameState.clock_text()]
+		return
+	GameState.advance_time(float(a.minutes))
+	var got := await _run_effects(a.effects)
+	%CampResult.text = "%s 완료.%s" % [a.name, "" if got.is_empty() else "  " + "  ·  ".join(got)]
+	_build_camp_buttons()
+
+
+func _close_camp() -> void:
+	%CampPanel.visible = false
 	frozen = false
 
 
@@ -264,6 +385,7 @@ func _start_dialogue(npc: Dictionary) -> void:
 func _on_dialogue_finished() -> void:
 	_dialogue_ui.queue_free()
 	_dialogue_ui = null
+	StoryRunner.enter_field()
 	frozen = false
 	_update_hud()
 
@@ -276,18 +398,19 @@ func _start_combat(enemy: Node) -> void:
 	_combat_ui = CombatScene.instantiate()
 	_combat_ui.embedded = true
 	_combat_ui.enemy_id_override = enemy.data.ref
-	_combat_ui.player_state = player_body
+	_combat_ui.player_state = GameState.player_body
 	_combat_ui.finished.connect(_on_combat_finished)
 	%Overlay.add_child(_combat_ui)
 
 
 func _on_combat_finished(outcome: String) -> void:
-	player_body = _combat_ui.combat.player_parts.duplicate(true)
+	GameState.player_body = _combat_ui.combat.player_parts.duplicate(true)
 	_combat_ui.queue_free()
 	_combat_ui = null
 	_update_hud()
 	match outcome:
 		"win":
+			GameState.field_mark(map.map_id, "removed", _combat_enemy.data.object_id)
 			enemies.erase(_combat_enemy)
 			_combat_enemy.queue_free()
 			frozen = false
@@ -296,18 +419,33 @@ func _on_combat_finished(outcome: String) -> void:
 			_combat_enemy.state = "return"
 			frozen = false
 		_:
-			# TODO(기획 §11): 회차 종료·부활 연출. 지금은 맵 처음부터 다시.
+			# 사망: 회차 종료. 저장은 지워져 되돌릴 수 없다 (§11, §13). TODO: 사망·부활 연출
+			SaveManager.end_run()
+			%DeathText.text = "사망\n%d번째 회차가 끝났다." % GameState.run_count
 			%DeathPanel.visible = true
 	_combat_enemy = null
 
 
+func _new_run() -> void:
+	SaveManager.begin_run()
+	%DeathPanel.visible = false
+	load_map(GameState.current_map)
+
+
 # ---------------------------------------------------------------- HUD
 func _update_hud() -> void:
+	var parts := PackedStringArray()
+	for p in DataLoader.survival:
+		var v := GameState.get_survival(p.param_id)
+		var col := "#e46a6a" if v <= float(p.warn) else "#bbbbbb"
+		parts.append("[color=%s]%s %d[/color]" % [col, p.name, roundi(v)])
+	%Status.text = "[color=#eeeeee]%d일차 %s[/color]   [color=#888888]·  %d회차[/color]      %s" % [
+		GameState.day(), GameState.clock_text(), GameState.run_count, "   ".join(parts)]
 	var hurt := PackedStringArray()
-	for p in player_body.values():
+	for p in GameState.player_body.values():
 		if p.broken:
 			hurt.append("%s 절단" % p.name if not p.vital else "%s 파괴" % p.name)
 		elif p.hp < p.max_hp:
 			hurt.append("%s %d/%d" % [p.name, p.hp, p.max_hp])
 	%Body.text = "부상: " + ("없음" if hurt.is_empty() else "  ·  ".join(hurt))
-	%Items.text = "소지품 %d/%d" % [GameState.inventory.size(), GameState.slot_count()]
+	%InventoryButton.text = "소지품 %d/%d" % [GameState.inventory.size(), GameState.slot_count()]

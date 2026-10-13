@@ -11,10 +11,15 @@ var f: Node
 func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute("user://field_smoke")
 	seed(3)
-	f = load("res://scenes/field/field.tscn").instantiate()
+	SaveManager.save_dir = "user://test_saves/"
+	SaveManager.delete_all()
+	SaveManager.begin_run()
+	var scene: PackedScene = load("res://scenes/field/field.tscn")
+	preload("res://scenes/field/field.gd").next_map_id = "test_field"
+	f = scene.instantiate()
 	add_child(f)
 	await _wait(0.3)
-	check(f.enemies.size() == 2 and f.spots.size() == 3, "맵 로드: 적 2, 조사 지점 3")
+	check(f.enemies.size() == 2 and f.spots.size() == 5, "맵 로드: 적 2, 조사 4 + 출구 1")
 	await _snap("start")
 
 	# 이동: 오른쪽으로 0.5초 → 약 2칸 (4칸/초)
@@ -86,7 +91,7 @@ func _ready() -> void:
 	await _snap("combat")
 	await _end_combat("fled", func(c): c.player_parts.left_arm.hp = 7)
 	check(f._combat_ui == null and not f.frozen and e1.grace > 0.0, "도주 → 필드 복귀, 적 유예")
-	check(f.player_body.left_arm.hp == 7, "전투 피해가 필드에 이어짐")
+	check(GameState.player_body.left_arm.hp == 7, "전투 피해가 필드에 이어짐")
 	await _wait(0.1)
 	await _snap("after_flee")
 
@@ -96,16 +101,21 @@ func _ready() -> void:
 	await _wait_until(func(): return f._combat_ui != null, 2.0)
 	check(f._combat_ui.combat.player_parts.left_arm.hp == 7, "다음 전투도 부상 상태로 시작")
 	await _end_combat("win", func(c): c.player_parts.left_arm.broken = true; c.player_parts.left_arm.hp = 0)
-	check(f.enemies.size() == 1 and f.player_body.left_arm.broken, "승리 → 적 제거, 왼팔 절단 유지")
+	check(f.enemies.size() == 1 and GameState.player_body.left_arm.broken, "승리 → 적 제거, 왼팔 절단 유지")
 	check("왼팔 절단" in f.get_node("%Body").text, "HUD 부상 표시: %s" % f.get_node("%Body").text)
 
 	# 사망 → 처음부터 패널
 	_teleport_to(f.enemies[0])
 	await _wait_until(func(): return f._combat_ui != null, 2.0)
 	await _end_combat("lose", func(_c): pass)
-	check(f.get_node("%DeathPanel").visible, "사망 → 처음부터 패널")
+	check(f.get_node("%DeathPanel").visible and not SaveManager.has_run_save(), "사망 → 회차 종료 패널, 저장 없음")
 	await _snap("dead")
 
+	f.get_node("%NewRunButton").pressed.emit()
+	await _wait(0.2)
+	check(GameState.run_count == 2 and GameState.current_map == "basecamp" and not GameState.player_body.left_arm.broken,
+		"새 회차 → 2회차, 베이스캠프, 몸 새로")
+	SaveManager.delete_all()
 	print("[field_smoke] 스크린샷 %d장, 실패 %d → %s" % [_shot, _fail, ProjectSettings.globalize_path("user://field_smoke")])
 	get_tree().quit(1 if _fail > 0 else 0)
 
