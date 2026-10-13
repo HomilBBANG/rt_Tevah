@@ -761,8 +761,9 @@ def export(d, maps):
     }
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     for name, obj in out.items():
-        (OUT_DIR / f"{name}.json").write_text(json.dumps(obj, ensure_ascii=False, indent=1) + "\n",
-                                              encoding="utf-8", newline="\n")
+        # Path.write_text(newline=) 는 Python 3.10+ 라서 open() 사용 (맥 기본 Python 3.9 지원)
+        with open(OUT_DIR / f"{name}.json", "w", encoding="utf-8", newline="\n") as fp:
+            fp.write(json.dumps(obj, ensure_ascii=False, indent=1) + "\n")
     return out
 
 
