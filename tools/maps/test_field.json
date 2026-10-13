@@ -1,0 +1,145 @@
+{
+ "map_id": "test_field",
+ "tiles": [
+  "##############################",
+  "#............#...............#",
+  "#............#...............#",
+  "#....##......#...............#",
+  "#....##......######..#########",
+  "#............................#",
+  "#............................#",
+  "#............#####...........#",
+  "#####..#######...#...........#",
+  "#................#...........#",
+  "#................#...........#",
+  "#................#...........#",
+  "##############################"
+ ],
+ "start": [
+  1,
+  1
+ ],
+ "run_start": [
+  14,
+  5
+ ],
+ "objects": [
+  {
+   "object_id": "fo_npc1",
+   "type": "npc",
+   "x": 10,
+   "y": 1,
+   "ref": "fd_npc1_a",
+   "name": "NPC 1",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": ""
+  },
+  {
+   "object_id": "fo_to_camp",
+   "type": "exit",
+   "x": 2,
+   "y": 2,
+   "ref": "basecamp",
+   "name": "베이스캠프로",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": ""
+  },
+  {
+   "object_id": "fo_enemy1",
+   "type": "enemy",
+   "x": 21,
+   "y": 2,
+   "ref": "enemy_test",
+   "name": "적 A (테스트)",
+   "text": "",
+   "patrol_dir": "right",
+   "patrol_len": 5,
+   "condition": "",
+   "schedule": ""
+  },
+  {
+   "object_id": "fo_look1",
+   "type": "investigate",
+   "x": 8,
+   "y": 6,
+   "ref": "spot_b",
+   "name": "조사 지점 1",
+   "text": "조사 텍스트 1 (테스트)",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": ""
+  },
+  {
+   "object_id": "fo_supply",
+   "type": "investigate",
+   "x": 11,
+   "y": 6,
+   "ref": "spot_supply",
+   "name": "보급 상자",
+   "text": "조사 텍스트 4 (테스트, 음식·물)",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": ""
+  },
+  {
+   "object_id": "fo_enemy2",
+   "type": "enemy",
+   "x": 23,
+   "y": 8,
+   "ref": "enemy_test",
+   "name": "적 A (테스트)",
+   "text": "",
+   "patrol_dir": "down",
+   "patrol_len": 3,
+   "condition": "",
+   "schedule": ""
+  },
+  {
+   "object_id": "fo_npc2",
+   "type": "npc",
+   "x": 10,
+   "y": 9,
+   "ref": "fd_npc2_a",
+   "name": "NPC 2",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": ""
+  },
+  {
+   "object_id": "fo_look2",
+   "type": "investigate",
+   "x": 3,
+   "y": 10,
+   "ref": "spot_charm",
+   "name": "조사 지점 2",
+   "text": "조사 텍스트 2 (테스트, 부활 아이템)",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": ""
+  },
+  {
+   "object_id": "fo_look3",
+   "type": "investigate",
+   "x": 25,
+   "y": 11,
+   "ref": "spot_empty",
+   "name": "조사 지점 3",
+   "text": "조사 텍스트 3 (테스트, 빈 탐색)",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": ""
+  }
+ ]
+}

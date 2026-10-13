@@ -23,30 +23,30 @@
   "objects": [
    {
     "object_id": "fo_camp",
-    "map_id": "basecamp",
-    "marker": "c",
     "type": "camp",
     "ref": "",
     "name": "베이스캠프 거점",
     "text": "",
-    "patrol": "",
     "condition": "",
-    "schedule": [],
+    "map_id": "basecamp",
     "x": 4,
     "y": 2,
     "patrol_dir": "",
-    "patrol_len": 0
+    "patrol_len": 0,
+    "schedule": []
    },
    {
     "object_id": "fo_cat",
-    "map_id": "basecamp",
-    "marker": "k",
     "type": "npc",
     "ref": "fd_cat_a",
     "name": "고양이",
     "text": "",
-    "patrol": "",
     "condition": "",
+    "map_id": "basecamp",
+    "x": 9,
+    "y": 2,
+    "patrol_dir": "",
+    "patrol_len": 0,
     "schedule": [
      [
       360,
@@ -56,27 +56,21 @@
       1200,
       1380
      ]
-    ],
-    "x": 9,
-    "y": 2,
-    "patrol_dir": "",
-    "patrol_len": 0
+    ]
    },
    {
     "object_id": "fo_to_field",
-    "map_id": "basecamp",
-    "marker": "x",
     "type": "exit",
     "ref": "test_field",
     "name": "탐험 지역으로",
     "text": "",
-    "patrol": "",
     "condition": "",
-    "schedule": [],
+    "map_id": "basecamp",
     "x": 7,
     "y": 6,
     "patrol_dir": "",
-    "patrol_len": 0
+    "patrol_len": 0,
+    "schedule": []
    }
   ]
  },
@@ -110,147 +104,129 @@
   "objects": [
    {
     "object_id": "fo_npc1",
-    "map_id": "test_field",
-    "marker": "n",
     "type": "npc",
     "ref": "fd_npc1_a",
     "name": "NPC 1",
     "text": "",
-    "patrol": "",
     "condition": "",
-    "schedule": [],
+    "map_id": "test_field",
     "x": 10,
     "y": 1,
     "patrol_dir": "",
-    "patrol_len": 0
+    "patrol_len": 0,
+    "schedule": []
    },
    {
     "object_id": "fo_to_camp",
-    "map_id": "test_field",
-    "marker": "x",
     "type": "exit",
     "ref": "basecamp",
     "name": "베이스캠프로",
     "text": "",
-    "patrol": "",
     "condition": "",
-    "schedule": [],
+    "map_id": "test_field",
     "x": 2,
     "y": 2,
     "patrol_dir": "",
-    "patrol_len": 0
+    "patrol_len": 0,
+    "schedule": []
    },
    {
     "object_id": "fo_enemy1",
-    "map_id": "test_field",
-    "marker": "a",
     "type": "enemy",
     "ref": "enemy_test",
     "name": "적 A (테스트)",
     "text": "",
-    "patrol": "right 5",
     "condition": "",
-    "schedule": [],
+    "map_id": "test_field",
     "x": 21,
     "y": 2,
     "patrol_dir": "right",
-    "patrol_len": 5
+    "patrol_len": 5,
+    "schedule": []
    },
    {
     "object_id": "fo_look1",
-    "map_id": "test_field",
-    "marker": "b",
     "type": "investigate",
     "ref": "spot_b",
     "name": "조사 지점 1",
     "text": "조사 텍스트 1 (테스트)",
-    "patrol": "",
     "condition": "",
-    "schedule": [],
+    "map_id": "test_field",
     "x": 8,
     "y": 6,
     "patrol_dir": "",
-    "patrol_len": 0
+    "patrol_len": 0,
+    "schedule": []
    },
    {
     "object_id": "fo_supply",
-    "map_id": "test_field",
-    "marker": "f",
     "type": "investigate",
     "ref": "spot_supply",
     "name": "보급 상자",
     "text": "조사 텍스트 4 (테스트, 음식·물)",
-    "patrol": "",
     "condition": "",
-    "schedule": [],
+    "map_id": "test_field",
     "x": 11,
     "y": 6,
     "patrol_dir": "",
-    "patrol_len": 0
+    "patrol_len": 0,
+    "schedule": []
    },
    {
     "object_id": "fo_enemy2",
-    "map_id": "test_field",
-    "marker": "c",
     "type": "enemy",
     "ref": "enemy_test",
     "name": "적 A (테스트)",
     "text": "",
-    "patrol": "down 3",
     "condition": "",
-    "schedule": [],
+    "map_id": "test_field",
     "x": 23,
     "y": 8,
     "patrol_dir": "down",
-    "patrol_len": 3
+    "patrol_len": 3,
+    "schedule": []
    },
    {
     "object_id": "fo_npc2",
-    "map_id": "test_field",
-    "marker": "m",
     "type": "npc",
     "ref": "fd_npc2_a",
     "name": "NPC 2",
     "text": "",
-    "patrol": "",
     "condition": "",
-    "schedule": [],
+    "map_id": "test_field",
     "x": 10,
     "y": 9,
     "patrol_dir": "",
-    "patrol_len": 0
+    "patrol_len": 0,
+    "schedule": []
    },
    {
     "object_id": "fo_look2",
-    "map_id": "test_field",
-    "marker": "d",
     "type": "investigate",
     "ref": "spot_charm",
     "name": "조사 지점 2",
     "text": "조사 텍스트 2 (테스트, 부활 아이템)",
-    "patrol": "",
     "condition": "",
-    "schedule": [],
+    "map_id": "test_field",
     "x": 3,
     "y": 10,
     "patrol_dir": "",
-    "patrol_len": 0
+    "patrol_len": 0,
+    "schedule": []
    },
    {
     "object_id": "fo_look3",
-    "map_id": "test_field",
-    "marker": "e",
     "type": "investigate",
     "ref": "spot_empty",
     "name": "조사 지점 3",
     "text": "조사 텍스트 3 (테스트, 빈 탐색)",
-    "patrol": "",
     "condition": "",
-    "schedule": [],
+    "map_id": "test_field",
     "x": 25,
     "y": 11,
     "patrol_dir": "",
-    "patrol_len": 0
+    "patrol_len": 0,
+    "schedule": []
    }
   ]
  }

@@ -51,7 +51,6 @@ SCHEMA = {
                                    "damage", "weight"],
                      {"windup": (float, None), "damage": (int, None), "weight": (int, 1)}),
     # ---- 탐험 필드. 맵 모양은 tools/maps/<map_id>.txt, 맵 위 물체는 이 시트
-    "FieldObjects": ("object_id", ["object_id", "map_id", "marker", "type", "ref", "name", "text", "patrol"], {}),
     # ---- 생존·베이스캠프 (기획서 §4, §5, §12)
     "Survival": ("param_id", ["param_id", "name", "start", "max", "decay_per_hour", "warn"],
                  {"start": (float, None), "max": (float, None), "decay_per_hour": (float, 0.0), "warn": (float, 0.0)}),
@@ -62,12 +61,12 @@ SCHEMA = {
 }
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
-OPTIONAL_SHEETS = {"Abilities", "PlayerParts", "Enemies", "EnemyParts", "EnemyAttacks", "FieldObjects",
+OPTIONAL_SHEETS = {"Abilities", "PlayerParts", "Enemies", "EnemyParts", "EnemyAttacks",
                    "Survival", "CampActions", "Revivals"}
 FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit"}
 CAMP_KINDS = {"", "sleep"}   # sleep: 1시간 단위로 골라 자고, 자고 나면 저장 (effects 는 1시간마다)
-PATROL_RE = re.compile(r"^(up|down|left|right)\s+(\d+)$")
-MAP_FIXED = {"#", ".", " ", "P", "S"}   # 벽 / 바닥 / 빈칸(벽 취급) / 도착 위치(출구·부활) / 회차 시작 위치
+PATROL_DIRS = {"": (0, 0), "up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
+MAP_TILES = {"#", "."}   # 벽 / 바닥
 # ID 중복 검사를 여러 열 조합으로 하는 시트
 DUP_KEYS = {"EnemyParts": ("enemy_id", "part_id")}
 DODGE_KEYS = {"W", "A", "S", "D"}
@@ -82,8 +81,6 @@ OPTIONAL = {
     # 선택지 종류: normal(기본) / item / dice
     # dice: check=능력치, dc=목표값, mod=상황 보정, 실패 시 fail_effects·fail_next
     "Choices": ["type", "check", "dc", "mod", "fail_effects", "fail_next"],
-    "FieldObjects": ["condition",   # 맵에 들어올 때 이 조건이 참이어야 나타남
-                     "schedule"],   # npc 가 있는 시간대 "06:00-12:00, 20:00-23:00" (비우면 항상). 예: 고양이의 루틴
 }
 
 ID_RE = re.compile(r"^[A-Za-z0-9_]+$")
@@ -567,7 +564,7 @@ def validate(d, rep):
     roots = [[ep["start_node"], ep["timeout_node"]] +
              [g for g in item_gotos if g in nodes and nodes[g]["episode_id"] == ep["episode_id"]]
              for ep in d["Episodes"]]
-    roots.append([o["ref"] for o in d["FieldObjects"] if o["type"] == "npc"])
+    roots.append([o["ref"] for o in d["FieldObjects"] if o.get("type") == "npc"])
     for root in roots:
         q = deque(x for x in root if x in nodes)
         while q:
@@ -703,72 +700,118 @@ def _dlg_str(v):
 
 
 def read_maps(rep):
-    """tools/maps/*.txt → {map_id: {"lines": [...], "file": name}}"""
+    """tools/maps/<map_id>.json (맵 에디터 파일) → {map_id: {...}}
+
+    { map_id, tiles: ["#..#", ...], start: [x, y] (도착 위치 P), run_start: [x, y] 또는 null (회차 시작 S),
+      objects: [{object_id, type, x, y, ref, name, text, patrol_dir, patrol_len, condition, schedule}] }
+    """
     maps = {}
     if not MAPS_DIR.exists():
         return maps
+    for f in sorted(MAPS_DIR.glob("*.json")):
+        try:
+            m = json.loads(f.read_text(encoding="utf-8"))
+        except (ValueError, OSError) as e:
+            rep.err(f"맵 {f.name}", f"파일을 읽을 수 없음: {e}")
+            continue
+        m["file"] = f.name
+        m["tiles"] = [str(r) for r in m.get("tiles", [])]
+        m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len") else v for k, v in o.items()}
+                        for o in m.get("objects", [])]
+        maps[f.stem] = m
     for f in sorted(MAPS_DIR.glob("*.txt")):
-        lines = f.read_text(encoding="utf-8").rstrip("\n").split("\n")
-        lines = [ln.rstrip("\r") for ln in lines]
-        maps[f.stem] = {"lines": lines, "file": f.name}
+        rep.err(f"맵 {f.name}", ".txt 맵은 더 이상 읽지 않음 — Godot '맵' 탭(맵 에디터)의 .json 으로 옮길 것")
     return maps
+
+
+def field_objects(maps):
+    """맵 파일들의 물체를 한 목록으로 (map_id 포함). 대화 도달성 검사 등에 쓴다."""
+    out = []
+    for mid, m in maps.items():
+        for o in m["objects"]:
+            out.append(dict(o, map_id=mid, _row=m["file"]))
+    return out
 
 
 def validate_field(d, maps, rep, enemies):
     spots = {r["spot_id"] for r in d["Loot"] if r["spot_id"]}
     nodes = {n["node_id"]: n for n in d["Nodes"]}
+    seen = {}
     for mid, m in maps.items():
-        run_starts = sum(ln.count("S") for ln in m["lines"])
-        if run_starts > 1:
-            rep.err(f"맵 {m['file']}", f"회차 시작 위치 S 는 1개까지 (지금 {run_starts}개)")
-        starts = sum(ln.count("P") for ln in m["lines"])
-        if starts != 1:
-            rep.err(f"맵 {m['file']}", f"시작 위치 P 가 정확히 1개여야 함 (지금 {starts}개)")
-    for o in d["FieldObjects"]:
-        w = f"FieldObjects {o['_row']}행 ({o['object_id']})"
-        m = maps.get(o["map_id"])
-        if m is None:
-            rep.err(w, f"맵 파일 tools/maps/{o['map_id']}.txt 가 없음")
+        wm = f"맵 {m['file']}"
+        if m.get("map_id", mid) != mid:
+            rep.err(wm, f"map_id '{m.get('map_id')}' 가 파일 이름과 다름")
+        tiles = m["tiles"]
+        if not tiles:
+            rep.err(wm, "tiles 가 비어 있음")
             continue
-        mk = o["marker"]
-        if len(mk) != 1 or mk in MAP_FIXED:
-            rep.err(w, f"marker 는 # . P 가 아닌 글자 1개: '{mk}'")
-        else:
-            n = sum(ln.count(mk) for ln in m["lines"])
-            if n != 1:
-                rep.err(w, f"맵 {m['file']} 에 marker '{mk}' 가 정확히 1개여야 함 (지금 {n}개)")
-        if o["type"] not in FIELD_TYPES:
-            rep.err(w, f"type 은 enemy / investigate / npc / camp / exit: '{o['type']}'")
-        elif o["type"] == "enemy" and o["ref"] not in enemies:
-            rep.err(w, f"enemy 의 ref 는 Enemies 의 enemy_id: '{o['ref']}'")
-        elif o["type"] == "npc" and (o["ref"] not in nodes or nodes[o["ref"]]["episode_id"] != ""):
-            rep.err(w, f"npc 의 ref 는 필드 대화 시작 노드 (Nodes 에서 episode_id 를 비운 노드): '{o['ref']}'")
-        elif o["type"] == "exit" and o["ref"] not in maps:
-            rep.err(w, f"exit 의 ref 는 이동할 맵 이름 (tools/maps/<이름>.txt): '{o['ref']}'")
-        elif o["type"] == "investigate" and o["ref"] and o["ref"] not in spots:
-            rep.err(w, f"investigate 의 ref 는 Loot 의 spot_id (없으면 비움): '{o['ref']}'")
-        if o["schedule"]:
-            if o["type"] != "npc":
-                rep.err(w, "schedule 은 npc 만")
-            for rng in split_list(o["schedule"]):
-                if parse_time_range(rng) is None:
-                    rep.err(w, f"schedule 은 '시:분-시:분' 을 쉼표로 (예: 06:00-12:00, 22:00-02:00): '{rng}'")
-        if o["condition"]:
-            try:
-                parse_condition(o["condition"])
-            except ExprError as e:
-                rep.err(w, f"condition 문법 오류: {e}")
-        if o["patrol"]:
-            if o["type"] != "enemy":
-                rep.err(w, "patrol 은 enemy 만")
-            elif not PATROL_RE.match(o["patrol"].lower()):
-                rep.err(w, f"patrol 은 '방향 칸수' (예: right 4, 방향 up/down/left/right): '{o['patrol']}'")
-    for mid, m in maps.items():
-        known = {o["marker"] for o in d["FieldObjects"] if o["map_id"] == mid}
-        for y, ln in enumerate(m["lines"]):
-            for x, ch in enumerate(ln):
-                if ch not in MAP_FIXED and ch not in known:
-                    rep.err(f"맵 {m['file']} {y + 1}행 {x + 1}열", f"FieldObjects 에 없는 marker '{ch}'")
+        width = max(len(r) for r in tiles)
+        for y, row in enumerate(tiles):
+            bad = set(row) - MAP_TILES
+            if bad:
+                rep.err(wm, f"{y + 1}행에 알 수 없는 칸 {sorted(bad)} (# 벽 / . 바닥)")
+
+        def floor(x, y):
+            return 0 <= y < len(tiles) and 0 <= x < len(tiles[y]) and tiles[y][x] == "."
+
+        for key, label in (("start", "도착 위치 P"), ("run_start", "회차 시작 S")):
+            pos = m.get(key)
+            if pos is None:
+                if key == "start":
+                    rep.err(wm, "도착 위치 P 가 없음")
+                continue
+            if not (isinstance(pos, list) and len(pos) == 2 and floor(int(pos[0]), int(pos[1]))):
+                rep.err(wm, f"{label} 위치가 바닥이 아님: {pos}")
+        occupied = {}
+        for o in m["objects"]:
+            oid = o.get("object_id", "")
+            w = f"{wm} 물체 {oid or '(ID 없음)'}"
+            if not ID_RE.match(oid):
+                rep.err(w, "object_id 는 영문·숫자·_")
+            elif oid in seen:
+                rep.err(w, f"object_id 중복 (맵 {seen[oid]} 과 겹침)")
+            else:
+                seen[oid] = m["file"]
+            x, y = int(o.get("x", -1)), int(o.get("y", -1))
+            if not floor(x, y):
+                rep.err(w, f"위치 ({x}, {y}) 가 바닥이 아님")
+            elif (x, y) in occupied:
+                rep.err(w, f"위치 ({x}, {y}) 에 이미 {occupied[(x, y)]} 가 있음")
+            occupied[(x, y)] = oid
+            t = o.get("type", "")
+            ref = o.get("ref", "")
+            if t not in FIELD_TYPES:
+                rep.err(w, f"type 은 enemy / investigate / npc / camp / exit: '{t}'")
+            elif t == "enemy" and ref not in enemies:
+                rep.err(w, f"적 종류(ref)는 Enemies 의 enemy_id: '{ref}'")
+            elif t == "npc" and (ref not in nodes or nodes[ref]["episode_id"] != ""):
+                rep.err(w, f"NPC 의 대화(ref)는 필드 대화 시작 노드: '{ref}'")
+            elif t == "exit" and ref not in maps:
+                rep.err(w, f"출구의 ref 는 이동할 맵 이름: '{ref}'")
+            elif t == "investigate" and ref and ref not in spots:
+                rep.err(w, f"조사의 ref 는 Loot 의 spot_id (없으면 비움): '{ref}'")
+            pdir, plen = o.get("patrol_dir", ""), int(o.get("patrol_len", 0) or 0)
+            if pdir not in PATROL_DIRS:
+                rep.err(w, f"patrol_dir 은 up/down/left/right: '{pdir}'")
+            elif pdir and t != "enemy":
+                rep.err(w, "순찰은 적만")
+            elif pdir:
+                dx, dy = PATROL_DIRS[pdir]
+                for i in range(1, plen + 1):
+                    if not floor(x + dx * i, y + dy * i):
+                        rep.err(w, f"순찰 경로 {i}칸째 ({x + dx * i}, {y + dy * i}) 가 벽")
+                        break
+            if o.get("schedule"):
+                if t != "npc":
+                    rep.err(w, "schedule(루틴) 은 NPC 만")
+                for rng in split_list(o["schedule"]):
+                    if parse_time_range(rng) is None:
+                        rep.err(w, f"schedule 은 '시:분-시:분' 을 쉼표로 (예: 06:00-12:00, 22:00-02:00): '{rng}'")
+            if o.get("condition"):
+                try:
+                    parse_condition(o["condition"])
+                except ExprError as e:
+                    rep.err(w, f"condition 문법 오류: {e}")
 
 
 TIME_RANGE_RE = re.compile(r"^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$")
@@ -789,29 +832,18 @@ def parse_time_range(text):
 def export_maps(d, maps):
     out = []
     for mid, m in maps.items():
-        width = max(len(ln) for ln in m["lines"])
-        objs = {o["marker"]: o for o in d["FieldObjects"] if o["map_id"] == mid}
-        tiles, objects, start, run_start = [], [], [0, 0], None
-        for y, ln in enumerate(m["lines"]):
-            row = ""
-            for x, ch in enumerate(ln.ljust(width)):
-                if ch == "P":
-                    start = [x, y]
-                    ch = "."
-                elif ch == "S":
-                    run_start = [x, y]
-                    ch = "."
-                elif ch in objs:
-                    o = {k: v for k, v in objs[ch].items() if k != "_row"}
-                    pat = PATROL_RE.match(o["patrol"].lower()) if o["patrol"] else None
-                    o.update(x=x, y=y, patrol_dir=pat.group(1) if pat else "", patrol_len=int(pat.group(2)) if pat else 0,
-                             schedule=[parse_time_range(r) for r in split_list(o.get("schedule", ""))])
-                    objects.append(o)
-                    ch = "."
-                row += "#" if ch == " " else ch
-            tiles.append(row)
+        width = max(len(r) for r in m["tiles"])
+        tiles = [r.ljust(width, "#") for r in m["tiles"]]
+        objects = []
+        for o in m["objects"]:
+            e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition")}
+            e.update(map_id=mid, x=int(o["x"]), y=int(o["y"]), patrol_dir=o.get("patrol_dir", ""),
+                     patrol_len=int(o.get("patrol_len", 0) or 0),
+                     schedule=[parse_time_range(r) for r in split_list(o.get("schedule", ""))])
+            objects.append(e)
+        start = m.get("start") or [0, 0]
         out.append({"map_id": mid, "width": width, "height": len(tiles), "tiles": tiles, "start": start,
-                    "run_start": run_start or start, "objects": objects})
+                    "run_start": m.get("run_start") or start, "objects": objects})
     return out
 
 
@@ -902,6 +934,7 @@ def _run(path, say):
     read_dialogues(data, rep)
     maps = read_maps(rep)
     data["_maps"] = maps
+    data["FieldObjects"] = field_objects(maps)
     validate(data, rep)
     validate_field(data, maps, rep, {e["enemy_id"] for e in data["Enemies"]})
     if rep.errors:

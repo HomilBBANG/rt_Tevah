@@ -1,0 +1,58 @@
+{
+ "map_id": "basecamp",
+ "tiles": [
+  "##############",
+  "#............#",
+  "#............#",
+  "#............#",
+  "#............#",
+  "#............#",
+  "#######.######"
+ ],
+ "start": [
+  7,
+  4
+ ],
+ "run_start": null,
+ "objects": [
+  {
+   "object_id": "fo_camp",
+   "type": "camp",
+   "x": 4,
+   "y": 2,
+   "ref": "",
+   "name": "베이스캠프 거점",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": ""
+  },
+  {
+   "object_id": "fo_cat",
+   "type": "npc",
+   "x": 9,
+   "y": 2,
+   "ref": "fd_cat_a",
+   "name": "고양이",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "06:00-12:00, 20:00-23:00"
+  },
+  {
+   "object_id": "fo_to_field",
+   "type": "exit",
+   "x": 7,
+   "y": 6,
+   "ref": "test_field",
+   "name": "탐험 지역으로",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": ""
+  }
+ ]
+}
