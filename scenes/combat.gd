@@ -5,6 +5,10 @@ extends Control
 ## 적 턴: 공격 전조 → 회피 원이 고리에 닿는 순간 맞는 방향키(W/A/S/D 또는 방향키·패드) 입력
 
 const Combat = preload("res://core/combat/combat.gd")
+const InputActions = preload("res://core/input_actions.gd")
+
+## 탐험 필드 안에서 띄웠을 때: 끝나면 결과("win"/"lose"/"fled")를 알린다
+signal finished(outcome: String)
 
 ## 회피 입력 액션 → 키 글자 (기획서 §8.1)
 const DODGE_ACTIONS := {"dodge_up": "W", "dodge_left": "A", "dodge_down": "S", "dodge_right": "D"}
@@ -15,6 +19,10 @@ const TURN_PAUSE := 0.6
 static var next_enemy_id := ""
 
 var combat := Combat.new()
+## 필드에서 띄울 때 add_child 전에 채운다
+var embedded := false
+var enemy_id_override := ""
+var player_state := {}
 var _state := ""              # player / target / enemy / over
 var _log: PackedStringArray = []
 var _strike_start := 0
@@ -23,11 +31,11 @@ var _press_time := 0
 
 
 func _ready() -> void:
-	_ensure_dodge_actions()
-	var enemy_id: String = next_enemy_id
+	InputActions.ensure()
+	var enemy_id: String = enemy_id_override if enemy_id_override != "" else next_enemy_id
 	if enemy_id == "" and not DataLoader.enemies.is_empty():
 		enemy_id = DataLoader.enemies.keys().front()
-	if enemy_id == "" or not combat.setup(enemy_id):
+	if enemy_id == "" or not combat.setup(enemy_id, player_state):
 		_add_log("[오류] 전투 데이터가 없습니다. tools/xlsx_to_json.py 를 실행했는지 확인하세요.")
 		return
 	%EnemyName.text = combat.enemy.name
@@ -39,9 +47,16 @@ func _ready() -> void:
 	%DefendButton.pressed.connect(_on_defend)
 	%FleeButton.pressed.connect(_on_flee)
 	%CancelButton.pressed.connect(_player_turn)
-	%RetryButton.pressed.connect(func(): get_tree().reload_current_scene())
-	%TitleButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
-	%QuitButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
+	if embedded:
+		%RetryButton.visible = false
+		%QuitButton.visible = false
+		%TitleButton.text = "계속"
+		%TitleButton.pressed.connect(func(): finished.emit(combat.outcome))
+	else:
+		%RetryButton.pressed.connect(func(): get_tree().reload_current_scene())
+		%TitleButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
+		%QuitButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
+	%PlayerBody.refresh()
 	_add_log("%s 이(가) 나타났다." % combat.enemy.name)
 	_player_turn()
 
@@ -212,21 +227,3 @@ func _add_log(line: String) -> void:
 	if _log.size() > 4:
 		_log = _log.slice(_log.size() - 4)
 	%Log.text = "\n".join(_log)
-
-
-static func _ensure_dodge_actions() -> void:
-	var keys := {"dodge_up": [KEY_W, KEY_UP], "dodge_left": [KEY_A, KEY_LEFT],
-		"dodge_down": [KEY_S, KEY_DOWN], "dodge_right": [KEY_D, KEY_RIGHT]}
-	var pads := {"dodge_up": JOY_BUTTON_DPAD_UP, "dodge_left": JOY_BUTTON_DPAD_LEFT,
-		"dodge_down": JOY_BUTTON_DPAD_DOWN, "dodge_right": JOY_BUTTON_DPAD_RIGHT}
-	for action in keys:
-		if InputMap.has_action(action):
-			continue
-		InputMap.add_action(action)
-		for k in keys[action]:
-			var ev := InputEventKey.new()
-			ev.physical_keycode = k
-			InputMap.action_add_event(action, ev)
-		var jb := InputEventJoypadButton.new()
-		jb.button_index = pads[action]
-		InputMap.action_add_event(action, jb)

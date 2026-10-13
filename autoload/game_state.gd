@@ -44,6 +44,24 @@ func reset_for_episode(ep: Dictionary) -> void:
 	flags_changed.emit()
 
 
+## 탐험 회차 시작 (에피소드 없이). 스탯·인벤토리·플래그를 처음 상태로.
+## TODO(기획 §11): 회차 구조·베이스캠프 저장이 들어오면 여기서 회차 초기화를 맡는다.
+func reset_run() -> void:
+	episode_id = ""
+	node_id = ""
+	stats = {}
+	for s in STATS:
+		stats[s] = DataLoader.get_config_int(s + "_start", 100)
+	inventory = []
+	ep_flags = {}
+	timed_out = false
+	traits = []
+	abilities = {}
+	stats_changed.emit()
+	inventory_changed.emit()
+	flags_changed.emit()
+
+
 # ---------------------------------------------------------------- 스탯
 func get_stat(name: String) -> int:
 	return int(stats.get(name, 0))

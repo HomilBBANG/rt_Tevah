@@ -41,6 +41,11 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "시작"
 
+[node name="FieldButton" type="Button" parent="Center/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "탐험 테스트"
+
 [node name="CombatButton" type="Button" parent="Center/VBox"]
 unique_name_in_owner = true
 layout_mode = 2

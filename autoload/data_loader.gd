@@ -14,6 +14,8 @@ var endings := {}          # ending_id -> Dictionary
 var abilities := {}        # ability_id -> Dictionary
 var player_parts: Array = []  # 전투: 플레이어 부위 (엑셀 행 순서)
 var enemies := {}          # 전투: enemy_id -> { name, parts: [...], attacks: [{..., strikes}] }
+var maps := {}             # 탐험: map_id -> { width, height, tiles: [String], start: [x, y], objects: [...] }
+var map_order: Array[String] = []
 var config := {}           # key -> number
 
 
@@ -33,6 +35,8 @@ func load_all() -> void:
 	abilities.clear()
 	player_parts = []
 	enemies.clear()
+	maps.clear()
+	map_order.clear()
 
 	for ep in _read_list("episodes"):
 		episodes[ep.episode_id] = ep
@@ -64,6 +68,10 @@ func load_all() -> void:
 	if FileAccess.file_exists(DATA_DIR + "enemies.json"):
 		for en in _read_list("enemies"):
 			enemies[en.enemy_id] = en
+	if FileAccess.file_exists(DATA_DIR + "maps.json"):
+		for m in _read_list("maps"):
+			maps[m.map_id] = m
+			map_order.append(m.map_id)
 	var cfg = _read("config")
 	config = cfg if cfg is Dictionary else {}
 

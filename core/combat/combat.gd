@@ -30,17 +30,16 @@ var outcome := ""            # "" 진행 중 / "win" / "lose" / "fled"
 var forced_rolls: Array[float] = []
 
 
-func setup(enemy_id: String) -> bool:
+## player_state: 이전 전투에서 이어지는 플레이어 부위 상태 (비우면 새 몸). 복사해서 쓴다.
+func setup(enemy_id: String, player_state := {}) -> bool:
 	var data: Dictionary = DataLoader.enemies.get(enemy_id, {})
 	if data.is_empty():
 		push_error("[Combat] 없는 적: %s" % enemy_id)
 		return false
 	enemy = {"enemy_id": enemy_id, "name": data.name}
-	player_parts.clear()
+	player_parts = player_state.duplicate(true) if not player_state.is_empty() else fresh_player_parts()
 	player_order.clear()
 	for p in DataLoader.player_parts:
-		player_parts[p.part_id] = {"part_id": p.part_id, "name": p.name, "key": p.key, "hp": int(p.hp),
-			"max_hp": int(p.hp), "vital": p.vital, "broken": false}
 		player_order.append(p.part_id)
 	enemy_parts.clear()
 	enemy_order.clear()
@@ -52,6 +51,15 @@ func setup(enemy_id: String) -> bool:
 	defending = false
 	outcome = ""
 	return true
+
+
+## 다친 곳 없는 플레이어 부위 상태
+static func fresh_player_parts() -> Dictionary:
+	var parts := {}
+	for p in DataLoader.player_parts:
+		parts[p.part_id] = {"part_id": p.part_id, "name": p.name, "key": p.key, "hp": int(p.hp),
+			"max_hp": int(p.hp), "vital": p.vital, "broken": false}
+	return parts
 
 
 static func config_float(key: String, default: float) -> float:
