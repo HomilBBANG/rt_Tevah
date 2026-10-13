@@ -158,7 +158,7 @@ func _show_page(p: Dictionary) -> void:
 
 
 func _show_dialogue(p: Dictionary) -> void:
-	var protagonist: String = DataLoader.episodes.get(GameState.episode_id, {}).get("protagonist_id", "")
+	var protagonist: String = GameState.protagonist_id
 	var side := "none"
 	if p.speaker_id != protagonist:
 		var i := _slots.find(p.speaker_id)

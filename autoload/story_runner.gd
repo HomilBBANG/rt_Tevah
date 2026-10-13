@@ -15,6 +15,8 @@ signal choices_shown(entries: Array)
 signal message(text: String)
 signal messages_cleared
 signal ending_reached(ending_id: String)
+## 필드 대화가 EXIT 에 닿음 → 필드로 복귀
+signal dialogue_ended
 ## 인벤토리가 가득 참: UI는 버릴 칸을 고르게 하고 choose_discard(slot 또는 -1)을 호출해야 한다.
 signal inventory_full(item_id: String, amount: int)
 ## 주사위 판정 결과 (dice_preview() 내용 + roll, total, success, critical). 효과 적용 전에 발신.
@@ -28,6 +30,8 @@ var busy := false    # 효과 처리 중 (입력 무시)
 ## 테스트용: 비어 있지 않으면 주사위 대신 앞에서부터 꺼내 쓴다.
 var forced_rolls: Array[int] = []
 var ended := false
+## "episode" = 에피소드 진행 (엔딩·스탯 규칙·자동 저장) / "field" = 탐험 중 NPC 대화 (EXIT 로 끝)
+var mode := "episode"
 
 var _pending_episode := ""
 var _pending_resume := false
@@ -46,6 +50,7 @@ func prepare(episode_id: String, resume: bool) -> void:
 
 
 func launch() -> void:
+	mode = "episode"
 	if _pending_resume and SaveManager.load_episode(_pending_episode):
 		ended = false
 		busy = false
@@ -61,9 +66,21 @@ func start_episode(episode_id: String) -> void:
 		return
 	SaveManager.delete_episode_save(episode_id)
 	GameState.reset_for_episode(ep)
+	mode = "episode"
 	ended = false
 	busy = true
 	await _goto(ep.start_node)
+	busy = false
+
+
+## 탐험 중 NPC 대화 시작. 게임 상태(인벤토리·플래그·능력치)는 그대로 쓰고, 대화가 EXIT 에 닿으면 dialogue_ended.
+## 시그널을 받을 화면을 먼저 띄운 뒤 호출할 것.
+func start_dialogue(node_id: String) -> void:
+	mode = "field"
+	ended = false
+	busy = true
+	messages_cleared.emit()
+	await _goto(node_id)
 	busy = false
 
 
@@ -178,6 +195,10 @@ func _goto(target: String) -> void:
 		if hops > 100:
 			push_error("[StoryRunner] 노드 이동이 100번 넘게 이어짐 (goto 순환?): %s" % target)
 			return
+		if target == "EXIT":
+			ended = true
+			dialogue_ended.emit()
+			return
 		if target.begins_with("END:"):
 			_finish(target.substr(4))
 			return
@@ -205,6 +226,9 @@ func _goto(target: String) -> void:
 
 ## 스탯 규칙. 이동이 필요하면 대상("END:x" 또는 node_id)을, 아니면 "" 을 돌려준다.
 func _check_stats() -> String:
+	# TODO(기획 §5): 탐험 중 생존 파라미터(배고픔·수면·위생·멘탈)가 들어오면 필드 대화에도 연결
+	if mode == "field":
+		return ""
 	var ep: Dictionary = DataLoader.episodes.get(GameState.episode_id, {})
 	if GameState.get_stat("hp") <= 0:
 		return "END:" + ep.get("death_ending", "")

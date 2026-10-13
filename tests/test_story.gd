@@ -9,6 +9,7 @@ var entries: Array = []
 var messages: Array[String] = []
 var ending := ""
 var last_dice := {}
+var dialogue_done := 0
 var discard_answers: Array[int] = []
 var full_events := 0
 
@@ -26,6 +27,7 @@ func _ready() -> void:
 	StoryRunner.messages_cleared.connect(func(): messages.clear())
 	StoryRunner.ending_reached.connect(func(id): ending = id)
 	StoryRunner.dice_rolled.connect(func(r): last_dice = r)
+	StoryRunner.dialogue_ended.connect(func(): dialogue_done += 1)
 	StoryRunner.inventory_full.connect(_on_full)
 	await _run()
 	SaveManager.delete_all()
@@ -176,6 +178,33 @@ func _run() -> void:
 	check(node_id == "t2_a", "NPC 2인 대화 후 t2_a")
 	await StoryRunner.choose("c2_a1")
 	check(ending == "end_t2_clear", "ep_test2 클리어")
+
+	# ---------- 필드 대화 (에피소드 없이, Config protagonist_id = char_t1)
+	ending = ""
+	GameState.reset_run()
+	check(GameState.protagonist_id == "char_t1" and GameState.get_ability("stat_a") == 3, "탐험 회차: 주인공 능력치 로드")
+	await StoryRunner.start_dialogue("fd_npc1_a")
+	check(node_id == "fd_npc1_a" and StoryRunner.mode == "field", "NPC 1 대화 시작")
+	check(_ids() == ["fdc1", "fdc2", "fdc3", "fdc4"] and not _enabled("fdc2"), "일반·아이템(칼 없음 → 회색)·판정·끝내기")
+	check(_dice("fdc3").mod == 3, "판정 보정 = 주인공 능력치 A 3")
+	await StoryRunner.choose("fdc4")
+	check(dialogue_done == 1 and StoryRunner.ended and ending == "", "EXIT → 대화 끝 (엔딩 아님)")
+	GameState.add_item("knife", 1)
+	await StoryRunner.start_dialogue("fd_npc1_a")
+	check(_enabled("fdc2"), "칼 소지 → 아이템 선택지 활성")
+	await StoryRunner.choose("fdc2")
+	check(node_id == "fd_npc1_b" and GameState.has_flag("showed_knife"), "아이템 선택지 → 다음 노드, 플래그")
+	await StoryRunner.continue_story()
+	check(dialogue_done == 2, "next_node EXIT → 대화 끝")
+	await StoryRunner.start_dialogue("fd_npc1_a")
+	StoryRunner.forced_rolls = [1]
+	await StoryRunner.choose("fdc3")
+	check(node_id == "fd_npc1_fail" and last_dice.critical == "fail", "대화 판정 실패 → fail_next")
+	await StoryRunner.continue_story()
+	await StoryRunner.start_dialogue("fd_npc2_a")
+	check(_ids().has("fdc5"), "다른 NPC 대화에서 플래그로 열린 선택지")
+	await StoryRunner.choose("fdc6")
+	check(dialogue_done == 4 and not SaveManager.has_episode_save(""), "필드 대화는 에피소드 저장 안 함")
 
 
 func _fresh_to_d() -> void:
