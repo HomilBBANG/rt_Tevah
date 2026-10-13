@@ -19,6 +19,9 @@ signal ending_reached(ending_id: String)
 signal dialogue_ended
 ## 인벤토리가 가득 참: UI는 버릴 칸을 고르게 하고 choose_discard(slot 또는 -1)을 호출해야 한다.
 signal inventory_full(item_id: String, amount: int)
+## 효과 save: 저장할 슬롯을 물어봄. 화면은 슬롯 선택 창을 띄우고 choose_save_slot(슬롯 또는 -1)을 부른다.
+signal save_slot_requested
+signal _save_slot_chosen(slot: int)
 ## 주사위 판정 결과 (dice_preview() 내용 + roll, total, success, critical). 효과 적용 전에 발신.
 ## critical: "success"(20, 대성공) / "fail"(1, 대실패) / "" — 1·20 은 합계와 무관하게 결과가 정해진다.
 signal dice_rolled(result: Dictionary)
@@ -29,6 +32,8 @@ const DICE_SIDES := 20
 var busy := false    # 효과 처리 중 (입력 무시)
 ## 테스트용: 비어 있지 않으면 주사위 대신 앞에서부터 꺼내 쓴다.
 var forced_rolls: Array[int] = []
+## 테스트용: 0 보다 크면 슬롯을 묻지 않고 이 슬롯에 저장
+var save_slot_override := 0
 var ended := false
 ## "episode" = 에피소드 진행 (엔딩·스탯 규칙·자동 저장) / "field" = 탐험 중 NPC 대화 (EXIT 로 끝)
 var mode := "episode"
@@ -329,17 +334,29 @@ func _apply_effects(effects: Array) -> String:
 			"goto":
 				redirect = e.id
 			"save":
-				_save_run()
+				await _save_run()
 	return redirect
 
 
 ## 효과 save: 베이스캠프에서만 회차 저장 (고양이에게 저장하기 등)
 func _save_run() -> void:
-	if SaveManager.can_save_run():
-		SaveManager.save_run()
-		message.emit("저장했다.  (%d일차 %s)" % [GameState.day(), GameState.clock_text()])
-	else:
+	if not SaveManager.can_save_run():
 		message.emit("여기서는 저장할 수 없다.")
+		return
+	var slot := save_slot_override
+	if slot <= 0:
+		save_slot_requested.emit()
+		slot = await _save_slot_chosen
+	if slot > 0:
+		SaveManager.save_run(slot)
+		message.emit("슬롯 %d 에 저장했다.  (%d일차 %s)" % [slot, GameState.day(), GameState.clock_text()])
+	else:
+		message.emit("저장하지 않았다.")
+
+
+## 저장 슬롯 선택 결과 (-1 = 저장 안 함). save_slot_requested 를 받은 뒤 호출.
+func choose_save_slot(slot: int) -> void:
+	_save_slot_chosen.emit(slot)
 
 
 func _give_item(item_id: String, amount: int) -> void:

@@ -33,12 +33,14 @@ func _ready() -> void:
 	await _snap("cat")
 	_find_button(dlg, "쓰다듬는다 (저장)").pressed.emit()
 	await _wait(0.2)
-	check(SaveManager.has_run_save(), "고양이를 쓰다듬어 저장")
+	check(_picker() != null, "고양이에게 저장 → 슬롯 선택 창")
+	await _snap("slot_picker")
+	await _press_prefix("슬롯 1 ")
+	check(SaveManager.has_run_save(1) and _picker() == null, "슬롯 1 에 저장")
 	await _snap("cat_saved")
 	dlg.advance()
 	await _wait(0.2)
 	check(f._dialogue_ui == null and not f.frozen, "'저장했다' 보여준 뒤 필드로")
-	SaveManager.delete_run_save()
 
 	# 거점 메뉴
 	_teleport(4, 3)   # 거점 (4,2) 아래
@@ -71,7 +73,9 @@ func _ready() -> void:
 	await _wait(0.3)
 	var hhmm := GameState.clock_text()
 	check(hhmm.begins_with("16:"), "8시간 잠 → 16시대 (%s)" % hhmm)
-	check(SaveManager.has_run_save() and "저장했다" in f.get_node("%CampResult").text, "고양이가 있어도 잠자면 저장")
+	check(_picker() != null, "자고 나면 슬롯 선택 창 (고양이가 있어도)")
+	await _press_prefix("저장하지 않기")
+	check(not SaveManager.has_run_save(2) and "저장하지 않았다" in f.get_node("%CampResult").text, "저장하지 않기")
 	check(not f.npcs[0].active and not f.npcs[0].node.visible, "16시 → 고양이 떠남 (루틴 밖)")
 	await _snap("camp_menu_cat_gone")
 	await _press_button("잠자기  (1시간 단위)")
@@ -80,6 +84,11 @@ func _ready() -> void:
 	await _press_button("잠들기")
 	await _wait(0.3)
 	check(GameState.clock_text().begins_with("20:") and f.npcs[0].active and f.npcs[0].node.visible, "4시간 더 → 20시대, 고양이 돌아옴")
+	await _press_prefix("슬롯 1 ")
+	check(_picker() != null and _find_prefix(f, "슬롯 1 ").text.ends_with("다시 누르면 덮어씀"), "이미 쓴 슬롯 → 한 번 더 눌러야 덮어씀")
+	await _press_prefix("슬롯 1 ")
+	check(_picker() == null and SaveManager.slot_info(1).time == GameState.clock_text() and "슬롯 1 에 저장했다" in f.get_node("%CampResult").text,
+		"슬롯 1 덮어쓰기")
 	var saved_at := GameState.clock_text()
 	await _press_button("닫기")
 	await _snap("cat_back")
@@ -125,7 +134,7 @@ func _ready() -> void:
 	# 저장 안 하고 종료 → 이어하기는 마지막 베이스캠프 저장 (16:30, 통조림 없음)
 	f.queue_free()
 	await _wait(0.1)
-	check(SaveManager.load_run(), "이어하기")
+	check(SaveManager.latest_slot() == 1 and SaveManager.load_run(1), "이어하기 (슬롯 1)")
 	check(GameState.current_map == "basecamp" and GameState.clock_text() == saved_at and GameState.item_count("food") == 0,
 		"마지막 저장(베이스캠프에서 자고 일어난 %s)으로 돌아감" % saved_at)
 
@@ -151,6 +160,29 @@ func _press_button(text: String) -> void:
 
 
 ## 키를 눌렀다 뗀다 (떼지 않으면 move_* 가 계속 눌린 상태로 남는다)
+func _picker() -> Node:
+	for c in f.get_node("%Overlay").get_children():
+		if c is Control and c.has_signal("chosen") and c.visible and not c.is_queued_for_deletion():
+			return c
+	return null
+
+
+func _find_prefix(root: Node, prefix: String) -> Button:
+	for c in root.find_children("*", "Button", true, false):
+		if c.text.begins_with(prefix) and c.is_visible_in_tree():
+			return c
+	return Button.new()
+
+
+func _press_prefix(prefix: String) -> void:
+	var b := _find_prefix(f, prefix)
+	if not b.is_inside_tree():
+		check(false, "버튼 없음: " + prefix)
+	else:
+		b.pressed.emit()
+	await _wait(0.2)
+
+
 func _keys(action: String, times: int) -> void:
 	for i in times:
 		_press(action)

@@ -70,25 +70,45 @@ func _ready() -> void:
 	var cat_r: Array = cat.schedule.map(func(r): return [int(r[0]), int(r[1])])   # JSON 숫자는 float
 	check(cat_r == [[360, 720], [1200, 1380]], "더미 고양이 루틴 06:00-12:00, 20:00-23:00")
 
-	# ---------- 효과 save: 베이스캠프에서만
+	# ---------- 효과 save: 베이스캠프에서만 (슬롯은 테스트에서 1로 고정)
+	StoryRunner.save_slot_override = 1
 	messages.clear()
 	GameState.current_map = "test_field"
 	await StoryRunner.run_effects("save")
 	check(not SaveManager.has_run_save() and messages.has("여기서는 저장할 수 없다."), "탐험 지역에서는 save 효과로 저장 안 됨")
 	GameState.current_map = "basecamp"
 	await StoryRunner.run_effects("save")
-	check(SaveManager.has_run_save() and messages.any(func(m): return m.begins_with("저장했다")), "베이스캠프에서는 save 효과로 저장")
+	check(SaveManager.has_run_save(1) and messages.any(func(m): return m.begins_with("슬롯 1 에 저장했다")), "베이스캠프에서는 save 효과로 슬롯에 저장")
+	StoryRunner.save_slot_override = 0
+
+	# ---------- 저장 슬롯
+	check(SaveManager.slot_count() == 5, "슬롯 5개 (Config save_slots)")
+	GameState.advance_time(60)
+	SaveManager.save_run(3)
+	var info := SaveManager.slot_info(3)
+	check(info.time == GameState.clock_text() and int(info.run_count) == GameState.run_count and info.saved_at != "",
+		"슬롯 정보: 시각·회차·저장한 때 (%s)" % [info])
+	check(SaveManager.slot_info(2).is_empty() and not SaveManager.has_run_save(2), "빈 슬롯")
+	check(SaveManager.latest_slot() == 3, "가장 최근 저장 = 슬롯 3")
+	SaveManager.delete_run_save(3)
+	# 슬롯 도입 전 저장(run.json) → 빈 슬롯 1 로 옮김
+	SaveManager.delete_run_save(1)
+	var fa := FileAccess.open(SaveManager.save_dir + "run.json", FileAccess.WRITE)
+	fa.store_string(JSON.stringify(GameState.run_to_dict()))
+	fa.close()
+	SaveManager._migrate_old_save()
+	check(SaveManager.has_run_save(1) and not FileAccess.file_exists(SaveManager.save_dir + "run.json"), "예전 run.json → 슬롯 1")
 
 	# ---------- 저장 → 불러오기
 	GameState.player_body.left_arm.hp = 0
 	GameState.player_body.left_arm.broken = true
 	GameState.field_mark("test_field", "removed", "fo_enemy1")
 	GameState.set_flag("showed_knife", true)
-	SaveManager.save_run()
+	SaveManager.save_run(1)
 	var snap := GameState.run_to_dict()
 	GameState.reset_run()
 	check(not GameState.player_body.left_arm.broken, "reset 후 몸 새로")
-	check(SaveManager.load_run(), "회차 불러오기")
+	check(SaveManager.load_run(1), "회차 불러오기")
 	var now := GameState.run_to_dict()
 	var surv_same := true
 	for k in snap.survival:
@@ -138,7 +158,7 @@ func _ready() -> void:
 	SaveManager.begin_run()
 	check(GameState.run_count == 2 and GameState.item_count("food") == 0, "2회차: 소지품 초기화")
 	check(SaveManager.has_run_save(), "새 회차를 시작해도 저장 슬롯은 남음 (다음 저장 때 덮어씀)")
-	check(SaveManager.load_run() and GameState.run_count == 2 and GameState.current_map == "basecamp",
+	check(SaveManager.load_run(1) and GameState.run_count == 2 and GameState.current_map == "basecamp",
 		"사망 뒤에도 마지막 저장을 불러올 수 있음")
 
 	SaveManager.delete_all()

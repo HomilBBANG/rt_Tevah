@@ -141,6 +141,7 @@ tools/
     - TODO(기획 확인): 부활 시 치명 부위(머리·몸통)만 최대 HP로 회복, 잘린 팔다리는 유지(§9 거래로만 복구).
     - 월드 `death_count`: 부활 포함 모든 사망 횟수 (초월적 존재의 반복 부활 인식용, 아직 조건 문법에는 없음).
   - **영구 능력치 강화는 없다** (확정).
+  - **저장 슬롯 여러 개** (Config `save_slots`=5, 파일 `user://saves/run_<n>.json`). 잠에서 깨거나 효과 `save`(고양이) 때 슬롯 선택 창(`ui/save_slot_picker.gd`)이 뜬다. 이미 쓴 슬롯은 두 번 눌러야 덮어씀, "저장하지 않기" 가능. 타이틀 '이어하기'도 슬롯을 골라 불러온다. 예전 `run.json` 은 슬롯 1로 자동 이동. 효과 save 는 `StoryRunner.save_slot_requested` 로 화면에 슬롯을 물어본다 (테스트는 `save_slot_override`).
   - **사망해도 저장 슬롯은 지우지 않는다** (기획 변경, 기획서 §13 '죽음 취소 불가'와 다름). 새 회차에서 저장하면 덮어쓴다. 그래서 타이틀 '이어하기'로 죽기 전 저장을 불러올 수 있다.
   - **저장은 베이스캠프에서만** (`SaveManager.can_save_run()`). 방법은 둘:
     - **잠**: CampActions `kind=sleep` (minutes=60, effects 는 1시간마다), ← → 로 1~`sleep_max_hours` 시간을 조절해(처음 `sleep_default_hours`) 자고 나면 저장. 고양이가 있어도 잠으로 저장된다. 별도 "저장" 버튼은 없다.

@@ -2,13 +2,14 @@ extends Node
 ## user:// 에 월드 상태 파일 1개 + 에피소드별 진행 파일을 따로 저장한다.
 ##   user://saves/world.json            월드 플래그
 ##   user://saves/episode_<id>.json     진행 중인 에피소드 (노드·스탯·인벤토리·에피소드 플래그)
-##   user://saves/run.json              탐험 회차 (베이스캠프에서만 저장. 사망해도 지우지 않음 — 다음 저장 때 덮어씀)
+##   user://saves/run_<1~5>.json        탐험 회차 저장 슬롯 (베이스캠프에서만, 저장할 때마다 슬롯 선택. 사망해도 지우지 않음)
 ## 엔딩에 도달하면 해당 에피소드 진행 파일은 지운다.
 
 var save_dir := "user://saves/"   # 테스트에서 바꿔 쓴다
 
 
 func _ready() -> void:
+	_migrate_old_save()
 	load_world()
 
 
@@ -60,12 +61,40 @@ func delete_episode_save(episode_id: String) -> void:
 
 
 # ---------------------------------------------------------------- 탐험 회차 (§11, §13)
-func run_path() -> String:
-	return save_dir + "run.json"
+## 저장 슬롯 1 ~ save_slots. 저장할 때마다 슬롯을 고른다 (잠·고양이). 0 은 '아무 슬롯'.
+func slot_count() -> int:
+	return maxi(1, DataLoader.get_config_int("save_slots", 5))
 
 
-func has_run_save() -> bool:
-	return FileAccess.file_exists(run_path())
+func slot_path(slot: int) -> String:
+	return save_dir + "run_%d.json" % slot
+
+
+func has_run_save(slot := 0) -> bool:
+	if slot > 0:
+		return FileAccess.file_exists(slot_path(slot))
+	for i in range(1, slot_count() + 1):
+		if FileAccess.file_exists(slot_path(i)):
+			return true
+	return false
+
+
+## 슬롯 목록 표시용: { day, time, map_id, run_count, saved_at, saved_unix } (비었으면 {})
+func slot_info(slot: int) -> Dictionary:
+	var d = _read(slot_path(slot)) if has_run_save(slot) else null
+	return d.get("meta", {}) if d is Dictionary else {}
+
+
+## 가장 최근에 저장한 슬롯 (없으면 0)
+func latest_slot() -> int:
+	var best := 0
+	var best_t := -1.0
+	for i in range(1, slot_count() + 1):
+		var t := float(slot_info(i).get("saved_unix", -1.0))
+		if t > best_t:
+			best = i
+			best_t = t
+	return best
 
 
 ## 탐험 회차는 베이스캠프에서만 저장할 수 있다 (§13)
@@ -74,16 +103,32 @@ func can_save_run() -> bool:
 
 
 ## can_save_run() 을 확인한 뒤 부른다
-func save_run() -> void:
-	_write(run_path(), GameState.run_to_dict())
+func save_run(slot: int) -> void:
+	var d := GameState.run_to_dict()
+	d.meta = {"day": GameState.day(), "time": GameState.clock_text(), "map_id": GameState.current_map,
+		"run_count": GameState.run_count, "saved_at": Time.get_datetime_string_from_system(false, true),
+		"saved_unix": Time.get_unix_time_from_system()}
+	_write(slot_path(slot), d)
 
 
-func load_run() -> bool:
-	var d = _read(run_path())
+func load_run(slot: int) -> bool:
+	var d = _read(slot_path(slot))
 	if not d is Dictionary or not DataLoader.maps.has(d.get("current_map", "")):
 		return false
 	GameState.run_from_dict(d)
 	return true
+
+
+func delete_run_save(slot: int) -> void:
+	if has_run_save(slot):
+		DirAccess.remove_absolute(slot_path(slot))
+
+
+## 슬롯 도입 전 저장(run.json)은 빈 슬롯 1로 옮긴다
+func _migrate_old_save() -> void:
+	var old := save_dir + "run.json"
+	if FileAccess.file_exists(old) and not FileAccess.file_exists(slot_path(1)):
+		DirAccess.rename_absolute(old, slot_path(1))
 
 
 ## 새 회차: 회차 수를 늘리고 처음 상태로 (월드 상태 유지). 저장 슬롯은 지우지 않고, 새 회차에서 저장하면 덮어쓴다.
@@ -104,11 +149,6 @@ func revive_run() -> void:
 	GameState.death_count += 1
 	GameState.restore_after_revival()
 	save_world()
-
-
-func delete_run_save() -> void:
-	if has_run_save():
-		DirAccess.remove_absolute(run_path())
 
 
 ## 모든 저장 삭제 (테스트·초기화용)

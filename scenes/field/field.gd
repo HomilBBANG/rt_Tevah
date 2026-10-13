@@ -17,6 +17,7 @@ const Expr = preload("res://core/expr.gd")
 const CombatScene = preload("res://scenes/combat.tscn")
 const DialogueScene = preload("res://scenes/main_play.tscn")
 const ChoiceButton = preload("res://ui/choice_button.gd")
+const SlotPicker = preload("res://ui/save_slot_picker.gd")
 const NpcScript = preload("res://scenes/field/field_npc.gd")
 const PlayerScript = preload("res://scenes/field/field_player.gd")
 const EnemyScript = preload("res://scenes/field/field_enemy.gd")
@@ -61,6 +62,7 @@ func _ready() -> void:
 	StoryRunner.enter_field()
 	StoryRunner.message.connect(_on_story_message)
 	StoryRunner.inventory_full.connect(_on_inventory_full)
+	StoryRunner.save_slot_requested.connect(_on_save_slot_requested)
 	GameState.survival_changed.connect(_update_hud)
 	GameState.clock_changed.connect(_update_hud)
 	GameState.clock_changed.connect(_refresh_presence)
@@ -74,7 +76,8 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
-	for pair in [[StoryRunner.message, _on_story_message], [StoryRunner.inventory_full, _on_inventory_full]]:
+	for pair in [[StoryRunner.message, _on_story_message], [StoryRunner.inventory_full, _on_inventory_full],
+			[StoryRunner.save_slot_requested, _on_save_slot_requested]]:
 		if pair[0].is_connected(pair[1]):
 			pair[0].disconnect(pair[1])
 
@@ -501,17 +504,37 @@ func _cancel_sleep() -> void:
 	_build_camp_buttons()
 
 
-## hours 시간 잔다: 1시간마다 시간이 흐르고 effects 적용. 자고 나면 저장 (베이스캠프 §13).
+## hours 시간 잔다: 1시간마다 시간이 흐르고 effects 적용. 자고 나면 슬롯을 골라 저장 (베이스캠프 §13).
 func sleep_hours(a: Dictionary, hours: int) -> void:
 	for i in hours:
 		GameState.advance_time(60)
 		await _run_effects(a.effects)
 	var result := "%d시간 잤다.  %d일차 %s" % [hours, GameState.day(), GameState.clock_text()]
+	%CampResult.text = result
 	if SaveManager.can_save_run():
-		SaveManager.save_run()
-		result += "  —  저장했다."
+		var slot := await ask_save_slot()
+		if slot > 0:
+			SaveManager.save_run(slot)
+			result += "  —  슬롯 %d 에 저장했다." % slot
+		else:
+			result += "  —  저장하지 않았다."
 	%CampResult.text = result
 	_build_camp_buttons()
+
+
+## 저장 슬롯 선택 창을 (대화 화면 위에도) 띄우고 고른 슬롯을 돌려준다. -1 = 저장 안 함
+func ask_save_slot() -> int:
+	var picker := SlotPicker.new()
+	%Overlay.add_child(picker)
+	picker.open("save")
+	var slot: int = await picker.chosen
+	picker.queue_free()
+	return slot
+
+
+## 대화 효과 save (고양이 등): 슬롯을 골라 StoryRunner 에 돌려준다
+func _on_save_slot_requested() -> void:
+	StoryRunner.choose_save_slot(await ask_save_slot())
 
 
 func _close_camp() -> void:
