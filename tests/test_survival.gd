@@ -38,12 +38,14 @@ func _ready() -> void:
 	check(messages.has("사용: 통조림(테스트)") and messages.has("포만감 +40"), "사용 메시지: %s" % [messages])
 
 	# ---------- 베이스캠프 행동
-	var sleep8: Dictionary = DataLoader.camp_actions.filter(func(a): return a.action_id == "camp_sleep8")[0]
+	var sleep: Dictionary = DataLoader.camp_actions.filter(func(a): return a.kind == "sleep")[0]
+	check(sleep.minutes == 60, "잠은 1시간 단위")
 	var before_sleep := GameState.get_survival("sleep")
 	var before_clock := GameState.clock
-	GameState.advance_time(sleep8.minutes)
-	await StoryRunner.run_effects(sleep8.effects)
-	check(GameState.clock - before_clock == 480.0, "수면 8시간 → 시계 +8시간")
+	for i in 8:   # 필드에서 8시간을 고른 것과 같은 처리
+		GameState.advance_time(sleep.minutes)
+		await StoryRunner.run_effects(sleep.effects)
+	check(GameState.clock - before_clock == 480.0, "8시간 자기 → 시계 +8시간")
 	check(GameState.get_survival("sleep") > before_sleep, "수면 회복 (%.0f → %.0f)" % [before_sleep, GameState.get_survival("sleep")])
 	GameState.change_survival("sleep", "+", 999)
 	check(GameState.get_survival("sleep") == 100.0, "최대치에서 멈춤")
@@ -53,6 +55,15 @@ func _ready() -> void:
 	await StoryRunner.run_effects("loot:spot_supply")
 	check(GameState.clock - t0 == 10.0 and GameState.item_count("food") == 2 and GameState.item_count("water") == 2,
 		"보급 상자 조사 → 10분, 음식·물 2개씩")
+
+	# ---------- 효과 save: 베이스캠프에서만
+	messages.clear()
+	GameState.current_map = "test_field"
+	await StoryRunner.run_effects("save")
+	check(not SaveManager.has_run_save() and messages.has("여기서는 저장할 수 없다."), "탐험 지역에서는 save 효과로 저장 안 됨")
+	GameState.current_map = "basecamp"
+	await StoryRunner.run_effects("save")
+	check(SaveManager.has_run_save() and messages.any(func(m): return m.begins_with("저장했다")), "베이스캠프에서는 save 효과로 저장")
 
 	# ---------- 저장 → 불러오기
 	GameState.player_body.left_arm.hp = 0

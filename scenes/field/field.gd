@@ -4,7 +4,8 @@ extends Node2D
 ## - 이동 중 게임 시계가 실시간으로 흐르고 생존 파라미터가 줄어든다 (전투·대화·메뉴 중에는 멈춤).
 ## - 적과 닿으면 턴제 전투(화면 위에 겹쳐 띄움) → 승리: 적 제거 / 도주: 잠시 유예 / 사망: 회차 종료
 ## - NPC 에게 말을 걸면 대화 화면(scenes/main_play)을 겹쳐 띄우고 필드 대화 진행, EXIT 에서 복귀.
-## - 베이스캠프 거점(camp)에서 식사·수면·위생·저장. 출구(exit)로 맵 이동.
+## - 베이스캠프 거점(camp)에서 식사·위생·잠(1시간 단위, 자고 나면 저장). 출구(exit)로 맵 이동.
+## - 저장은 베이스캠프에서만: 고양이가 와 있으면 고양이에게(대화 효과 save), 없으면 잠을 자야 저장된다.
 ## 회차 상태(시계·생존·몸·처치한 적·조사한 곳·소지품)는 GameState 에 있고, 베이스캠프에서만 저장된다.
 ##
 ## TODO(기획 미확정): 생존 파라미터가 낮을 때의 효과(§5), 탐험 중 종료 처리(§13.2 — 지금은 마지막 저장에서 이어짐),
@@ -151,6 +152,10 @@ func _build_actors() -> void:
 
 	var dirs := {"up": Vector2.UP, "down": Vector2.DOWN, "left": Vector2.LEFT, "right": Vector2.RIGHT}
 	for o in map.objects:
+		# 조건이 맞을 때만 나타나는 물체 (예: 베이스캠프에 찾아온 고양이)
+		# TODO(기획 확인): 고양이가 오는 조건(시간대·날짜·확률 등)은 미정 — FieldObjects.condition 으로 조정
+		if o.get("condition", "") != "" and not Expr.evaluate(o.condition, GameState):
+			continue
 		var pos := _tile_center(o.x, o.y)
 		match o.type:
 			"enemy":
@@ -351,17 +356,52 @@ func _build_camp_buttons() -> void:
 
 
 func _do_camp_action(a: Dictionary) -> void:
-	if a.kind == "save":
-		# 저장은 베이스캠프에서만 (§13)
-		if map.map_id != DataLoader.get_config_str("basecamp_map"):
-			%CampResult.text = "여기서는 저장할 수 없다."
-			return
-		SaveManager.save_run()
-		%CampResult.text = "저장했다.  (%d일차 %s)" % [GameState.day(), GameState.clock_text()]
+	if a.kind == "sleep":
+		_show_sleep_picker(a)
 		return
 	GameState.advance_time(float(a.minutes))
 	var got := await _run_effects(a.effects)
 	%CampResult.text = "%s 완료.%s" % [a.name, "" if got.is_empty() else "  " + "  ·  ".join(got)]
+	_build_camp_buttons()
+
+
+## 잠: 1시간 단위로 고른다
+func _show_sleep_picker(a: Dictionary) -> void:
+	for c in %CampActions.get_children():
+		%CampActions.remove_child(c)
+		c.queue_free()
+	var q := Label.new()
+	q.text = "몇 시간 잘까?  (지금 %d일차 %s)" % [GameState.day(), GameState.clock_text()]
+	%CampActions.add_child(q)
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	for h in range(1, DataLoader.get_config_int("sleep_max_hours", 12) + 1):
+		var b := ChoiceButton.new()
+		b.text = "%d시간" % h
+		b.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.pressed.connect(sleep_hours.bind(a, h))
+		grid.add_child(b)
+	%CampActions.add_child(grid)
+	var cancel := ChoiceButton.new()
+	cancel.text = "취소"
+	cancel.pressed.connect(_build_camp_buttons)
+	%CampActions.add_child(cancel)
+
+
+## hours 시간 잔다: 1시간마다 시간이 흐르고 effects 적용. 자고 나면 저장 (베이스캠프 §13).
+## TODO(기획 확인): 고양이가 있어도 잠으로 저장되게 둠 (고양이는 잠 없이 저장하는 추가 수단).
+func sleep_hours(a: Dictionary, hours: int) -> void:
+	for i in hours:
+		GameState.advance_time(60)
+		await _run_effects(a.effects)
+	var result := "%d시간 잤다.  %d일차 %s" % [hours, GameState.day(), GameState.clock_text()]
+	if SaveManager.can_save_run():
+		SaveManager.save_run()
+		result += "  —  저장했다."
+	%CampResult.text = result
 	_build_camp_buttons()
 
 

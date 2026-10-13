@@ -68,7 +68,12 @@ func has_run_save() -> bool:
 	return FileAccess.file_exists(run_path())
 
 
-## 베이스캠프에서만 부른다
+## 탐험 회차는 베이스캠프에서만 저장할 수 있다 (§13)
+func can_save_run() -> bool:
+	return GameState.current_map != "" and GameState.current_map == DataLoader.get_config_str("basecamp_map")
+
+
+## can_save_run() 을 확인한 뒤 부른다
 func save_run() -> void:
 	_write(run_path(), GameState.run_to_dict())
 

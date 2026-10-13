@@ -328,7 +328,18 @@ func _apply_effects(effects: Array) -> String:
 				await _do_loot(e.id)
 			"goto":
 				redirect = e.id
+			"save":
+				_save_run()
 	return redirect
+
+
+## 효과 save: 베이스캠프에서만 회차 저장 (고양이에게 저장하기 등)
+func _save_run() -> void:
+	if SaveManager.can_save_run():
+		SaveManager.save_run()
+		message.emit("저장했다.  (%d일차 %s)" % [GameState.day(), GameState.clock_text()])
+	else:
+		message.emit("여기서는 저장할 수 없다.")
 
 
 func _give_item(item_id: String, amount: int) -> void:

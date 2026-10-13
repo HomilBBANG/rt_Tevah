@@ -3,7 +3,7 @@ extends RefCounted
 ##
 ## 조건: has:id, has:id>=2, flag:x, wflag:x, stat:hp>=30, abil:stat_a>=3, surv:hunger<30, trait:x / 연산자 ! & | ( )  (우선순위 ! > & > |)
 ## 효과(; 구분): item:+id, item:-id, item:+id*2, stat:hp-10 / +10 / =10, setflag:x, clearflag:x,
-##              setwflag:x, loot:spot, goto:node, abil:stat_a+1 / -1 / =3, surv:hunger+40
+##              setwflag:x, loot:spot, goto:node, abil:stat_a+1 / -1 / =3, surv:hunger+40, save
 ##
 ## 문법 오류는 크래시하지 않는다: push_error 로 남기고 조건은 false, 효과는 그 항목만 건너뛴다.
 ##
@@ -68,6 +68,9 @@ static func parse_effects(text: String) -> Array:
 		m = _surv_re.search(e)
 		if m:
 			out.append({"type": "surv", "param": m.get_string(1), "op": m.get_string(2), "value": m.get_string(3).to_int()})
+			continue
+		if e == "save":
+			out.append({"type": "save"})
 			continue
 		m = _simple_re.search(e)
 		if m:

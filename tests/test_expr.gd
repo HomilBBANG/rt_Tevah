@@ -99,6 +99,8 @@ func _ready() -> void:
 	eff("surv:hunger+40;surv:sleep=10", [
 		{"type": "surv", "param": "hunger", "op": "+", "value": 40},
 		{"type": "surv", "param": "sleep", "op": "=", "value": 10}], 0)
+	eff("save;setflag:x", [{"type": "save"}, {"type": "setflag", "id": "x"}], 0)
+	eff("save:now", [], 1)
 	eff("", [], 0)
 	eff(";;", [], 0)
 	eff("item:+", [], 1)
