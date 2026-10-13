@@ -9,6 +9,7 @@ extends VBoxContainer
 ## 게임 실행 중(테스트)에서도 열 수 있도록 에디터 전용 기능은 Engine.is_editor_hint() 로 감싼다.
 
 const Card = preload("res://addons/dialogue_editor/dialogue_card.gd")
+const ToolCommon = preload("res://addons/tool_common.gd")
 
 const DIALOGUE_DIR := "res://tools/dialogues/"
 const EXIT_NAME := "__EXIT__"
@@ -399,22 +400,9 @@ func _rename_node(card: GraphNode, new_id: String) -> void:
 func run_convert() -> bool:
 	if dirty:
 		save()
-	var script := ProjectSettings.globalize_path("res://tools/xlsx_to_json.py")
-	var python := "python" if OS.get_name() == "Windows" else "python3"
-	# 결과는 UTF-8 파일로 받는다 (윈도우 콘솔 출력 인코딩 문제를 피함)
-	var log_path := ProjectSettings.globalize_path("user://convert_log.txt")
-	if FileAccess.file_exists(log_path):
-		DirAccess.remove_absolute(log_path)
-	var out := []
-	var code := OS.execute(python, [script, "--log", log_path], out, true)
-	if FileAccess.file_exists(log_path):
-		log_view.text = FileAccess.get_file_as_string(log_path)
-	else:
-		log_view.text = "변환 스크립트를 실행하지 못했습니다. %s 가 설치되어 있고 PATH 에 있는지 확인하세요.\n%s" % [python, "\n".join(out)]
-	_status("변환 성공" if code == 0 else "변환 실패 — 아래 오류를 확인하세요")
-	if code == 0 and Engine.is_editor_hint():
-		EditorInterface.get_resource_filesystem().scan()
-	return code == 0
+	var ok: bool = ToolCommon.run_convert(log_view)
+	_status("변환 성공" if ok else "변환 실패 — 아래 오류를 확인하세요")
+	return ok
 
 
 ## 고른 카드(없으면 첫 카드)부터 실제 대화 화면으로 실행

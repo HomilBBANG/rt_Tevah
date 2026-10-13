@@ -1,0 +1,441 @@
+@tool
+extends VBoxContainer
+## 맵 에디터 (Godot 에디터의 '맵' 탭). tools/maps/<맵ID>.json 을 편집한다.
+##   벽·바닥 칠하기, 도착 위치 P (출구로 들어올 때·베이스캠프에서 깨어날 때), 회차 시작 S,
+##   물체 놓기(적·조사·NPC·거점·출구) → 오른쪽 칸에서 세부, 저장 → 변환·검사 → 테스트 플레이.
+## 게임 실행 중(테스트)에서도 열 수 있도록 에디터 전용 기능은 Engine.is_editor_hint() 로 감싼다.
+
+const Canvas = preload("res://addons/map_editor/map_canvas.gd")
+const ToolCommon = preload("res://addons/tool_common.gd")
+
+const MAP_DIR := "res://tools/maps/"
+const PLAYTEST_FILE := "user://map_playtest.json"
+const TOOLS := [
+	["select", "선택·이동"], ["wall", "벽"], ["floor", "바닥"], ["start", "도착 P"], ["run_start", "회차 시작 S"],
+	["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["exit", "출구"], ["erase", "지우개"],
+]
+const TYPE_NAME := {"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구"}
+
+var dir := MAP_DIR                   # 테스트에서 바꿔 쓴다
+var map := {}
+var path := ""
+var dirty := false
+
+var canvas: Control
+var files: OptionButton
+var status: Label
+var inspector: VBoxContainer
+var log_view: TextEdit
+var tool_buttons := {}
+# 목록 (data/*.json 에서)
+var enemies: Array = []              # [[id, 이름]]
+var dialogue_starts: Array = []      # 필드 대화 노드
+var loot_spots: Array = []
+var map_ids: Array = []
+
+
+func _init() -> void:
+	size_flags_vertical = SIZE_EXPAND_FILL
+	size_flags_horizontal = SIZE_EXPAND_FILL
+	var bar := HBoxContainer.new()
+	add_child(bar)
+	files = OptionButton.new()
+	files.custom_minimum_size.x = 200
+	files.item_selected.connect(func(i): open_map(files.get_item_text(i)))
+	bar.add_child(files)
+	for b in [["새 맵", _ask_new], ["저장", save], ["변환·검사", run_convert], ["테스트 플레이", playtest]]:
+		var btn := Button.new()
+		btn.text = b[0]
+		btn.pressed.connect(b[1])
+		bar.add_child(btn)
+	status = Label.new()
+	status.size_flags_horizontal = SIZE_EXPAND_FILL
+	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	bar.add_child(status)
+	# 도구
+	var tools := HBoxContainer.new()
+	add_child(tools)
+	var group := ButtonGroup.new()
+	for t in TOOLS:
+		var b := Button.new()
+		b.text = t[1]
+		b.toggle_mode = true
+		b.button_group = group
+		b.pressed.connect(set_tool.bind(t[0]))
+		tools.add_child(b)
+		tool_buttons[t[0]] = b
+	var help := Label.new()
+	help.text = "   휠: 확대   가운데·오른쪽 끌기: 이동"
+	help.modulate = Color(1, 1, 1, 0.6)
+	tools.add_child(help)
+	# 캔버스 | 오른쪽 칸
+	var split := HSplitContainer.new()
+	split.size_flags_vertical = SIZE_EXPAND_FILL
+	add_child(split)
+	canvas = Canvas.new()
+	canvas.size_flags_horizontal = SIZE_EXPAND_FILL
+	canvas.id_maker = _new_object_id
+	canvas.changed.connect(func():
+		dirty = true
+		_status("수정됨 (저장 안 함)"))
+	canvas.selection_changed.connect(_edit_object)
+	split.add_child(canvas)
+	var side := ScrollContainer.new()
+	side.custom_minimum_size.x = 380
+	split.add_child(side)
+	inspector = VBoxContainer.new()
+	inspector.size_flags_horizontal = SIZE_EXPAND_FILL
+	side.add_child(inspector)
+	log_view = TextEdit.new()
+	log_view.editable = false
+	log_view.custom_minimum_size.y = 100
+	log_view.placeholder_text = "변환·검사 결과가 여기에 나옵니다."
+	add_child(log_view)
+	set_tool("select")
+
+
+func _ready() -> void:
+	refresh_file_list()
+
+
+# ---------------------------------------------------------------- 파일
+func refresh_file_list() -> void:
+	_load_lookups()
+	var current: String = map.get("map_id", "")
+	files.clear()
+	map_ids = []
+	var d := DirAccess.open(dir)
+	if d:
+		for f in d.get_files():
+			if f.ends_with(".json"):
+				map_ids.append(f.get_basename())
+	map_ids.sort()
+	for m in map_ids:
+		files.add_item(m)
+	if current == "" and not map_ids.is_empty():
+		open_map(map_ids[0])
+	else:
+		_select_file_item(current)
+
+
+func open_map(id: String) -> void:
+	if dirty and not map.is_empty():
+		save()
+	var p := dir + id + ".json"
+	var parsed = ToolCommon.read_json(p, null)
+	if not parsed is Dictionary:
+		_status("열 수 없음: " + p)
+		return
+	map = parsed
+	map.map_id = id
+	for o in map.get("objects", []):
+		o.x = int(o.x)
+		o.y = int(o.y)
+		o.patrol_len = int(o.get("patrol_len", 0))
+	if not map.has("objects"):
+		map.objects = []
+	for key in ["start", "run_start"]:   # JSON 숫자는 float → 칸 좌표는 int
+		var pos = map.get(key)
+		map[key] = [int(pos[0]), int(pos[1])] if pos is Array and pos.size() == 2 else null
+	path = p
+	canvas.set_map(map)
+	dirty = false
+	_select_file_item(id)
+	_edit_map()
+	_status("열림: " + id)
+
+
+func new_map(id: String, w: int, h: int) -> bool:
+	id = id.strip_edges()
+	if not RegEx.create_from_string("^[A-Za-z0-9_]+$").search(id):
+		_status("맵 ID 는 영문·숫자·_ 만")
+		return false
+	if FileAccess.file_exists(dir + id + ".json"):
+		_status("이미 있는 맵: " + id)
+		return false
+	DirAccess.make_dir_recursive_absolute(dir)
+	w = clampi(w, 3, 300)
+	h = clampi(h, 3, 300)
+	var tiles := []
+	for y in h:
+		var row := ""
+		for x in w:
+			row += "#" if x == 0 or y == 0 or x == w - 1 or y == h - 1 else "."
+		tiles.append(row)
+	map = {"map_id": id, "tiles": tiles, "start": [w / 2, h / 2], "run_start": null, "objects": []}
+	path = dir + id + ".json"
+	canvas.set_map(map)
+	save()
+	refresh_file_list()
+	_select_file_item(id)
+	_edit_map()
+	return true
+
+
+func save() -> void:
+	if map.is_empty():
+		return
+	var out := {"map_id": map.map_id, "tiles": map.tiles, "start": map.get("start"), "run_start": map.get("run_start"),
+		"objects": []}
+	for o in map.objects:
+		var e := {}
+		for k in ["object_id", "type", "x", "y", "ref", "name", "text", "patrol_dir", "patrol_len", "condition", "schedule"]:
+			e[k] = o.get(k, "" if k not in ["x", "y", "patrol_len"] else 0)
+		out.objects.append(e)
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		_status("저장 실패: " + path)
+		return
+	f.store_string(JSON.stringify(out, " ", false) + "\n")
+	f.close()
+	dirty = false
+	_status("저장함: " + path.get_file())
+
+
+## 크기 바꾸기: 늘리면 바깥은 벽, 줄이면 밖으로 나간 물체·위치는 지움
+func resize_map(w: int, h: int) -> void:
+	w = clampi(w, 3, 300)
+	h = clampi(h, 3, 300)
+	var tiles := []
+	for y in h:
+		var row := String(map.tiles[y]) if y < map.tiles.size() else ""
+		row = row.substr(0, w)
+		while row.length() < w:
+			row += "#"
+		tiles.append(row)
+	map.tiles = tiles
+	map.objects = map.objects.filter(func(o): return o.x < w and o.y < h)
+	for key in ["start", "run_start"]:
+		var p = map.get(key)
+		if p is Array and (int(p[0]) >= w or int(p[1]) >= h):
+			map[key] = [1, 1] if key == "start" else null
+	canvas.set_map(map)
+	dirty = true
+	_edit_map()
+
+
+# ---------------------------------------------------------------- 변환·테스트 플레이
+func run_convert() -> bool:
+	if dirty:
+		save()
+	var ok: bool = ToolCommon.run_convert(log_view)
+	_status("변환 성공" if ok else "변환 실패 — 아래 오류를 확인하세요")
+	if ok:
+		_load_lookups()
+	return ok
+
+
+## 이 맵에서 새 회차처럼 바로 실행 (실제 저장·회차 수는 건드리지 않음)
+func playtest() -> void:
+	if map.is_empty() or not run_convert():
+		return
+	var f := FileAccess.open(PLAYTEST_FILE, FileAccess.WRITE)
+	f.store_string(JSON.stringify({"map": map.map_id}))
+	f.close()
+	if Engine.is_editor_hint():
+		EditorInterface.play_custom_scene("res://addons/map_editor/playtest.tscn")
+
+
+# ---------------------------------------------------------------- 오른쪽 칸
+func set_tool(t: String) -> void:
+	canvas.tool = t
+	if tool_buttons.has(t):
+		tool_buttons[t].button_pressed = true
+
+
+func _edit_map() -> void:
+	_clear_inspector()
+	if map.is_empty():
+		return
+	_title("맵: " + map.map_id)
+	var w := String(map.tiles[0]).length() if not map.tiles.is_empty() else 0
+	var ws := _spin("너비 (칸)", w, 3, 300)
+	var hs := _spin("높이 (칸)", map.tiles.size(), 3, 300)
+	var apply := Button.new()
+	apply.text = "크기 적용"
+	apply.pressed.connect(func(): resize_map(int(ws.value), int(hs.value)))
+	inspector.add_child(apply)
+	_hint("P = 출구로 들어오거나 베이스캠프에서 깨어나는 곳 (꼭 하나)\nS = 새 회차를 시작하는 곳 (Config start_map 의 맵에서만 쓰임, 없으면 P)\n물체를 고르면 여기에 세부가 나옵니다.")
+
+
+func _edit_object(o: Dictionary) -> void:
+	if o.is_empty():
+		_edit_map()
+		return
+	_clear_inspector()
+	_title("%s  (%d, %d)" % [TYPE_NAME.get(o.type, o.type), o.x, o.y])
+	_line("object_id", o.object_id, func(v): set_field(o, "object_id", v))
+	_line("이름", o.get("name", ""), func(v): set_field(o, "name", v), "화면에 보이는 이름")
+	match o.type:
+		"enemy":
+			_option("적 종류", enemies, o.get("ref", ""), func(v): set_field(o, "ref", v))
+			_option("순찰 방향", [["", "(가만히)"], ["up", "위"], ["down", "아래"], ["left", "왼쪽"], ["right", "오른쪽"]],
+				o.get("patrol_dir", ""), func(v): set_field(o, "patrol_dir", v))
+			var sp := _spin("순찰 칸 수 (왕복)", int(o.get("patrol_len", 0)), 0, 100)
+			sp.value_changed.connect(func(v): set_field(o, "patrol_len", int(v)))
+		"npc":
+			_option("대화 (시작 노드)", dialogue_starts, o.get("ref", ""), func(v): set_field(o, "ref", v))
+			_line("루틴 시간대 (schedule)", o.get("schedule", ""), func(v): set_field(o, "schedule", v), "예: 06:00-12:00, 20:00-23:00 (비우면 항상)")
+		"investigate":
+			_option("얻는 것 (Loot spot)", [["", "(없음)"]] + loot_spots, o.get("ref", ""), func(v): set_field(o, "ref", v))
+			var l := Label.new()
+			l.text = "조사 문구"
+			inspector.add_child(l)
+			var te := TextEdit.new()
+			te.text = o.get("text", "")
+			te.custom_minimum_size.y = 110
+			te.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+			te.text_changed.connect(func(): set_field(o, "text", te.text))
+			inspector.add_child(te)
+		"exit":
+			_option("이동할 맵", map_ids.map(func(m): return [m, m]), o.get("ref", ""), func(v): set_field(o, "ref", v))
+	_line("나타나는 조건 (condition)", o.get("condition", ""), func(v): set_field(o, "condition", v), "예: flag:met & !wflag:cat_away")
+	var del := Button.new()
+	del.text = "이 물체 지우기"
+	del.pressed.connect(func():
+		map.objects.erase(o)
+		canvas.select({})
+		dirty = true)
+	inspector.add_child(del)
+
+
+func set_field(o: Dictionary, key: String, v: Variant) -> void:
+	o[key] = v
+	dirty = true
+	canvas.queue_redraw()
+
+
+# ---------------------------------------------------------------- 도우미
+func _load_lookups() -> void:
+	enemies = []
+	for e in ToolCommon.read_json("res://data/enemies.json", []):
+		enemies.append([e.enemy_id, "%s  (%s)" % [e.name, e.enemy_id]])
+	dialogue_starts = []
+	var names := {}
+	for c in ToolCommon.read_json("res://data/characters.json", []):
+		names[c.char_id] = c.name
+	for n in ToolCommon.read_json("res://data/nodes.json", []):
+		if n.get("episode_id", "") == "":
+			var who: String = names.get(n.speaker_id, "내레이션") if n.speaker_id != "" else "내레이션"
+			dialogue_starts.append([n.node_id, "%s  — %s: %s" % [n.node_id, who, String(n.text).left(14)]])
+	loot_spots = []
+	var seen := {}
+	for l in ToolCommon.read_json("res://data/loot.json", []):
+		if not seen.has(l.spot_id):
+			seen[l.spot_id] = true
+			loot_spots.append([l.spot_id, l.spot_id])
+	var cfg: Dictionary = ToolCommon.read_json("res://data/config.json", {})
+	canvas.sight_tiles = float(cfg.get("field_enemy_sight", 5))
+
+
+func _new_object_id(type: String) -> String:
+	var used := {}
+	for o in map.get("objects", []):
+		used[o.object_id] = true
+	var i := 1
+	while used.has("%s_%s_%d" % [map.map_id, type, i]):
+		i += 1
+	return "%s_%s_%d" % [map.map_id, type, i]
+
+
+func _select_file_item(id: String) -> void:
+	for i in files.item_count:
+		if files.get_item_text(i) == id:
+			files.select(i)
+
+
+func _status(t: String) -> void:
+	status.text = t
+
+
+func _ask_new() -> void:
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "새 맵"
+	var box := VBoxContainer.new()
+	var id := LineEdit.new()
+	id.placeholder_text = "맵 ID (영문·숫자·_, 예: ruins_east)"
+	box.add_child(id)
+	var row := HBoxContainer.new()
+	var w := SpinBox.new()
+	w.min_value = 3
+	w.max_value = 300
+	w.value = 30
+	w.prefix = "너비"
+	var h := SpinBox.new()
+	h.min_value = 3
+	h.max_value = 300
+	h.value = 20
+	h.prefix = "높이"
+	row.add_child(w)
+	row.add_child(h)
+	box.add_child(row)
+	dlg.add_child(box)
+	dlg.confirmed.connect(func():
+		new_map(id.text, int(w.value), int(h.value))
+		dlg.queue_free())
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered(Vector2i(480, 160))
+
+
+func _clear_inspector() -> void:
+	for c in inspector.get_children():
+		inspector.remove_child(c)
+		c.queue_free()
+
+
+func _title(t: String) -> void:
+	var l := Label.new()
+	l.text = t
+	l.add_theme_font_size_override("font_size", 18)
+	inspector.add_child(l)
+
+
+func _hint(t: String) -> void:
+	var l := Label.new()
+	l.text = t
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.modulate = Color(1, 1, 1, 0.6)
+	inspector.add_child(l)
+
+
+func _line(label: String, value: String, on_change: Callable, hint := "") -> void:
+	var l := Label.new()
+	l.text = label
+	inspector.add_child(l)
+	var e := LineEdit.new()
+	e.text = value
+	e.placeholder_text = hint
+	e.text_changed.connect(func(v): on_change.call(v))
+	inspector.add_child(e)
+
+
+## items: [[값, 표시]] — 지금 값이 목록에 없으면 '(목록에 없음)' 으로 맨 위에 둔다
+func _option(label: String, items: Array, current: String, on_change: Callable) -> void:
+	var l := Label.new()
+	l.text = label
+	inspector.add_child(l)
+	var o := OptionButton.new()
+	var list := items.duplicate()
+	if current != "" and not list.any(func(it): return it[0] == current):
+		list.push_front([current, current + "  (목록에 없음 — 변환·검사로 확인)"])
+	if current == "" and not list.any(func(it): return it[0] == ""):
+		list.push_front(["", "(고르세요)"])
+	for i in list.size():
+		o.add_item(list[i][1], i)
+		if list[i][0] == current:
+			o.select(i)
+	o.item_selected.connect(func(i): on_change.call(list[i][0]))
+	inspector.add_child(o)
+
+
+func _spin(label: String, value: int, lo: int, hi: int) -> SpinBox:
+	var l := Label.new()
+	l.text = label
+	inspector.add_child(l)
+	var s := SpinBox.new()
+	s.min_value = lo
+	s.max_value = hi
+	s.value = value
+	inspector.add_child(s)
+	return s
