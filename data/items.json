@@ -39,5 +39,23 @@
   "use_effects": "item:-pill;stat:sanity+10",
   "stack_max": 3,
   "dice_bonus": []
+ },
+ {
+  "item_id": "food",
+  "name": "통조림(테스트)",
+  "type": "food",
+  "description": "아이템 설명 5",
+  "use_effects": "item:-food;surv:hunger+40",
+  "stack_max": 5,
+  "dice_bonus": []
+ },
+ {
+  "item_id": "water",
+  "name": "물(테스트)",
+  "type": "drink",
+  "description": "아이템 설명 6",
+  "use_effects": "item:-water;surv:thirst+50",
+  "stack_max": 5,
+  "dice_bonus": []
  }
 ]

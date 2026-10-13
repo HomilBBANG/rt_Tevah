@@ -1,0 +1,42 @@
+[
+ {
+  "param_id": "hunger",
+  "name": "포만감",
+  "start": 80.0,
+  "max": 100.0,
+  "decay_per_hour": 4.0,
+  "warn": 30.0
+ },
+ {
+  "param_id": "thirst",
+  "name": "수분",
+  "start": 80.0,
+  "max": 100.0,
+  "decay_per_hour": 6.0,
+  "warn": 30.0
+ },
+ {
+  "param_id": "sleep",
+  "name": "수면",
+  "start": 90.0,
+  "max": 100.0,
+  "decay_per_hour": 5.0,
+  "warn": 25.0
+ },
+ {
+  "param_id": "hygiene",
+  "name": "위생",
+  "start": 90.0,
+  "max": 100.0,
+  "decay_per_hour": 2.0,
+  "warn": 30.0
+ },
+ {
+  "param_id": "mental",
+  "name": "멘탈",
+  "start": 100.0,
+  "max": 100.0,
+  "decay_per_hour": 1.0,
+  "warn": 30.0
+ }
+]

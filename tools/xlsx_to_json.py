@@ -48,11 +48,18 @@ SCHEMA = {
                      {"windup": (float, None), "damage": (int, None), "weight": (int, 1)}),
     # ---- 탐험 필드. 맵 모양은 tools/maps/<map_id>.txt, 맵 위 물체는 이 시트
     "FieldObjects": ("object_id", ["object_id", "map_id", "marker", "type", "ref", "name", "text", "patrol"], {}),
+    # ---- 생존·베이스캠프 (기획서 §4, §5, §12)
+    "Survival": ("param_id", ["param_id", "name", "start", "max", "decay_per_hour", "warn"],
+                 {"start": (float, None), "max": (float, None), "decay_per_hour": (float, 0.0), "warn": (float, 0.0)}),
+    "CampActions": ("action_id", ["action_id", "name", "minutes", "condition", "effects", "kind"],
+                    {"minutes": (int, 0)}),
 }
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
-OPTIONAL_SHEETS = {"Abilities", "PlayerParts", "Enemies", "EnemyParts", "EnemyAttacks", "FieldObjects"}
-FIELD_TYPES = {"enemy", "investigate", "npc"}
+OPTIONAL_SHEETS = {"Abilities", "PlayerParts", "Enemies", "EnemyParts", "EnemyAttacks", "FieldObjects",
+                   "Survival", "CampActions"}
+FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit"}
+CAMP_KINDS = {"", "save"}
 PATROL_RE = re.compile(r"^(up|down|left|right)\s+(\d+)$")
 MAP_FIXED = {"#", ".", " ", "P"}   # 벽 / 바닥 / 빈칸(벽 취급) / 시작 위치
 # ID 중복 검사를 여러 열 조합으로 하는 시트
@@ -89,7 +96,7 @@ class Report:
 
 # ---------------------------------------------------------------- 조건·효과 문법
 # 런타임 파서(core/expr.gd)와 같은 문법. 한쪽을 바꾸면 다른 쪽도 맞춰야 한다.
-ATOM_RE = re.compile(r"(has|flag|wflag|stat|trait|abil):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\d+(?:\.\d+)?))?")
+ATOM_RE = re.compile(r"(has|flag|wflag|stat|trait|abil|surv):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\d+(?:\.\d+)?))?")
 
 
 class ExprError(Exception):
@@ -117,6 +124,8 @@ def parse_condition(text):
                     raise ExprError(f"알 수 없는 스탯 '{ident}' (가능: {', '.join(sorted(STATS))})")
                 if not op:
                     raise ExprError(f"'{m.group(0)}': stat 조건에는 비교식이 필요 (예: stat:hp>=10)")
+            elif kind == "surv" and not op:
+                raise ExprError(f"'{m.group(0)}': surv 조건에는 비교식이 필요 (예: surv:hunger<30)")
             elif kind == "abil" and not op:
                 raise ExprError(f"'{m.group(0)}': abil 조건에는 비교식이 필요 (예: abil:stat_a>=3)")
             elif kind in ("flag", "wflag", "trait") and op:
@@ -175,6 +184,7 @@ EFFECT_RES = [
     ("item", re.compile(r"^item:([+-])([A-Za-z0-9_]+)(?:\*(\d+))?$")),
     ("stat", re.compile(r"^stat:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
     ("abil", re.compile(r"^abil:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
+    ("surv", re.compile(r"^surv:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
     ("simple", re.compile(r"^(setflag|clearflag|setwflag|loot|goto):([A-Za-z0-9_]+)$")),
 ]
 
@@ -197,8 +207,8 @@ def parse_effects(text):
             elif kind == "stat":
                 if m.group(1) not in STATS:
                     raise ExprError(f"'{e}': 알 수 없는 스탯 '{m.group(1)}'")
-            elif kind == "abil":
-                refs.append(("abil", m.group(1)))
+            elif kind in ("abil", "surv"):
+                refs.append((kind, m.group(1)))
             else:
                 refs.append((m.group(1), m.group(2)))
             break
@@ -293,6 +303,7 @@ def validate(d, rep):
     eps, nodes, choices = index("Episodes"), index("Nodes"), index("Choices")
     items, loots, chars, endings = index("Items"), index("Loot"), index("Characters"), index("Endings")
     config, abils = index("Config"), index("Abilities")
+    survs = index("Survival")
     pparts, enemies, eparts, eattacks = index("PlayerParts"), index("Enemies"), index("EnemyParts"), \
         index("EnemyAttacks")
     spots = {r["spot_id"] for r in d["Loot"] if r["spot_id"]}
@@ -308,6 +319,8 @@ def validate(d, rep):
                 rep.err(where, f"없는 item_id '{rid}'")
             elif kind == "abil" and rid not in abils:
                 rep.err(where, f"없는 ability_id '{rid}' (Abilities 시트)")
+            elif kind == "surv" and rid not in survs:
+                rep.err(where, f"없는 생존 파라미터 '{rid}' (Survival 시트)")
             elif kind == "loot" and rid not in spots:
                 rep.err(where, f"없는 spot_id '{rid}' (Loot 시트)")
             elif kind == "goto":
@@ -342,6 +355,8 @@ def validate(d, rep):
                     rep.err(where, f"조건의 없는 item_id '{rid}'")
                 elif kind == "abil" and rid not in abils:
                     rep.err(where, f"조건의 없는 ability_id '{rid}'")
+                elif kind == "surv" and rid not in survs:
+                    rep.err(where, f"조건의 없는 생존 파라미터 '{rid}'")
         except ExprError as e:
             rep.err(where, f"조건 문법 오류: {e}")
 
@@ -397,6 +412,26 @@ def validate(d, rep):
 
     # 전투
     validate_combat(d, rep, pparts, enemies, eparts)
+
+    # 생존·베이스캠프
+    for sv in d["Survival"]:
+        w = f"Survival {sv['_row']}행 ({sv['param_id']})"
+        if sv["max"] is not None and sv["max"] <= 0:
+            rep.err(w, "max 는 0보다 커야 함")
+        if None not in (sv["start"], sv["max"]) and not (0 <= sv["start"] <= sv["max"]):
+            rep.err(w, "start 는 0~max")
+    for ca in d["CampActions"]:
+        w = f"CampActions {ca['_row']}행 ({ca['action_id']})"
+        if ca["kind"] not in CAMP_KINDS:
+            rep.err(w, f"kind 는 비우거나 save: '{ca['kind']}'")
+        if ca["minutes"] is not None and ca["minutes"] < 0:
+            rep.err(w, "minutes 는 0 이상")
+        check_cond(w, ca["condition"])
+        if check_effects(w, ca["effects"], None):
+            rep.err(w, "베이스캠프 행동에는 goto 를 쓸 수 없음")
+    for key in ("start_map", "basecamp_map"):
+        if key in config and config[key]["value"] not in d["_maps"]:
+            rep.err("Config", f"{key} 는 tools/maps 의 맵 이름: '{config[key]['value']}'")
 
     # Loot
     for lo in d["Loot"]:
@@ -639,11 +674,13 @@ def validate_field(d, maps, rep, enemies):
             if n != 1:
                 rep.err(w, f"맵 {m['file']} 에 marker '{mk}' 가 정확히 1개여야 함 (지금 {n}개)")
         if o["type"] not in FIELD_TYPES:
-            rep.err(w, f"type 은 enemy / investigate / npc: '{o['type']}'")
+            rep.err(w, f"type 은 enemy / investigate / npc / camp / exit: '{o['type']}'")
         elif o["type"] == "enemy" and o["ref"] not in enemies:
             rep.err(w, f"enemy 의 ref 는 Enemies 의 enemy_id: '{o['ref']}'")
         elif o["type"] == "npc" and (o["ref"] not in nodes or nodes[o["ref"]]["episode_id"] != ""):
             rep.err(w, f"npc 의 ref 는 필드 대화 시작 노드 (Nodes 에서 episode_id 를 비운 노드): '{o['ref']}'")
+        elif o["type"] == "exit" and o["ref"] not in maps:
+            rep.err(w, f"exit 의 ref 는 이동할 맵 이름 (tools/maps/<이름>.txt): '{o['ref']}'")
         elif o["type"] == "investigate" and o["ref"] and o["ref"] not in spots:
             rep.err(w, f"investigate 의 ref 는 Loot 의 spot_id (없으면 비움): '{o['ref']}'")
         if o["patrol"]:
@@ -717,6 +754,8 @@ def export(d, maps):
                                   for a in clean(d["EnemyAttacks"]) if a["enemy_id"] == e["enemy_id"]])
                     for e in clean(d["Enemies"])],
         "maps": export_maps(d, maps),
+        "survival": clean(d["Survival"]),
+        "camp_actions": clean(d["CampActions"]),
         "endings": [dict(r, world_flags_set=split_list(r["world_flags_set"])) for r in clean(d["Endings"])],
         "config": {r["key"]: config_value(r["value"]) for r in d["Config"]},
     }
@@ -743,6 +782,7 @@ def main():
         print(f"파일을 열 수 없음(다른 프로그램이 잠금?): {path}")
         return 1
     maps = read_maps(rep)
+    data["_maps"] = maps
     validate(data, rep)
     validate_field(data, maps, rep, {e["enemy_id"] for e in data["Enemies"]})
     if rep.errors:
