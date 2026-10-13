@@ -56,6 +56,19 @@ func _ready() -> void:
 	check(GameState.clock - t0 == 10.0 and GameState.item_count("food") == 2 and GameState.item_count("water") == 2,
 		"보급 상자 조사 → 10분, 음식·물 2개씩")
 
+	# ---------- NPC 시간대 (FieldObjects.schedule)
+	var F = preload("res://scenes/field/field.gd")
+	check(F.in_schedule([], 0) and F.in_schedule([], 1439), "schedule 비면 항상")
+	var day_r := [[360, 720]]   # 06:00-12:00
+	check(not F.in_schedule(day_r, 359) and F.in_schedule(day_r, 360) and F.in_schedule(day_r, 719) and not F.in_schedule(day_r, 720),
+		"06:00-12:00: 06:00 부터, 12:00 전까지")
+	var night_r := [[1320, 120]]   # 22:00-02:00
+	check(F.in_schedule(night_r, 1380) and F.in_schedule(night_r, 60) and not F.in_schedule(night_r, 130) and not F.in_schedule(night_r, 1300),
+		"22:00-02:00: 자정 넘김")
+	var cat: Dictionary = DataLoader.maps.basecamp.objects.filter(func(o): return o.object_id == "fo_cat")[0]
+	var cat_r: Array = cat.schedule.map(func(r): return [int(r[0]), int(r[1])])   # JSON 숫자는 float
+	check(cat_r == [[360, 720], [1200, 1380]], "더미 고양이 루틴 06:00-12:00, 20:00-23:00")
+
 	# ---------- 효과 save: 베이스캠프에서만
 	messages.clear()
 	GameState.current_map = "test_field"

@@ -5,7 +5,8 @@ extends Node2D
 ## - 적과 닿으면 턴제 전투(화면 위에 겹쳐 띄움) → 승리: 적 제거 / 도주: 잠시 유예 / 사망: 회차 종료
 ## - NPC 에게 말을 걸면 대화 화면(scenes/main_play)을 겹쳐 띄우고 필드 대화 진행, EXIT 에서 복귀.
 ## - 베이스캠프 거점(camp)에서 식사·위생·잠(1시간 단위, 자고 나면 저장). 출구(exit)로 맵 이동.
-## - 저장은 베이스캠프에서만: 고양이가 와 있으면 고양이에게(대화 효과 save), 없으면 잠을 자야 저장된다.
+## - 저장은 베이스캠프에서만: 잠을 자면 저장되고, 고양이가 와 있으면 고양이에게도 저장할 수 있다(대화 효과 save).
+## - NPC 는 FieldObjects.schedule 의 시간대에만 나타난다 (예: 고양이의 하루 루틴). 시계가 흐르면 바로 반영.
 ## 회차 상태(시계·생존·몸·처치한 적·조사한 곳·소지품)는 GameState 에 있고, 베이스캠프에서만 저장된다.
 ##
 ## TODO(기획 미확정): 생존 파라미터가 낮을 때의 효과(§5), 탐험 중 종료 처리(§13.2 — 지금은 마지막 저장에서 이어짐),
@@ -35,7 +36,7 @@ var frozen := false
 var player: CharacterBody2D
 var enemies: Array = []
 var spots: Array = []            # 상호작용 지점 [{ kind: "spot"/"camp"/"exit", data, pos, done }]
-var npcs: Array = []             # NPC [{ kind: "npc", data, pos, node }]
+var npcs: Array = []             # NPC [{ kind: "npc", data, pos, node, active }] — active: 지금 시간대에 있음
 
 var _combat_ui: Node
 var _dialogue_ui: Node
@@ -58,6 +59,7 @@ func _ready() -> void:
 	StoryRunner.inventory_full.connect(_on_inventory_full)
 	GameState.survival_changed.connect(_update_hud)
 	GameState.clock_changed.connect(_update_hud)
+	GameState.clock_changed.connect(_refresh_presence)
 	GameState.inventory_changed.connect(_update_hud)
 	%TitleButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
 	%InventoryButton.pressed.connect(_open_inventory)
@@ -152,8 +154,7 @@ func _build_actors() -> void:
 
 	var dirs := {"up": Vector2.UP, "down": Vector2.DOWN, "left": Vector2.LEFT, "right": Vector2.RIGHT}
 	for o in map.objects:
-		# 조건이 맞을 때만 나타나는 물체 (예: 베이스캠프에 찾아온 고양이)
-		# TODO(기획 확인): 고양이가 오는 조건(시간대·날짜·확률 등)은 미정 — FieldObjects.condition 으로 조정
+		# 조건이 맞을 때만 나타나는 물체 (시간대는 schedule 로 따로 — _refresh_presence)
 		if o.get("condition", "") != "" and not Expr.evaluate(o.condition, GameState):
 			continue
 		var pos := _tile_center(o.x, o.y)
@@ -191,7 +192,34 @@ func _build_actors() -> void:
 				n.position = pos
 				_add_circle_shape(n, n.radius)
 				%World.add_child(n)
-				npcs.append({"kind": "npc", "data": o, "pos": pos, "node": n})
+				npcs.append({"kind": "npc", "data": o, "pos": pos, "node": n, "active": true})
+	_refresh_presence()
+
+
+## 시간대(schedule)에 맞춰 NPC 를 보이거나 숨긴다. 숨은 NPC 는 부딪히지도, 말을 걸 수도 없다.
+func _refresh_presence() -> void:
+	var minute := GameState.minute_of_day()
+	for n in npcs:
+		var here := in_schedule(n.data.get("schedule", []), minute)
+		if here != n.active:
+			n.active = here
+			n.node.visible = here
+			n.node.collision_layer = NPC_LAYER if here else 0
+			if not here and _near_spot == n:
+				_near_spot = {}
+				%Prompt.visible = false
+
+
+## schedule: [[시작분, 끝분], ...] (하루 중 분). 비어 있으면 항상. 끝 < 시작이면 자정을 넘는 범위.
+static func in_schedule(schedule: Array, minute: int) -> bool:
+	if schedule.is_empty():
+		return true
+	for r in schedule:
+		var start := int(r[0])
+		var end := int(r[1])
+		if (start < end and minute >= start and minute < end) or (start > end and (minute >= start or minute < end)):
+			return true
+	return false
 
 
 func _tile_center(x: float, y: float) -> Vector2:
@@ -239,7 +267,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _update_near_spot() -> void:
 	var best := {}
 	var best_d := INF
-	for s in spots + npcs:
+	for s in spots + npcs.filter(func(n): return n.active):
 		var d: float = s.pos.distance_to(player.global_position)
 		if d <= INTERACT_RANGE * tile and d < best_d:
 			best = s
@@ -349,7 +377,7 @@ func _build_camp_buttons() -> void:
 		var b := ChoiceButton.new()
 		var mins := int(a.minutes)
 		var dur := "" if mins == 0 else ("  (%d시간%s)" % [mins / 60, "" if mins % 60 == 0 else " %d분" % (mins % 60)] if mins >= 60 else "  (%d분)" % mins)
-		b.text = a.name + dur
+		b.text = a.name + ("  (1시간 단위)" if a.kind == "sleep" else dur)
 		b.disabled = not Expr.evaluate(a.condition, GameState)
 		b.pressed.connect(_do_camp_action.bind(a))
 		%CampActions.add_child(b)
@@ -392,7 +420,6 @@ func _show_sleep_picker(a: Dictionary) -> void:
 
 
 ## hours 시간 잔다: 1시간마다 시간이 흐르고 effects 적용. 자고 나면 저장 (베이스캠프 §13).
-## TODO(기획 확인): 고양이가 있어도 잠으로 저장되게 둠 (고양이는 잠 없이 저장하는 추가 수단).
 func sleep_hours(a: Dictionary, hours: int) -> void:
 	for i in hours:
 		GameState.advance_time(60)

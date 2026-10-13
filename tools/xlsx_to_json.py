@@ -76,7 +76,8 @@ OPTIONAL = {
     # 선택지 종류: normal(기본) / item / dice
     # dice: check=능력치, dc=목표값, mod=상황 보정, 실패 시 fail_effects·fail_next
     "Choices": ["type", "check", "dc", "mod", "fail_effects", "fail_next"],
-    "FieldObjects": ["condition"],  # 맵에 들어올 때 이 조건이 참이어야 나타남 (예: 베이스캠프의 고양이)
+    "FieldObjects": ["condition",   # 맵에 들어올 때 이 조건이 참이어야 나타남
+                     "schedule"],   # npc 가 있는 시간대 "06:00-12:00, 20:00-23:00" (비우면 항상). 예: 고양이의 루틴
 }
 
 ID_RE = re.compile(r"^[A-Za-z0-9_]+$")
@@ -689,6 +690,12 @@ def validate_field(d, maps, rep, enemies):
             rep.err(w, f"exit 의 ref 는 이동할 맵 이름 (tools/maps/<이름>.txt): '{o['ref']}'")
         elif o["type"] == "investigate" and o["ref"] and o["ref"] not in spots:
             rep.err(w, f"investigate 의 ref 는 Loot 의 spot_id (없으면 비움): '{o['ref']}'")
+        if o["schedule"]:
+            if o["type"] != "npc":
+                rep.err(w, "schedule 은 npc 만")
+            for rng in split_list(o["schedule"]):
+                if parse_time_range(rng) is None:
+                    rep.err(w, f"schedule 은 '시:분-시:분' 을 쉼표로 (예: 06:00-12:00, 22:00-02:00): '{rng}'")
         if o["condition"]:
             try:
                 parse_condition(o["condition"])
@@ -707,6 +714,21 @@ def validate_field(d, maps, rep, enemies):
                     rep.err(f"맵 {m['file']} {y + 1}행 {x + 1}열", f"FieldObjects 에 없는 marker '{ch}'")
 
 
+TIME_RANGE_RE = re.compile(r"^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$")
+
+
+def parse_time_range(text):
+    """'06:00-12:00' → [360, 720] (하루 중 분). 끝이 시작보다 작으면 자정을 넘는 범위. 형식 오류면 None."""
+    m = TIME_RANGE_RE.match(text.strip())
+    if not m:
+        return None
+    h1, m1, h2, m2 = (int(g) for g in m.groups())
+    if not (0 <= h1 <= 24 and 0 <= h2 <= 24 and m1 < 60 and m2 < 60) or h1 * 60 + m1 > 1440 or h2 * 60 + m2 > 1440:
+        return None
+    start, end = h1 * 60 + m1, h2 * 60 + m2
+    return None if start == end else [start, end]
+
+
 def export_maps(d, maps):
     out = []
     for mid, m in maps.items():
@@ -722,7 +744,8 @@ def export_maps(d, maps):
                 elif ch in objs:
                     o = {k: v for k, v in objs[ch].items() if k != "_row"}
                     pat = PATROL_RE.match(o["patrol"].lower()) if o["patrol"] else None
-                    o.update(x=x, y=y, patrol_dir=pat.group(1) if pat else "", patrol_len=int(pat.group(2)) if pat else 0)
+                    o.update(x=x, y=y, patrol_dir=pat.group(1) if pat else "", patrol_len=int(pat.group(2)) if pat else 0,
+                             schedule=[parse_time_range(r) for r in split_list(o.get("schedule", ""))])
                     objects.append(o)
                     ch = "."
                 row += "#" if ch == " " else ch

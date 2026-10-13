@@ -21,6 +21,24 @@ func _ready() -> void:
 	check(f.map.map_id == "basecamp", "새 회차는 베이스캠프에서")
 	await _snap("basecamp")
 
+	# 고양이 루틴: 06:00-12:00, 20:00-23:00. 지금 08:00 → 와 있음. (9,2) 아래에서 말 걸어 저장
+	check(f.npcs.size() == 1 and f.npcs[0].active and f.npcs[0].node.visible, "08:00 고양이가 와 있음")
+	_teleport(9, 3)
+	await _wait(0.15)
+	check("대화: 고양이" in f.get_node("%Prompt").text, "고양이 근처 → 대화 안내")
+	_press("interact")
+	await _wait(0.3)
+	var dlg: Node = f._dialogue_ui
+	await _snap("cat")
+	_find_button(dlg, "쓰다듬는다 (저장)").pressed.emit()
+	await _wait(0.2)
+	check(SaveManager.has_run_save(), "고양이를 쓰다듬어 저장")
+	await _snap("cat_saved")
+	dlg.advance()
+	await _wait(0.2)
+	check(f._dialogue_ui == null and not f.frozen, "'저장했다' 보여준 뒤 필드로")
+	SaveManager.delete_run_save()
+
 	# 거점 메뉴
 	_teleport(4, 3)   # 거점 (4,2) 아래
 	await _wait(0.15)
@@ -33,42 +51,23 @@ func _ready() -> void:
 	await _press_button("씻기  (30분)")
 	check(is_equal_approx(GameState.clock - t0, 30.0) and GameState.get_survival("hygiene") == 100.0, "씻기: 30분, 위생 회복")
 	check(_find_button(f, "저장").text == "", "따로 '저장' 버튼은 없음 (잠·고양이로만)")
-	check(not SaveManager.has_run_save(), "아직 저장 안 됨")
-	await _press_button("잠자기  (1시간)")
+	await _press_button("잠자기  (1시간 단위)")
 	check(_find_button(f, "12시간").is_inside_tree() and not _find_button(f, "13시간").is_inside_tree(), "1~12시간 고르기")
 	await _snap("sleep_picker")
 	await _press_button("8시간")
 	await _wait(0.3)
-	check(is_equal_approx(GameState.clock - t0, 510.0), "8시간 잠 → 16:30 (%s)" % GameState.clock_text())
-	check(SaveManager.has_run_save() and "저장했다" in f.get_node("%CampResult").text, "자고 나면 저장")
-	await _snap("camp_menu")
-	await _press_button("닫기")
-
-	# 고양이에게 저장 (고양이 (9,2) 아래에서 말 걸기)
-	SaveManager.delete_run_save()
-	check(f.npcs.size() == 1 and f.npcs[0].data.name == "고양이", "고양이가 베이스캠프에 와 있음")
-	_teleport(9, 3)
-	await _wait(0.15)
-	check("대화: 고양이" in f.get_node("%Prompt").text, "고양이 근처 → 대화 안내")
-	_press("interact")
+	var hhmm := GameState.clock_text()
+	check(hhmm.begins_with("16:"), "8시간 잠 → 16시대 (%s)" % hhmm)
+	check(SaveManager.has_run_save() and "저장했다" in f.get_node("%CampResult").text, "고양이가 있어도 잠자면 저장")
+	check(not f.npcs[0].active and not f.npcs[0].node.visible, "16시 → 고양이 떠남 (루틴 밖)")
+	await _snap("camp_menu_cat_gone")
+	await _press_button("잠자기  (1시간 단위)")
+	await _press_button("4시간")
 	await _wait(0.3)
-	var dlg: Node = f._dialogue_ui
-	await _snap("cat")
-	var pet := _find_button(dlg, "쓰다듬는다 (저장)")
-	pet.pressed.emit()
-	await _wait(0.2)
-	check(SaveManager.has_run_save(), "고양이를 쓰다듬어 저장")
+	check(GameState.clock_text().begins_with("20:") and f.npcs[0].active and f.npcs[0].node.visible, "4시간 더 → 20시대, 고양이 돌아옴")
 	var saved_at := GameState.clock_text()
-	await _snap("cat_saved")
-	dlg.advance()
-	await _wait(0.2)
-	check(f._dialogue_ui == null and not f.frozen, "'저장했다' 보여준 뒤 필드로")
-	# 고양이가 없으면 맵에 나타나지 않는다
-	GameState.set_wflag("cat_away")
-	f.load_map("basecamp")
-	await _wait(0.1)
-	check(f.npcs.is_empty(), "고양이 없음 (condition 거짓) → 잠으로만 저장")
-	GameState.world_flags.erase("cat_away")
+	await _press_button("닫기")
+	await _snap("cat_back")
 
 	# 탐험 맵으로
 	_teleport(7, 5)   # 출구 (7,6) 위
@@ -113,7 +112,7 @@ func _ready() -> void:
 	await _wait(0.1)
 	check(SaveManager.load_run(), "이어하기")
 	check(GameState.current_map == "basecamp" and GameState.clock_text() == saved_at and GameState.item_count("food") == 0,
-		"마지막 저장(고양이에게 저장한 %s, 베이스캠프)으로 돌아감" % saved_at)
+		"마지막 저장(베이스캠프에서 자고 일어난 %s)으로 돌아감" % saved_at)
 
 	SaveManager.delete_all()
 	print("[basecamp_smoke] 스크린샷 %d장, 실패 %d → %s" % [_shot, _fail, ProjectSettings.globalize_path("user://basecamp_smoke")])

@@ -127,6 +127,11 @@ func survival_def(param_id: String) -> Dictionary:
 	return {}
 
 
+## 하루 중 몇 분째인지 (0 ~ 1439)
+func minute_of_day() -> int:
+	return int(clock) % 1440
+
+
 func day() -> int:
 	return int(clock / 1440.0) + 1
 
