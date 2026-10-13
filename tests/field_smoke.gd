@@ -131,8 +131,8 @@ func _ready() -> void:
 	await _wait_until(func(): return f._combat_ui != null, 2.0)
 	await _end_combat("lose", func(_c): pass)
 	await _wait(0.2)
-	check(f.get_node("%DeathPanel").visible and f.get_node("%NewRunButton").text == "처음부터" and not SaveManager.has_run_save(),
-		"부활 수단 없음 → '처음부터', 저장 없음")
+	check(f.get_node("%DeathPanel").visible and f.get_node("%NewRunButton").text == "처음부터",
+		"부활 수단 없음 → '처음부터'")
 	await _snap("dead")
 	f.get_node("%NewRunButton").pressed.emit()
 	await _wait(0.2)

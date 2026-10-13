@@ -131,12 +131,15 @@ func _ready() -> void:
 
 	# ---------- 사망 → 저장 삭제, 회차 수 유지
 	SaveManager.end_run()
-	check(not SaveManager.has_run_save() and GameState.death_count == deaths + 2, "부활 없는 사망 → 회차 저장 삭제 (되돌릴 수 없음)")
+	check(SaveManager.has_run_save() and GameState.death_count == deaths + 2, "부활 없는 사망 → 저장 슬롯은 남음")
 	GameState.world_from_dict({})
 	SaveManager.load_world()
 	check(GameState.run_count == 1 and GameState.death_count == deaths + 2, "회차 수·사망 횟수는 월드에 남음")
 	SaveManager.begin_run()
 	check(GameState.run_count == 2 and GameState.item_count("food") == 0, "2회차: 소지품 초기화")
+	check(SaveManager.has_run_save(), "새 회차를 시작해도 저장 슬롯은 남음 (다음 저장 때 덮어씀)")
+	check(SaveManager.load_run() and GameState.run_count == 2 and GameState.current_map == "basecamp",
+		"사망 뒤에도 마지막 저장을 불러올 수 있음")
 
 	SaveManager.delete_all()
 	print("\n[test_survival] %d 통과, %d 실패" % [_pass, _fail])

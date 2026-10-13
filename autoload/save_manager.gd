@@ -2,7 +2,7 @@ extends Node
 ## user:// 에 월드 상태 파일 1개 + 에피소드별 진행 파일을 따로 저장한다.
 ##   user://saves/world.json            월드 플래그
 ##   user://saves/episode_<id>.json     진행 중인 에피소드 (노드·스탯·인벤토리·에피소드 플래그)
-##   user://saves/run.json              탐험 회차 (베이스캠프에서만 저장, 사망하면 삭제 — 기획서 §13)
+##   user://saves/run.json              탐험 회차 (베이스캠프에서만 저장. 사망해도 지우지 않음 — 다음 저장 때 덮어씀)
 ## 엔딩에 도달하면 해당 에피소드 진행 파일은 지운다.
 
 var save_dir := "user://saves/"   # 테스트에서 바꿔 쓴다
@@ -86,18 +86,16 @@ func load_run() -> bool:
 	return true
 
 
-## 새 회차: 이전 회차 저장을 지우고 회차 수를 늘린다 (월드 상태는 유지)
+## 새 회차: 회차 수를 늘리고 처음 상태로 (월드 상태 유지). 저장 슬롯은 지우지 않고, 새 회차에서 저장하면 덮어쓴다.
 func begin_run() -> void:
-	delete_run_save()
 	GameState.reset_run()
 	GameState.run_count += 1
 	save_world()
 
 
-## 부활 없는 사망: 회차 저장을 지워 죽음을 되돌릴 수 없게 한다 (게임 처음부터)
+## 부활 없는 사망: 게임 처음부터. 저장 슬롯은 지우지 않는다 (기획 변경 — 기획서 §13 의 '죽음 취소 불가'와 다름).
 func end_run() -> void:
 	GameState.death_count += 1
-	delete_run_save()
 	save_world()
 
 

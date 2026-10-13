@@ -136,17 +136,18 @@ tools/
 
 ## 생존·베이스캠프 (진행 중, 기획서 §4, §5, §11–13)
 - **회차 상태**는 GameState: `current_map`, `clock`(분), `survival`, `player_body`, `field_state`(맵별 처치한 적·조사한 곳), 소지품·플래그·능력치.
-  - **새 회차** `SaveManager.begin_run()`: 회차 저장 삭제, `run_count`+1, Config `start_map`(test_field) 의 **S(맵 한복판)** 에서 깨어남. 게임 첫 시작도 같다.
-  - **사망** (§11): 엑셀 `Revivals` 에서 condition 이 참인 첫 행이 있으면 **부활** — effects 적용(아이템 소모 등), text 표시, `revive_run()`: 소지품·시간·생존·부상·플래그 모두 유지한 채 **베이스캠프 P** 에서 깨어남, 저장 유지. 맞는 행이 없으면 `end_run()`: 저장 삭제, **게임 처음부터**.
+  - **새 회차** `SaveManager.begin_run()`: `run_count`+1, Config `start_map`(test_field) 의 **S(맵 한복판)** 에서 깨어남. 게임 첫 시작도 같다.
+  - **사망** (§11): 엑셀 `Revivals` 에서 condition 이 참인 첫 행이 있으면 **부활** — effects 적용(아이템 소모 등), text 표시, `revive_run()`: 소지품·시간·생존·부상·플래그 모두 유지한 채 **베이스캠프 P** 에서 깨어남, 저장 유지. 맞는 행이 없으면 `end_run()`: **게임 처음부터**.
     - TODO(기획 확인): 부활 시 치명 부위(머리·몸통)만 최대 HP로 회복, 잘린 팔다리는 유지(§9 거래로만 복구).
     - 월드 `death_count`: 부활 포함 모든 사망 횟수 (초월적 존재의 반복 부활 인식용, 아직 조건 문법에는 없음).
   - **영구 능력치 강화는 없다** (확정).
+  - **사망해도 저장 슬롯은 지우지 않는다** (기획 변경, 기획서 §13 '죽음 취소 불가'와 다름). 새 회차에서 저장하면 덮어쓴다. 그래서 타이틀 '이어하기'로 죽기 전 저장을 불러올 수 있다.
   - **저장은 베이스캠프에서만** (`SaveManager.can_save_run()`). 방법은 둘:
     - **잠**: CampActions `kind=sleep` (minutes=60, effects 는 1시간마다), ← → 로 1~`sleep_max_hours` 시간을 조절해(처음 `sleep_default_hours`) 자고 나면 저장. 고양이가 있어도 잠으로 저장된다. 별도 "저장" 버튼은 없다.
     - **고양이**(하나, §15.1)가 와 있으면 고양이에게도: 필드 대화의 효과 `save`.
   - NPC 의 하루 루틴은 FieldObjects `schedule` ("06:00-12:00, 20:00-23:00", 자정 넘김 "22:00-02:00" 가능). 그 시간대에만 나타나고, 시계가 흐르면(탐험·잠) 바로 나타나거나 사라진다. `condition` 과 함께 쓰면 둘 다 맞아야 있다.
   - 이어하기 = 마지막 베이스캠프 저장 (§13.2 미정이라 임시로 이 방식).
-  - 월드(`world.json`): 월드 플래그 + `run_count` — 회차가 바뀌어도 유지 (초월적 존재의 부활 인식용).
+  - 월드(`world.json`): 월드 플래그 + `run_count` + `death_count` — 회차가 바뀌어도 유지 (초월적 존재의 부활 인식용).
 - **시간**: 탐험 중 실시간 (Config `time_scale` = 실제 1초당 게임 분). 전투·대화·메뉴·메시지 중에는 멈춤. 베이스캠프 행동 `minutes`, 조사 Loot `time_cost` 만큼 흐름.
 - **생존 파라미터**: 엑셀 `Survival` (start, max, decay_per_hour, warn). 100 = 좋음. 조건 `surv:hunger<30`, 효과 `surv:hunger+40`.
 - **베이스캠프**: 맵 `tools/maps/basecamp.txt`, FieldObjects `camp` = 거점 메뉴(엑셀 `CampActions`: minutes, condition, effects, kind=sleep), `exit` = 맵 이동(도착은 그 맵의 P).

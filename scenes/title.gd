@@ -8,8 +8,6 @@ func _ready() -> void:
 	var has_save := SaveManager.has_run_save()
 	%ContinueButton.disabled = not has_save
 	%RunInfo.text = "지금까지 %d번 부활했다." % GameState.run_count if GameState.run_count > 0 else ""
-	if has_save:
-		%NewRunButton.text = "새 회차 (저장된 회차는 사라짐)"
 	%NewRunButton.pressed.connect(func():
 		SaveManager.begin_run()
 		get_tree().change_scene_to_file(FIELD))
