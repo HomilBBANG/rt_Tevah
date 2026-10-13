@@ -12,6 +12,8 @@ var loot_by_spot := {}     # spot_id -> Array[Dictionary]
 var characters := {}       # char_id -> Dictionary
 var endings := {}          # ending_id -> Dictionary
 var abilities := {}        # ability_id -> Dictionary
+var player_parts: Array = []  # 전투: 플레이어 부위 (엑셀 행 순서)
+var enemies := {}          # 전투: enemy_id -> { name, parts: [...], attacks: [{..., strikes}] }
 var config := {}           # key -> number
 
 
@@ -29,6 +31,8 @@ func load_all() -> void:
 	characters.clear()
 	endings.clear()
 	abilities.clear()
+	player_parts = []
+	enemies.clear()
 
 	for ep in _read_list("episodes"):
 		episodes[ep.episode_id] = ep
@@ -55,6 +59,11 @@ func load_all() -> void:
 	if FileAccess.file_exists(DATA_DIR + "abilities.json"):
 		for ab in _read_list("abilities"):
 			abilities[ab.ability_id] = ab
+	if FileAccess.file_exists(DATA_DIR + "player_parts.json"):
+		player_parts = _read_list("player_parts")
+	if FileAccess.file_exists(DATA_DIR + "enemies.json"):
+		for en in _read_list("enemies"):
+			enemies[en.enemy_id] = en
 	var cfg = _read("config")
 	config = cfg if cfg is Dictionary else {}
 
