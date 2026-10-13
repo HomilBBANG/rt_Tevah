@@ -104,6 +104,14 @@
   "on_enter": ""
  },
  {
+  "node_id": "fd_cat_a",
+  "episode_id": "",
+  "speaker_id": "char_cat",
+  "text": "고양이 노드 (테스트, 사람 말을 하지 않는다)",
+  "next_node": "",
+  "on_enter": ""
+ },
+ {
   "node_id": "fd_npc1_a",
   "episode_id": "",
   "speaker_id": "char_npc",
@@ -141,14 +149,6 @@
   "speaker_id": "char_npc2",
   "text": "필드 대화 노드 5 (flag:showed_knife 일 때만)",
   "next_node": "EXIT",
-  "on_enter": ""
- },
- {
-  "node_id": "fd_cat_a",
-  "episode_id": "",
-  "speaker_id": "char_cat",
-  "text": "고양이 노드 (테스트, 사람 말을 하지 않는다)",
-  "next_node": "",
   "on_enter": ""
  }
 ]

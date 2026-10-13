@@ -1,0 +1,62 @@
+{
+ "dialogue_id": "npc2",
+ "episode_id": "",
+ "nodes": [
+  {
+   "node_id": "fd_npc2_a",
+   "speaker_id": "char_npc2",
+   "text": "필드 대화 노드 4 (NPC 2)",
+   "next_node": "",
+   "on_enter": "",
+   "pos": [
+    40,
+    60
+   ]
+  },
+  {
+   "node_id": "fd_npc2_b",
+   "speaker_id": "char_npc2",
+   "text": "필드 대화 노드 5 (flag:showed_knife 일 때만)",
+   "next_node": "EXIT",
+   "on_enter": "",
+   "pos": [
+    560,
+    140
+   ]
+  }
+ ],
+ "choices": [
+  {
+   "choice_id": "fdc5",
+   "node_id": "fd_npc2_a",
+   "text": "칼 이야기 (flag:showed_knife)",
+   "condition": "flag:showed_knife",
+   "show_mode": "hide",
+   "cost": "",
+   "effects": "",
+   "next_node": "fd_npc2_b",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  },
+  {
+   "choice_id": "fdc6",
+   "node_id": "fd_npc2_a",
+   "text": "대화 끝내기",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "",
+   "next_node": "EXIT",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  }
+ ]
+}

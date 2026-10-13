@@ -1,0 +1,67 @@
+{
+ "dialogue_id": "cat",
+ "episode_id": "",
+ "nodes": [
+  {
+   "node_id": "fd_cat_a",
+   "speaker_id": "char_cat",
+   "text": "고양이 노드 (테스트, 사람 말을 하지 않는다)",
+   "next_node": "",
+   "on_enter": "",
+   "pos": [
+    40,
+    60
+   ]
+  }
+ ],
+ "choices": [
+  {
+   "choice_id": "fdc_cat1",
+   "node_id": "fd_cat_a",
+   "text": "쓰다듬는다 (저장)",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "save",
+   "next_node": "EXIT",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  },
+  {
+   "choice_id": "fdc_cat2",
+   "node_id": "fd_cat_a",
+   "text": "그냥 둔다",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "",
+   "next_node": "EXIT",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  },
+  {
+   "choice_id": "fdc_cat3",
+   "node_id": "fd_cat_a",
+   "text": "(테스트) 부활 보호 받기",
+   "condition": "!flag:hana_protect",
+   "show_mode": "hide",
+   "cost": "",
+   "effects": "setflag:hana_protect",
+   "next_node": "EXIT",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  }
+ ]
+}

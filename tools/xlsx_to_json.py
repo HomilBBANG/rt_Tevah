@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""tools/sheets/content.xlsx (+ tools/maps/*.txt) → res://data/*.json 변환 + 데이터 검사.
+"""tools/sheets/content.xlsx (+ tools/maps/*.txt, tools/dialogues/*.json) → res://data/*.json 변환 + 데이터 검사. Python 3.9+.
+
+대화(노드·선택지)는 Godot 의 '대화' 탭(addons/dialogue_editor)이 만드는 tools/dialogues/*.json 이 원본이고,
+엑셀 Nodes·Choices 시트와 합쳐서 검사·출력한다.
 
 사용법:  python tools/xlsx_to_json.py [xlsx 경로]
 오류가 하나라도 있으면 JSON을 쓰지 않고 종료 코드 1로 끝난다.
@@ -16,6 +19,7 @@ from openpyxl import load_workbook
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_XLSX = ROOT / "tools" / "sheets" / "content.xlsx"
 MAPS_DIR = ROOT / "tools" / "maps"
+DIALOGUES_DIR = ROOT / "tools" / "dialogues"
 OUT_DIR = ROOT / "data"
 
 STATS = {"hp", "sanity", "time"}
@@ -302,7 +306,7 @@ def validate(d, rep):
         for r in d[sheet]:
             rid = tuple(r[c] for c in DUP_KEYS[sheet]) if sheet in DUP_KEYS else r[id_col]
             if rid in seen:
-                rep.err(f"{sheet} {r['_row']}행", f"ID 중복 '{rid}' ({seen[rid]['_row']}행과 겹침)")
+                rep.err(loc(sheet, r), f"ID 중복 '{rid}' ({loc(sheet, seen[rid])} 과 겹침)")
             else:
                 seen[rid] = r
         return seen
@@ -492,7 +496,7 @@ def validate(d, rep):
     edges = {}  # node_id -> set(node_id)
     for n in d["Nodes"]:
         nid = n["node_id"]
-        w = f"Nodes {n['_row']}행 ({nid})"
+        w = f"{loc('Nodes', n)} ({nid})"
         ep = n["episode_id"]
         if ep != "" and ep not in eps:
             rep.err(w, f"없는 episode_id '{ep}'")
@@ -508,7 +512,7 @@ def validate(d, rep):
         edges[nid] = out
 
     for c in d["Choices"]:
-        w = f"Choices {c['_row']}행 ({c['choice_id']})"
+        w = f"{loc('Choices', c)} ({c['choice_id']})"
         node = nodes.get(c["node_id"])
         if node is None:
             rep.err(w, f"없는 node_id '{c['node_id']}'")
@@ -574,7 +578,7 @@ def validate(d, rep):
             q.extend(x for x in edges.get(nid, ()) if x in nodes)
     for n in d["Nodes"]:
         if n["node_id"] not in reached and (n["episode_id"] in eps or n["episode_id"] == ""):
-            rep.err(f"Nodes {n['_row']}행 ({n['node_id']})",
+            rep.err(f"{loc('Nodes', n)} ({n['node_id']})",
                     "시작 노드에서 도달할 수 없음" if n["episode_id"] else "어떤 NPC(FieldObjects)에서도 도달할 수 없는 필드 대화")
 
 
@@ -655,6 +659,47 @@ def validate_combat(d, rep, pparts, enemies, eparts):
                 rep.err(w, f"targets 의 없는 PlayerParts part_id '{t}'")
         if a["windup"] is not None and a["windup"] <= 0:
             rep.err(w, "windup(전조 시간, 초)은 0보다 커야 함")
+
+
+def loc(sheet, r):
+    """오류 위치: 엑셀 행이면 '시트 N행', 대화 파일이면 '대화 파일.json'"""
+    return f"대화 {r['_row']}" if isinstance(r["_row"], str) else f"{sheet} {r['_row']}행"
+
+
+def read_dialogues(d, rep):
+    """tools/dialogues/*.json (대화 에디터 파일) 의 노드·선택지를 엑셀 Nodes·Choices 뒤에 붙인다."""
+    if not DIALOGUES_DIR.exists():
+        return
+    node_cols = SCHEMA["Nodes"][1]
+    choice_cols = SCHEMA["Choices"][1] + OPTIONAL.get("Choices", [])
+    for f in sorted(DIALOGUES_DIR.glob("*.json")):
+        try:
+            dlg = json.loads(f.read_text(encoding="utf-8"))
+        except (ValueError, OSError) as e:
+            rep.err(f"대화 {f.name}", f"파일을 읽을 수 없음: {e}")
+            continue
+        episode = str(dlg.get("episode_id", "") or "")
+        for n in dlg.get("nodes", []):
+            rec = {c: _dlg_str(n.get(c, "")) for c in node_cols}
+            rec["episode_id"] = episode
+            rec["_row"] = f"{f.name}"
+            d["Nodes"].append(rec)
+        for c in dlg.get("choices", []):
+            rec = {k: _dlg_str(c.get(k, "")) for k in choice_cols}
+            if rec["type"] != "dice":
+                rec["dc"] = rec["mod"] = ""
+            elif rec["mod"] == "0":
+                rec["mod"] = ""
+            rec["_row"] = f"{f.name}"
+            d["Choices"].append(rec)
+
+
+def _dlg_str(v):
+    if v is None:
+        return ""
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)
+    return str(v).strip()
 
 
 def read_maps(rep):
@@ -832,6 +877,7 @@ def main():
     except PermissionError:
         print(f"파일을 열 수 없음(다른 프로그램이 잠금?): {path}")
         return 1
+    read_dialogues(data, rep)
     maps = read_maps(rep)
     data["_maps"] = maps
     validate(data, rep)

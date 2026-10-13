@@ -1,0 +1,105 @@
+{
+ "dialogue_id": "npc1",
+ "episode_id": "",
+ "nodes": [
+  {
+   "node_id": "fd_npc1_a",
+   "speaker_id": "char_npc",
+   "text": "필드 대화 노드 1 (NPC 1)",
+   "next_node": "",
+   "on_enter": "",
+   "pos": [
+    40,
+    60
+   ]
+  },
+  {
+   "node_id": "fd_npc1_b",
+   "speaker_id": "char_t1",
+   "text": "필드 대화 노드 2 (주인공)",
+   "next_node": "EXIT",
+   "on_enter": "",
+   "pos": [
+    560,
+    140
+   ]
+  },
+  {
+   "node_id": "fd_npc1_fail",
+   "speaker_id": "char_npc",
+   "text": "필드 대화 노드 3 (판정 실패)",
+   "next_node": "EXIT",
+   "on_enter": "",
+   "pos": [
+    1080,
+    60
+   ]
+  }
+ ],
+ "choices": [
+  {
+   "choice_id": "fdc1",
+   "node_id": "fd_npc1_a",
+   "text": "대화 선택지 1 (일반)",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "",
+   "next_node": "fd_npc1_b",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  },
+  {
+   "choice_id": "fdc2",
+   "node_id": "fd_npc1_a",
+   "text": "칼 보여주기",
+   "condition": "has:knife",
+   "show_mode": "gray",
+   "cost": "",
+   "effects": "setflag:showed_knife",
+   "next_node": "fd_npc1_b",
+   "type": "item",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  },
+  {
+   "choice_id": "fdc3",
+   "node_id": "fd_npc1_a",
+   "text": "설득 (능력치 A, 목표 12)",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "item:+bandage",
+   "next_node": "fd_npc1_b",
+   "type": "dice",
+   "check": "stat_a",
+   "dc": 12,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": "fd_npc1_fail"
+  },
+  {
+   "choice_id": "fdc4",
+   "node_id": "fd_npc1_a",
+   "text": "대화 끝내기",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "",
+   "next_node": "EXIT",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  }
+ ]
+}
