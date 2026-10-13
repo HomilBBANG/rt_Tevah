@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tools/sheets/content.xlsx → res://data/*.json 변환 + 데이터 검사.
+"""tools/sheets/content.xlsx (+ tools/maps/*.txt) → res://data/*.json 변환 + 데이터 검사.
 
 사용법:  python tools/xlsx_to_json.py [xlsx 경로]
 오류가 하나라도 있으면 JSON을 쓰지 않고 종료 코드 1로 끝난다.
@@ -15,6 +15,7 @@ from openpyxl import load_workbook
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_XLSX = ROOT / "tools" / "sheets" / "content.xlsx"
+MAPS_DIR = ROOT / "tools" / "maps"
 OUT_DIR = ROOT / "data"
 
 STATS = {"hp", "sanity", "time"}
@@ -45,10 +46,15 @@ SCHEMA = {
     "EnemyAttacks": ("attack_id", ["attack_id", "enemy_id", "name", "part", "pattern", "targets", "windup",
                                    "damage", "weight"],
                      {"windup": (float, None), "damage": (int, None), "weight": (int, 1)}),
+    # ---- 탐험 필드. 맵 모양은 tools/maps/<map_id>.txt, 맵 위 물체는 이 시트
+    "FieldObjects": ("object_id", ["object_id", "map_id", "marker", "type", "ref", "name", "text", "patrol"], {}),
 }
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
-OPTIONAL_SHEETS = {"Abilities", "PlayerParts", "Enemies", "EnemyParts", "EnemyAttacks"}
+OPTIONAL_SHEETS = {"Abilities", "PlayerParts", "Enemies", "EnemyParts", "EnemyAttacks", "FieldObjects"}
+FIELD_TYPES = {"enemy", "investigate"}
+PATROL_RE = re.compile(r"^(up|down|left|right)\s+(\d+)$")
+MAP_FIXED = {"#", ".", " ", "P"}   # 벽 / 바닥 / 빈칸(벽 취급) / 시작 위치
 # ID 중복 검사를 여러 열 조합으로 하는 시트
 DUP_KEYS = {"EnemyParts": ("enemy_id", "part_id")}
 DODGE_KEYS = {"W", "A", "S", "D"}
@@ -563,8 +569,83 @@ def validate_combat(d, rep, pparts, enemies, eparts):
             rep.err(w, "windup(전조 시간, 초)은 0보다 커야 함")
 
 
+def read_maps(rep):
+    """tools/maps/*.txt → {map_id: {"lines": [...], "file": name}}"""
+    maps = {}
+    if not MAPS_DIR.exists():
+        return maps
+    for f in sorted(MAPS_DIR.glob("*.txt")):
+        lines = f.read_text(encoding="utf-8").rstrip("\n").split("\n")
+        lines = [ln.rstrip("\r") for ln in lines]
+        maps[f.stem] = {"lines": lines, "file": f.name}
+    return maps
+
+
+def validate_field(d, maps, rep, enemies):
+    spots = {r["spot_id"] for r in d["Loot"] if r["spot_id"]}
+    for mid, m in maps.items():
+        starts = sum(ln.count("P") for ln in m["lines"])
+        if starts != 1:
+            rep.err(f"맵 {m['file']}", f"시작 위치 P 가 정확히 1개여야 함 (지금 {starts}개)")
+    for o in d["FieldObjects"]:
+        w = f"FieldObjects {o['_row']}행 ({o['object_id']})"
+        m = maps.get(o["map_id"])
+        if m is None:
+            rep.err(w, f"맵 파일 tools/maps/{o['map_id']}.txt 가 없음")
+            continue
+        mk = o["marker"]
+        if len(mk) != 1 or mk in MAP_FIXED:
+            rep.err(w, f"marker 는 # . P 가 아닌 글자 1개: '{mk}'")
+        else:
+            n = sum(ln.count(mk) for ln in m["lines"])
+            if n != 1:
+                rep.err(w, f"맵 {m['file']} 에 marker '{mk}' 가 정확히 1개여야 함 (지금 {n}개)")
+        if o["type"] not in FIELD_TYPES:
+            rep.err(w, f"type 은 enemy / investigate: '{o['type']}'")
+        elif o["type"] == "enemy" and o["ref"] not in enemies:
+            rep.err(w, f"enemy 의 ref 는 Enemies 의 enemy_id: '{o['ref']}'")
+        elif o["type"] == "investigate" and o["ref"] and o["ref"] not in spots:
+            rep.err(w, f"investigate 의 ref 는 Loot 의 spot_id (없으면 비움): '{o['ref']}'")
+        if o["patrol"]:
+            if o["type"] != "enemy":
+                rep.err(w, "patrol 은 enemy 만")
+            elif not PATROL_RE.match(o["patrol"].lower()):
+                rep.err(w, f"patrol 은 '방향 칸수' (예: right 4, 방향 up/down/left/right): '{o['patrol']}'")
+    for mid, m in maps.items():
+        known = {o["marker"] for o in d["FieldObjects"] if o["map_id"] == mid}
+        for y, ln in enumerate(m["lines"]):
+            for x, ch in enumerate(ln):
+                if ch not in MAP_FIXED and ch not in known:
+                    rep.err(f"맵 {m['file']} {y + 1}행 {x + 1}열", f"FieldObjects 에 없는 marker '{ch}'")
+
+
+def export_maps(d, maps):
+    out = []
+    for mid, m in maps.items():
+        width = max(len(ln) for ln in m["lines"])
+        objs = {o["marker"]: o for o in d["FieldObjects"] if o["map_id"] == mid}
+        tiles, objects, start = [], [], [0, 0]
+        for y, ln in enumerate(m["lines"]):
+            row = ""
+            for x, ch in enumerate(ln.ljust(width)):
+                if ch == "P":
+                    start = [x, y]
+                    ch = "."
+                elif ch in objs:
+                    o = {k: v for k, v in objs[ch].items() if k != "_row"}
+                    pat = PATROL_RE.match(o["patrol"].lower()) if o["patrol"] else None
+                    o.update(x=x, y=y, patrol_dir=pat.group(1) if pat else "", patrol_len=int(pat.group(2)) if pat else 0)
+                    objects.append(o)
+                    ch = "."
+                row += "#" if ch == " " else ch
+            tiles.append(row)
+        out.append({"map_id": mid, "width": width, "height": len(tiles), "tiles": tiles, "start": start,
+                    "objects": objects})
+    return out
+
+
 # ---------------------------------------------------------------- 출력
-def export(d):
+def export(d, maps):
     def clean(rows):
         return [{k: v for k, v in r.items() if k != "_row"} for r in rows]
 
@@ -595,6 +676,7 @@ def export(d):
                          attacks=[dict(a, strikes=parse_strikes(a["pattern"], a["targets"]))
                                   for a in clean(d["EnemyAttacks"]) if a["enemy_id"] == e["enemy_id"]])
                     for e in clean(d["Enemies"])],
+        "maps": export_maps(d, maps),
         "endings": [dict(r, world_flags_set=split_list(r["world_flags_set"])) for r in clean(d["Endings"])],
         "config": {r["key"]: (int(r["value"]) if float(r["value"]).is_integer() else r["value"])
                    for r in d["Config"]},
@@ -621,13 +703,15 @@ def main():
     except PermissionError:
         print(f"파일을 열 수 없음(다른 프로그램이 잠금?): {path}")
         return 1
+    maps = read_maps(rep)
     validate(data, rep)
+    validate_field(data, maps, rep, {e["enemy_id"] for e in data["Enemies"]})
     if rep.errors:
         print(f"오류 {len(rep.errors)}개 — JSON을 쓰지 않았습니다.")
         for e in rep.errors:
             print("  " + e)
         return 1
-    out = export(data)
+    out = export(data, maps)
     print("변환 완료 → " + str(OUT_DIR))
     for k, v in out.items():
         print(f"  {k}.json: {len(v)}개")
