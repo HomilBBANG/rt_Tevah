@@ -38,5 +38,13 @@
   "amount": 2,
   "chance": 100.0,
   "time_cost": 0
+ },
+ {
+  "loot_id": "l6",
+  "spot_id": "spot_charm",
+  "item_id": "charm",
+  "amount": 1,
+  "chance": 100.0,
+  "time_cost": 5
  }
 ]

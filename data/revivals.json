@@ -1,0 +1,16 @@
+[
+ {
+  "revive_id": "rv_charm",
+  "name": "부활 부적",
+  "condition": "has:charm",
+  "effects": "item:-charm",
+  "text": "부활 텍스트 1 (테스트, 아이템으로 부활)"
+ },
+ {
+  "revive_id": "rv_hana",
+  "name": "초월체의 보호",
+  "condition": "flag:hana_protect",
+  "effects": "clearflag:hana_protect",
+  "text": "부활 텍스트 2 (테스트, 초월체가 부활시킴)"
+ }
+]

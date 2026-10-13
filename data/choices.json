@@ -494,5 +494,21 @@
   "mod": 0,
   "fail_effects": "",
   "fail_next": ""
+ },
+ {
+  "choice_id": "fdc_cat3",
+  "node_id": "fd_cat_a",
+  "text": "(테스트) 부활 보호 받기",
+  "condition": "!flag:hana_protect",
+  "show_mode": "hide",
+  "cost": "",
+  "effects": "setflag:hana_protect",
+  "next_node": "EXIT",
+  "type": "normal",
+  "check": "",
+  "dc": 0,
+  "mod": 0,
+  "fail_effects": "",
+  "fail_next": ""
  }
 ]

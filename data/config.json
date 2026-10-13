@@ -20,7 +20,7 @@
  "field_enemy_lose_sight": 8,
  "field_flee_grace": 3,
  "protagonist_id": "char_t1",
- "start_map": "basecamp",
+ "start_map": "test_field",
  "basecamp_map": "basecamp",
  "time_scale": 2,
  "start_hour": 8,

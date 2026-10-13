@@ -53,15 +53,17 @@ SCHEMA = {
                  {"start": (float, None), "max": (float, None), "decay_per_hour": (float, 0.0), "warn": (float, 0.0)}),
     "CampActions": ("action_id", ["action_id", "name", "minutes", "condition", "effects", "kind"],
                     {"minutes": (int, 0)}),
+    # ---- 부활 (기획서 §11): 사망 순간 위에서부터 condition 이 참인 첫 행으로 부활 → 모두 유지한 채 베이스캠프에서 깨어남
+    "Revivals": ("revive_id", ["revive_id", "name", "condition", "effects", "text"], {}),
 }
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
 OPTIONAL_SHEETS = {"Abilities", "PlayerParts", "Enemies", "EnemyParts", "EnemyAttacks", "FieldObjects",
-                   "Survival", "CampActions"}
+                   "Survival", "CampActions", "Revivals"}
 FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit"}
 CAMP_KINDS = {"", "sleep"}   # sleep: 1시간 단위로 골라 자고, 자고 나면 저장 (effects 는 1시간마다)
 PATROL_RE = re.compile(r"^(up|down|left|right)\s+(\d+)$")
-MAP_FIXED = {"#", ".", " ", "P"}   # 벽 / 바닥 / 빈칸(벽 취급) / 시작 위치
+MAP_FIXED = {"#", ".", " ", "P", "S"}   # 벽 / 바닥 / 빈칸(벽 취급) / 도착 위치(출구·부활) / 회차 시작 위치
 # ID 중복 검사를 여러 열 조합으로 하는 시트
 DUP_KEYS = {"EnemyParts": ("enemy_id", "part_id")}
 DODGE_KEYS = {"W", "A", "S", "D"}
@@ -439,6 +441,13 @@ def validate(d, rep):
     for key in ("start_map", "basecamp_map"):
         if key in config and config[key]["value"] not in d["_maps"]:
             rep.err("Config", f"{key} 는 tools/maps 의 맵 이름: '{config[key]['value']}'")
+    for rv in d["Revivals"]:
+        w = f"Revivals {rv['_row']}행 ({rv['revive_id']})"
+        if not rv["condition"]:
+            rep.err(w, "condition 이 비어 있음 (비우면 항상 부활해 죽음이 없어진다)")
+        check_cond(w, rv["condition"])
+        if check_effects(w, rv["effects"], None):
+            rep.err(w, "부활 효과에는 goto 를 쓸 수 없음")
 
     # Loot
     for lo in d["Loot"]:
@@ -664,6 +673,9 @@ def validate_field(d, maps, rep, enemies):
     spots = {r["spot_id"] for r in d["Loot"] if r["spot_id"]}
     nodes = {n["node_id"]: n for n in d["Nodes"]}
     for mid, m in maps.items():
+        run_starts = sum(ln.count("S") for ln in m["lines"])
+        if run_starts > 1:
+            rep.err(f"맵 {m['file']}", f"회차 시작 위치 S 는 1개까지 (지금 {run_starts}개)")
         starts = sum(ln.count("P") for ln in m["lines"])
         if starts != 1:
             rep.err(f"맵 {m['file']}", f"시작 위치 P 가 정확히 1개여야 함 (지금 {starts}개)")
@@ -734,12 +746,15 @@ def export_maps(d, maps):
     for mid, m in maps.items():
         width = max(len(ln) for ln in m["lines"])
         objs = {o["marker"]: o for o in d["FieldObjects"] if o["map_id"] == mid}
-        tiles, objects, start = [], [], [0, 0]
+        tiles, objects, start, run_start = [], [], [0, 0], None
         for y, ln in enumerate(m["lines"]):
             row = ""
             for x, ch in enumerate(ln.ljust(width)):
                 if ch == "P":
                     start = [x, y]
+                    ch = "."
+                elif ch == "S":
+                    run_start = [x, y]
                     ch = "."
                 elif ch in objs:
                     o = {k: v for k, v in objs[ch].items() if k != "_row"}
@@ -751,7 +766,7 @@ def export_maps(d, maps):
                 row += "#" if ch == " " else ch
             tiles.append(row)
         out.append({"map_id": mid, "width": width, "height": len(tiles), "tiles": tiles, "start": start,
-                    "objects": objects})
+                    "run_start": run_start or start, "objects": objects})
     return out
 
 
@@ -790,6 +805,7 @@ def export(d, maps):
         "maps": export_maps(d, maps),
         "survival": clean(d["Survival"]),
         "camp_actions": clean(d["CampActions"]),
+        "revivals": clean(d["Revivals"]),
         "endings": [dict(r, world_flags_set=split_list(r["world_flags_set"])) for r in clean(d["Endings"])],
         "config": {r["key"]: config_value(r["value"]) for r in d["Config"]},
     }

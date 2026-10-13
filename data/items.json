@@ -57,5 +57,14 @@
   "use_effects": "item:-water;surv:thirst+50",
   "stack_max": 5,
   "dice_bonus": []
+ },
+ {
+  "item_id": "charm",
+  "name": "부활 부적(테스트)",
+  "type": "relic",
+  "description": "아이템 설명 7",
+  "use_effects": "",
+  "stack_max": 1,
+  "dice_bonus": []
  }
 ]

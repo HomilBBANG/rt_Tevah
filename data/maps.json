@@ -16,6 +16,10 @@
    7,
    4
   ],
+  "run_start": [
+   7,
+   4
+  ],
   "objects": [
    {
     "object_id": "fo_camp",
@@ -98,6 +102,10 @@
   "start": [
    1,
    1
+  ],
+  "run_start": [
+   14,
+   5
   ],
   "objects": [
    {
@@ -217,9 +225,9 @@
     "map_id": "test_field",
     "marker": "d",
     "type": "investigate",
-    "ref": "",
+    "ref": "spot_charm",
     "name": "조사 지점 2",
-    "text": "조사 텍스트 2 (테스트, 아이템 없음)",
+    "text": "조사 텍스트 2 (테스트, 부활 아이템)",
     "patrol": "",
     "condition": "",
     "schedule": [],
