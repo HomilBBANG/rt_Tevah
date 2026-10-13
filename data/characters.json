@@ -34,5 +34,12 @@
   "traits": [],
   "name_color": "#4FC3F7",
   "abilities": {}
+ },
+ {
+  "char_id": "char_cat",
+  "name": "고양이",
+  "traits": [],
+  "name_color": "#E8B04A",
+  "abilities": {}
  }
 ]

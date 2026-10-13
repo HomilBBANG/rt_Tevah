@@ -23,5 +23,6 @@
  "start_map": "basecamp",
  "basecamp_map": "basecamp",
  "time_scale": 2,
- "start_hour": 8
+ "start_hour": 8,
+ "sleep_max_hours": 12
 }

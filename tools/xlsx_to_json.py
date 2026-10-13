@@ -59,7 +59,7 @@ SCHEMA = {
 OPTIONAL_SHEETS = {"Abilities", "PlayerParts", "Enemies", "EnemyParts", "EnemyAttacks", "FieldObjects",
                    "Survival", "CampActions"}
 FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit"}
-CAMP_KINDS = {"", "save"}
+CAMP_KINDS = {"", "sleep"}   # sleep: 1시간 단위로 골라 자고, 자고 나면 저장 (effects 는 1시간마다)
 PATROL_RE = re.compile(r"^(up|down|left|right)\s+(\d+)$")
 MAP_FIXED = {"#", ".", " ", "P"}   # 벽 / 바닥 / 빈칸(벽 취급) / 시작 위치
 # ID 중복 검사를 여러 열 조합으로 하는 시트
@@ -76,6 +76,7 @@ OPTIONAL = {
     # 선택지 종류: normal(기본) / item / dice
     # dice: check=능력치, dc=목표값, mod=상황 보정, 실패 시 fail_effects·fail_next
     "Choices": ["type", "check", "dc", "mod", "fail_effects", "fail_next"],
+    "FieldObjects": ["condition"],  # 맵에 들어올 때 이 조건이 참이어야 나타남 (예: 베이스캠프의 고양이)
 }
 
 ID_RE = re.compile(r"^[A-Za-z0-9_]+$")
@@ -186,6 +187,7 @@ EFFECT_RES = [
     ("abil", re.compile(r"^abil:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
     ("surv", re.compile(r"^surv:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
     ("simple", re.compile(r"^(setflag|clearflag|setwflag|loot|goto):([A-Za-z0-9_]+)$")),
+    ("save", re.compile(r"^save$")),   # 회차 저장 (베이스캠프 안에서만 동작)
 ]
 
 
@@ -209,6 +211,8 @@ def parse_effects(text):
                     raise ExprError(f"'{e}': 알 수 없는 스탯 '{m.group(1)}'")
             elif kind in ("abil", "surv"):
                 refs.append((kind, m.group(1)))
+            elif kind == "save":
+                pass
             else:
                 refs.append((m.group(1), m.group(2)))
             break
@@ -423,7 +427,9 @@ def validate(d, rep):
     for ca in d["CampActions"]:
         w = f"CampActions {ca['_row']}행 ({ca['action_id']})"
         if ca["kind"] not in CAMP_KINDS:
-            rep.err(w, f"kind 는 비우거나 save: '{ca['kind']}'")
+            rep.err(w, f"kind 는 비우거나 sleep: '{ca['kind']}'")
+        if ca["kind"] == "sleep" and ca["minutes"] != 60:
+            rep.err(w, "sleep 행동의 minutes 는 60 (1시간 단위로 잔다)")
         if ca["minutes"] is not None and ca["minutes"] < 0:
             rep.err(w, "minutes 는 0 이상")
         check_cond(w, ca["condition"])
@@ -683,6 +689,11 @@ def validate_field(d, maps, rep, enemies):
             rep.err(w, f"exit 의 ref 는 이동할 맵 이름 (tools/maps/<이름>.txt): '{o['ref']}'")
         elif o["type"] == "investigate" and o["ref"] and o["ref"] not in spots:
             rep.err(w, f"investigate 의 ref 는 Loot 의 spot_id (없으면 비움): '{o['ref']}'")
+        if o["condition"]:
+            try:
+                parse_condition(o["condition"])
+            except ExprError as e:
+                rep.err(w, f"condition 문법 오류: {e}")
         if o["patrol"]:
             if o["type"] != "enemy":
                 rep.err(w, "patrol 은 enemy 만")

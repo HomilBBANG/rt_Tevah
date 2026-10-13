@@ -16,22 +16,6 @@
   "kind": ""
  },
  {
-  "action_id": "camp_sleep4",
-  "name": "짧게 자기",
-  "minutes": 240,
-  "condition": "",
-  "effects": "surv:sleep+40",
-  "kind": ""
- },
- {
-  "action_id": "camp_sleep8",
-  "name": "푹 자기",
-  "minutes": 480,
-  "condition": "",
-  "effects": "surv:sleep+80;surv:mental+10",
-  "kind": ""
- },
- {
   "action_id": "camp_wash",
   "name": "씻기",
   "minutes": 30,
@@ -40,11 +24,11 @@
   "kind": ""
  },
  {
-  "action_id": "camp_save",
-  "name": "저장",
-  "minutes": 0,
+  "action_id": "camp_sleep",
+  "name": "잠자기",
+  "minutes": 60,
   "condition": "",
-  "effects": "",
-  "kind": "save"
+  "effects": "surv:sleep+10",
+  "kind": "sleep"
  }
 ]
