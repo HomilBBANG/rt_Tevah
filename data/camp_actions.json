@@ -17,10 +17,10 @@
  },
  {
   "action_id": "camp_wash",
-  "name": "씻기",
+  "name": "씻기 (물 1병)",
   "minutes": 30,
-  "condition": "",
-  "effects": "surv:hygiene+60",
+  "condition": "has:water",
+  "effects": "item:-water;surv:hygiene+60",
   "kind": ""
  },
  {
