@@ -154,3 +154,12 @@ tools/
 - **베이스캠프**: 맵 `tools/maps/basecamp.txt`, FieldObjects `camp` = 거점 메뉴(엑셀 `CampActions`: minutes, condition, effects, kind=sleep), `exit` = 맵 이동(도착은 그 맵의 P).
 - 필드 소지품: I / Tab. 필드 조사·거점 행동·아이템 사용은 `StoryRunner.run_effects()` / `use_item()` (대화 밖, mode="field") 으로 같은 효과 엔진을 쓴다.
 - 임시·미구현(TODO, 기획 미확정): 파라미터가 낮거나 0일 때의 효과·사망 여부(§5), 시간 배율·행동 시간(§4), 탐험 중 종료 처리(§13.2), 사망·부활 연출(§11).
+
+## 대화 에디터 (addons/dialogue_editor)
+- 대화(노드·선택지)의 원본은 **`tools/dialogues/<대화ID>.json`** (대화 하나 = 파일 하나). 변환기가 엑셀 Nodes·Choices 뒤에 합쳐 같은 규칙으로 검사한다. 엑셀 Nodes·Choices 도 계속 읽는다 (1단계 에피소드 테스트 대화는 엑셀에 있음).
+  - 파일: `{ dialogue_id, episode_id("" = 필드 대화), nodes: [{node_id, speaker_id, text, next_node, on_enter, pos}], choices: [{choice_id, node_id, text, condition, show_mode, cost, effects, next_node, type, check, dc, mod, fail_effects, fail_next}] }`
+- Godot 위쪽 **'대화' 탭** (EditorPlugin 메인 화면). 대사 카드(GraphNode)를 선으로 이어 next_node / 선택지 next_node / 판정 fail_next 를 정한다. 대화 끝(EXIT)·엔딩(END:id) 카드. 다른 파일·엑셀 노드로는 오른쪽 칸 '이동(직접 입력)'.
+  - 연결선은 데이터(next_node 등)를 따른다: 연결/끊기 → 데이터 수정 → 다시 그림 (`_sync_connections`).
+  - 버튼: 새 대화 / 대사 추가 / 엔딩 카드 / 저장 / 변환·검사(`tools/xlsx_to_json.py --log`, 결과는 UTF-8 로그 파일로 받음) / 미리보기(`addons/dialogue_editor/preview.tscn`, 고른 카드부터 실제 대화 화면, save 효과는 저장 안 함).
+  - 맥은 `python3`, 윈도우는 `python` 으로 변환기를 실행.
+- 테스트: `tests/dialogue_editor_smoke.tscn` (에디터 화면을 게임 안에서 띄워 열기·연결·저장·새 대화·변환 확인).

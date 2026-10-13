@@ -863,19 +863,41 @@ def export(d, maps):
 
 
 def main():
+    """사용법: python tools/xlsx_to_json.py [xlsx 경로] [--log 결과파일]
+    --log: 출력을 UTF-8 파일로도 남긴다 (대화 에디터가 읽음 — 윈도우 콘솔 인코딩과 무관하게)."""
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except AttributeError:
         pass
-    path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_XLSX
+    args = sys.argv[1:]
+    log_path = None
+    if "--log" in args:
+        i = args.index("--log")
+        log_path = args[i + 1] if i + 1 < len(args) else None
+        del args[i:i + 2]
+    lines = []
+
+    def say(text):
+        print(text)
+        lines.append(text)
+
+    try:
+        return _run(Path(args[0]) if args else DEFAULT_XLSX, say)
+    finally:
+        if log_path:
+            with open(log_path, "w", encoding="utf-8", newline="\n") as fp:
+                fp.write("\n".join(lines) + "\n")
+
+
+def _run(path, say):
     if not path.exists():
-        print(f"파일 없음: {path}")
+        say(f"파일 없음: {path}")
         return 1
     rep = Report()
     try:
         data = read_sheets(path, rep)
     except PermissionError:
-        print(f"파일을 열 수 없음(다른 프로그램이 잠금?): {path}")
+        say(f"파일을 열 수 없음(다른 프로그램이 잠금?): {path}")
         return 1
     read_dialogues(data, rep)
     maps = read_maps(rep)
@@ -883,14 +905,14 @@ def main():
     validate(data, rep)
     validate_field(data, maps, rep, {e["enemy_id"] for e in data["Enemies"]})
     if rep.errors:
-        print(f"오류 {len(rep.errors)}개 — JSON을 쓰지 않았습니다.")
+        say(f"오류 {len(rep.errors)}개 — JSON을 쓰지 않았습니다.")
         for e in rep.errors:
-            print("  " + e)
+            say("  " + e)
         return 1
     out = export(data, maps)
-    print("변환 완료 → " + str(OUT_DIR))
+    say("변환 완료 → " + str(OUT_DIR))
     for k, v in out.items():
-        print(f"  {k}.json: {len(v)}개")
+        say(f"  {k}.json: {len(v)}개")
     return 0
 
 
