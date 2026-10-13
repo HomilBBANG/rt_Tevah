@@ -2,18 +2,22 @@ extends Node2D
 ## 탑뷰 탐험 필드 (기획서 §6, §17.2 2단계). 맵은 data/maps.json (tools/maps/*.txt + FieldObjects 시트).
 ##
 ## 이동 → 적과 닿으면 턴제 전투(화면 위에 겹쳐 띄움) → 승리: 적 제거 / 도주: 잠시 유예 / 사망: 처음부터
+## NPC 에게 말을 걸면 대화 화면(scenes/main_play)을 겹쳐 띄우고 필드 대화를 진행, EXIT 에서 복귀.
 ## 플레이어 신체 상태(부상·절단)는 전투 사이에 이어진다 (한 회차 동안).
 ##
-## TODO(다음 단계): 시간 흐름(§4), 생존 파라미터(§5), NPC 대화 연결, 맵 이동, 베이스캠프·회차 저장(§11–13)
+## TODO(다음 단계): 시간 흐름(§4), 생존 파라미터(§5), 맵 이동, 베이스캠프·회차 저장(§11–13)
 
 const Combat = preload("res://core/combat/combat.gd")
 const InputActions = preload("res://core/input_actions.gd")
 const CombatScene = preload("res://scenes/combat.tscn")
+const DialogueScene = preload("res://scenes/main_play.tscn")
+const NpcScript = preload("res://scenes/field/field_npc.gd")
 const PlayerScript = preload("res://scenes/field/field_player.gd")
 const EnemyScript = preload("res://scenes/field/field_enemy.gd")
 
 const WALL_LAYER := 1
 const ACTOR_LAYER := 2
+const NPC_LAYER := 4
 const INTERACT_RANGE := 1.1      # 칸
 
 ## 다음에 열 맵 (비어 있으면 첫 번째 맵)
@@ -24,10 +28,12 @@ var tile := 48.0
 var frozen := false
 var player: CharacterBody2D
 var enemies: Array = []
-var spots: Array = []            # 조사 지점 [{ data, pos, done }]
+var spots: Array = []            # 조사 지점 [{ kind: "spot", data, pos, done }]
+var npcs: Array = []             # NPC [{ kind: "npc", data, pos, node }]
 var player_body := {}            # 전투 사이에 이어지는 부위 상태
 
 var _combat_ui: Node
+var _dialogue_ui: Node
 var _combat_enemy: Node
 var _near_spot := {}
 
@@ -92,7 +98,7 @@ func _build_actors() -> void:
 	player.radius = tile * 0.3
 	player.speed = cfg.call("field_player_speed", 4)
 	player.collision_layer = ACTOR_LAYER
-	player.collision_mask = WALL_LAYER
+	player.collision_mask = WALL_LAYER | NPC_LAYER
 	player.position = _tile_center(map.start[0], map.start[1])
 	_add_circle_shape(player, player.radius)
 	var cam := Camera2D.new()
@@ -128,7 +134,18 @@ func _build_actors() -> void:
 				add_child(e)
 				enemies.append(e)
 			"investigate":
-				spots.append({"data": o, "pos": pos, "done": false})
+				spots.append({"kind": "spot", "data": o, "pos": pos, "done": false})
+			"npc":
+				var n := StaticBody2D.new()
+				n.set_script(NpcScript)
+				n.radius = tile * 0.3
+				n.display_name = o.name
+				n.collision_layer = NPC_LAYER
+				n.collision_mask = 0
+				n.position = pos
+				_add_circle_shape(n, n.radius)
+				add_child(n)
+				npcs.append({"kind": "npc", "data": o, "pos": pos, "node": n})
 
 
 func _tile_center(x: float, y: float) -> Vector2:
@@ -168,20 +185,30 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _update_near_spot() -> void:
 	var best := {}
-	for s in spots:
-		if s.pos.distance_to(player.global_position) <= INTERACT_RANGE * tile:
+	var best_d := INF
+	for s in spots + npcs:
+		var d: float = s.pos.distance_to(player.global_position)
+		if d <= INTERACT_RANGE * tile and d < best_d:
 			best = s
+			best_d = d
 	if best != _near_spot:
 		_near_spot = best
 		%Prompt.visible = not best.is_empty()
-		if not best.is_empty():
+		if best.is_empty():
+			pass
+		elif best.kind == "npc":
+			%Prompt.text = "[E / Space]  대화: %s" % best.data.name
+		else:
 			%Prompt.text = "[E / Space]  조사: %s%s" % [best.data.name, "  (조사함)" if best.done else ""]
 
 
 # ---------------------------------------------------------------- 조사
-## 가까운 조사 지점 조사. 아이템은 처음 한 번만.
+## 가까운 조사 지점 조사(아이템은 처음 한 번만) 또는 NPC 대화.
 func interact() -> void:
 	if _near_spot.is_empty():
+		return
+	if _near_spot.kind == "npc":
+		_start_dialogue(_near_spot)
 		return
 	var s := _near_spot
 	var lines := PackedStringArray([s.data.text])
@@ -222,6 +249,25 @@ func close_message() -> void:
 	frozen = false
 
 
+# ---------------------------------------------------------------- NPC 대화
+func _start_dialogue(npc: Dictionary) -> void:
+	frozen = true
+	%Prompt.visible = false
+	_near_spot = {}
+	_dialogue_ui = DialogueScene.instantiate()
+	_dialogue_ui.embedded = true
+	_dialogue_ui.finished.connect(_on_dialogue_finished)
+	%Overlay.add_child(_dialogue_ui)
+	StoryRunner.start_dialogue(npc.data.ref)
+
+
+func _on_dialogue_finished() -> void:
+	_dialogue_ui.queue_free()
+	_dialogue_ui = null
+	frozen = false
+	_update_hud()
+
+
 # ---------------------------------------------------------------- 전투
 func _start_combat(enemy: Node) -> void:
 	frozen = true
@@ -232,7 +278,7 @@ func _start_combat(enemy: Node) -> void:
 	_combat_ui.enemy_id_override = enemy.data.ref
 	_combat_ui.player_state = player_body
 	_combat_ui.finished.connect(_on_combat_finished)
-	%CombatLayer.add_child(_combat_ui)
+	%Overlay.add_child(_combat_ui)
 
 
 func _on_combat_finished(outcome: String) -> void:

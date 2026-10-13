@@ -62,7 +62,7 @@ anchor_right = 0.98
 anchor_bottom = 1.0
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 theme_override_font_sizes/font_size = 15
-text = "이동: WASD / 방향키      조사: E / Space      붉은 원 = 적의 시야 (벽 너머는 못 봄)"
+text = "이동: WASD / 방향키      조사·대화: E / Space      붉은 원 = 적의 시야 (벽 너머는 못 봄)"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -121,6 +121,6 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "처음부터"
 
-[node name="CombatLayer" type="CanvasLayer" parent="."]
+[node name="Overlay" type="CanvasLayer" parent="."]
 unique_name_in_owner = true
 layer = 10

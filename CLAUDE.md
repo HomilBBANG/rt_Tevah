@@ -129,4 +129,6 @@ tools/
 - 맵 위 물체: 엑셀 `FieldObjects` (enemy: ref=enemy_id, patrol='right 4' 왕복 / investigate: text, ref=Loot spot_id). 조정값 Config `field_*`.
 - 적 순찰 경로는 매 회차 같다 (외워서 피하기, §6). 도주하면 `field_flee_grace` 초 동안 다시 덤비지 않는다.
 - 입력 액션은 `core/input_actions.gd` 한 곳에서 등록 (move_*, interact, dodge_*).
-- 임시·미구현(TODO): 사망 시 맵 처음부터(회차·부활 §11), 시간 흐름(§4), 생존 파라미터(§5), NPC 대화 연결, 맵 이동, 소지품 가득 참 처리, 조사 time_cost.
+- **NPC 대화**: Nodes 에서 `episode_id` 를 비운 노드 = 필드 대화, 끝은 `next_node`(또는 `fail_next`)에 `EXIT`. FieldObjects `type=npc`, `ref`=시작 노드. 말을 걸 때마다 시작 노드부터 (플래그·조건으로 분기). 대화 화면은 `scenes/main_play` 를 `embedded=true` 로 필드 위에 띄우고 `StoryRunner.start_dialogue()` (mode="field": 엔딩·스탯 규칙·자동 저장 없음).
+- 탐험 중 주인공은 Config `protagonist_id` (능력치·능력·주사위 보정·대화 배치).
+- 임시·미구현(TODO): 사망 시 맵 처음부터(회차·부활 §11), 시간 흐름(§4), 생존 파라미터(§5, 필드 대화의 stat: 효과도 이때 연결), 맵 이동, 대화에서 전투 시작, 소지품 가득 참 처리(필드 조사), 조사 time_cost.

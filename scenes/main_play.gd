@@ -12,11 +12,17 @@ extends Control
 
 const ChoiceButton = preload("res://ui/choice_button.gd")
 
+## 탐험 필드 위에 겹쳐 띄운 NPC 대화가 끝남 (embedded 일 때만)
+signal finished
+
 # 말풍선 위치 (기획서 기준, 화면 비율). 꼬리 방향에 따라 좌우로 약간 이동. none = 주인공(꼬리 없음)
 const BUBBLE_X := {"left": [0.266, 0.676], "right": [0.287, 0.697], "none": [0.287, 0.697]}
 const SIDES := ["left", "right"]
 const BUBBLE_Y := [0.68, 0.83]
 const PREV_BUBBLE_Y := [0.485, 0.635]
+
+## 필드에서 NPC 대화용으로 띄울 때 add_child 전에 true. 이때는 launch() 대신 필드가 start_dialogue() 를 부른다.
+var embedded := false
 
 var _pages: Array = []          # [{kind, text, speaker_id}]
 var _page_i := -1
@@ -29,31 +35,53 @@ var _prev_line := {}            # 직전 대사 (회색)
 var _slots := ["", ""]          # 초상화 자리 [왼쪽, 오른쪽] 에 선 NPC char_id
 var _slot_spoke := [0, 0]       # 각 자리가 마지막으로 말한 순번
 var _line_no := 0
+var _closing := false           # 필드 대화가 끝났고 남은 페이지만 보여주는 중
+var _links: Array = []          # [[signal, callable]] — 화면이 닫힐 때 끊는다
 
 
 func _ready() -> void:
-	StoryRunner.node_shown.connect(_on_node_shown)
-	StoryRunner.choices_shown.connect(_on_choices_shown)
-	StoryRunner.message.connect(func(t): _pending_msgs.append(t))
-	StoryRunner.messages_cleared.connect(func():
+	_link(StoryRunner.node_shown, _on_node_shown)
+	_link(StoryRunner.choices_shown, _on_choices_shown)
+	_link(StoryRunner.message, func(t): _pending_msgs.append(t))
+	_link(StoryRunner.messages_cleared, func():
 		_pending_msgs.clear()
 		_pending_dice = {})
-	StoryRunner.dice_rolled.connect(func(r): _pending_dice = r)
-	StoryRunner.ending_reached.connect(_on_ending)
-	StoryRunner.inventory_full.connect(%Inventory.open_discard)
-	GameState.stats_changed.connect(_update_status)
-	GameState.inventory_changed.connect(_update_status)
+	_link(StoryRunner.dice_rolled, func(r): _pending_dice = r)
+	_link(StoryRunner.ending_reached, _on_ending)
+	_link(StoryRunner.dialogue_ended, _on_dialogue_ended)
+	_link(StoryRunner.inventory_full, %Inventory.open_discard)
+	_link(GameState.stats_changed, _update_status)
+	_link(GameState.inventory_changed, _update_status)
 	%InventoryButton.pressed.connect(%Inventory.open_browse)
 	%MenuButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/episode_select.tscn"))
 	%ClickCatcher.gui_input.connect(func(e):
 		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
 			advance())
 	_update_status()
-	StoryRunner.launch()
+	if embedded:
+		# 필드 위 대화: 체력·정신력·시간 표시와 메뉴는 숨기고, 뒤의 필드가 비치게
+		%Stats.visible = false
+		%MenuButton.visible = false
+		$Scene.color.a = 0.55
+	else:
+		StoryRunner.launch()
+
+
+func _exit_tree() -> void:
+	for l in _links:
+		if l[0].is_connected(l[1]):
+			l[0].disconnect(l[1])
+	_links.clear()
+
+
+func _link(sig: Signal, callable: Callable) -> void:
+	sig.connect(callable)
+	_links.append([sig, callable])
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_accept") and not %Inventory.visible:
+	var go := event.is_action_pressed("ui_accept") or (InputMap.has_action("interact") and event.is_action_pressed("interact"))
+	if go and not %Inventory.visible:
 		advance()
 		get_viewport().set_input_as_handled()
 
@@ -67,6 +95,8 @@ func advance() -> void:
 		return
 	if _page_i < _pages.size() - 1:
 		_next_page()
+	elif _closing:
+		finished.emit()
 	elif not _ended and _choices.is_empty():
 		StoryRunner.continue_story()
 
@@ -99,6 +129,18 @@ func _on_ending(ending_id: String) -> void:
 	_ended = true
 	%InventoryButton.disabled = true
 	_start_pages()
+
+
+## 필드 대화가 EXIT 에 닿음: 남은 시스템 메시지가 있으면 보여준 뒤 닫는다
+func _on_dialogue_ended() -> void:
+	_pages = []
+	_flush_messages()
+	_choices = []
+	_closing = true
+	if _pages.is_empty():
+		finished.emit()
+	else:
+		_start_pages()
 
 
 func _flush_messages() -> void:

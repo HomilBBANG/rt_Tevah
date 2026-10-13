@@ -44,6 +44,34 @@ func _ready() -> void:
 	await _wait(0.1)
 	check(not f.frozen, "메시지 닫기")
 
+	# NPC 대화: NPC 1 (10,1) 옆에서 E → 대화 화면이 필드 위에 뜸
+	check(f.npcs.size() == 2, "NPC 2명")
+	_teleport(9, 1)
+	await _wait(0.15)
+	check("대화: NPC 1" in f.get_node("%Prompt").text, "NPC 근처 → 대화 안내")
+	_press("interact")
+	await _wait(0.3)
+	var dlg: Node = f._dialogue_ui
+	check(dlg != null and f.frozen, "대화 화면 열림, 필드 멈춤")
+	await _snap("npc_dialogue")
+	await _press_button(dlg, "[아이템] 칼 보여주기")
+	await _snap("npc_protagonist_line")
+	check(GameState.has_flag("showed_knife"), "아이템 선택지 → 플래그")
+	dlg.advance()
+	await _wait(0.2)
+	check(f._dialogue_ui == null and not f.frozen, "EXIT → 필드로 복귀")
+	# NPC 2 (10,9): NPC 1 대화에서 켠 플래그로 선택지가 열림
+	_teleport(11, 9)
+	await _wait(0.15)
+	_press("interact")
+	await _wait(0.3)
+	dlg = f._dialogue_ui
+	check(dlg != null and _find_button(dlg, "칼 이야기 (flag:showed_knife)") != null, "NPC 2: 플래그로 열린 선택지")
+	await _snap("npc2_dialogue")
+	await _press_button(dlg, "대화 끝내기")
+	await _wait(0.2)
+	check(f._dialogue_ui == null and not f.frozen, "대화 끝내기 → 복귀")
+
 	# 추격: 적 1 (21,2) 시야 안, 벽 없는 곳으로
 	var e1: Node = f.enemies[0]
 	_teleport(floorf(e1.position.x / f.tile) - 3, 3)   # 같은 방, 3칸 옆 한 줄 아래
@@ -90,6 +118,22 @@ func _end_combat(outcome: String, tweak: Callable) -> void:
 	await _wait(0.05)
 	ui.get_node("%TitleButton").pressed.emit()   # 필드에서는 "계속"
 	await _wait(0.1)
+
+
+func _find_button(root: Node, text: String) -> Button:
+	for c in root.find_children("*", "Button", true, false):
+		if c.text == text and c.is_visible_in_tree():
+			return c
+	return null
+
+
+func _press_button(root: Node, text: String) -> void:
+	var b := _find_button(root, text)
+	if b == null:
+		check(false, "버튼 없음: " + text)
+	else:
+		b.pressed.emit()
+	await _wait(0.2)
 
 
 func _teleport(tx: float, ty: float) -> void:
