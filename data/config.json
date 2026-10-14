@@ -26,5 +26,6 @@
  "start_hour": 8,
  "sleep_max_hours": 12,
  "sleep_default_hours": 8,
- "save_slots": 5
+ "save_slots": 5,
+ "combat_item_uses_turn": 1
 }

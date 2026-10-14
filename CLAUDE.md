@@ -118,8 +118,11 @@ tools/
 ## 전투 프로토타입 (진행 중, 기획서 §7–9)
 범위: 부위 선택 공격, 적 공격 전조, WASD 방향+타이밍 회피, 부위 파괴·사지 절단. 아트 없이 도형·텍스트 placeholder.
 - 전투 로직은 `core/combat/` (UI 없이 테스트 가능), 화면은 `scenes/combat.tscn`. 타이틀의 "전투 테스트"로 진입.
-- 데이터: 엑셀 `PlayerParts`, `Enemies`, `EnemyParts`, `EnemyAttacks` 시트 + Config 의 `combat_*` 키.
+- 데이터: 엑셀 `PlayerParts`, `Enemies`(flee_chance, image), `EnemyParts`, `EnemyAttacks` 시트 + Config 의 `combat_*` 키.
 - 회피 키: 머리 W / 왼팔·왼다리 A / 몸통 S / 오른팔·오른다리 D. 판정 완벽·일반·실패(기획서 §8.3).
+- **화면 배치** (사용자 시안): 왼쪽 위 적 이름(밑줄) / 가운데 적 그림(Enemies.image, 비우면 실루엣 `ui/enemy_figure.gd`) / 왼쪽 아래 '내 상태' 사람 모양(`body_diagram.figure`) / 가운데 아래 텍스트 창(시스템 메시지 + 공격할 부위 같은 세부 선택지) / 그 오른쪽 행동 버튼 **공격·아이템·도주** (방어 버튼은 시안에 없어 뺐다, 규칙 코드는 남아 있음).
+- 아이템: 인벤토리를 열어 소모품 사용 (`StoryRunner.use_item_in_combat`, 효과가 전투 중 몸 상태에 바로 적용). Config `combat_item_uses_turn`(1 = 턴 씀). TODO(기획): 장비 착용 — 장비 시스템 없음.
+- 도주: 주사위 1~100 이 적의 도주 성공률(Enemies `flee_chance` %, 비우면 Config `combat_flee_chance`) 이하면 성공.
 - 공격 패턴: normal / quick / combo(여러 부위 연속) / feint(전조가 도중에 바뀜).
 - 임시로 정한 것(TODO, 기획서 §18 미확정): 턴 순서(플레이어→적), 부위 HP·명중률·피해량, 회피 판정 시간, 방어·도주 효과, 절단 시 행동 제약, 스태미나 없음.
 

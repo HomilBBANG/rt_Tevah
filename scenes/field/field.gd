@@ -377,7 +377,7 @@ func _run_effects(text: String) -> PackedStringArray:
 
 
 func _on_story_message(text: String) -> void:
-	if _dialogue_ui != null:
+	if _dialogue_ui != null or _combat_ui != null:   # 대화·전투 화면이 직접 보여준다
 		return
 	if _collecting:
 		_collected.append(text)

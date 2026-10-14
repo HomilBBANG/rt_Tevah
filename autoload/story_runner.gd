@@ -219,6 +219,19 @@ func use_item(slot: int) -> void:
 	busy = false
 
 
+## 전투 중 아이템 사용: 대화 진행 상태(busy·ended)와 상관없이 효과만 적용한다 (goto 무시).
+## 대화 선택지로 시작한 전투에서는 choose() 가 전투 결과를 기다리는 중이라 use_item() 을 쓸 수 없다.
+func use_item_in_combat(slot: int) -> bool:
+	if slot < 0 or slot >= GameState.inventory.size():
+		return false
+	var item: Dictionary = DataLoader.items.get(GameState.inventory[slot].id, {})
+	if item.get("use_effects", "") == "":
+		return false
+	message.emit("사용: %s" % item.name)
+	await _apply_effects(Expr.parse_effects(item.use_effects))
+	return true
+
+
 ## 탐험 필드에 들어옴: 대화 밖 상태 (아이템 사용·효과 실행 가능)
 func enter_field() -> void:
 	mode = "field"

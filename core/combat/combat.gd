@@ -1,7 +1,7 @@
 extends RefCounted
 ## 턴제 전투 로직 (기획서 §7–9). UI 없이 동작하고, 화면(scenes/combat.gd)이 호출해서 결과를 그린다.
 ##
-## 흐름: 플레이어 턴(공격·방어·도주) → 적 턴(공격 1개 = 타격 1~N회, 타격마다 회피 판정) → 반복
+## 흐름: 플레이어 턴(공격·아이템·도주, 방어는 지금 화면에 버튼 없음) → 적 턴(공격 1개 = 타격 1~N회, 타격마다 회피 판정) → 반복
 ## 회피 판정은 judge_dodge() — 누른 키·타이밍 오차(초)만 받아 결과를 낸다. 시간 측정은 화면 몫.
 ##
 ## TODO(기획 §18 미확정, 지금은 임시 규칙):
@@ -25,6 +25,7 @@ var attacks: Array = []
 
 var defending := false
 var outcome := ""            # "" 진행 중 / "win" / "lose" / "fled"
+var last_flee := {}          # 마지막 도주 굴림 { roll(1~100), chance(%), success }
 
 ## 테스트용: 비어 있지 않으면 0~100 난수 대신 앞에서부터 꺼내 쓴다 (명중·도주·공격 선택)
 var forced_rolls: Array[float] = []
@@ -36,7 +37,7 @@ func setup(enemy_id: String, player_state := {}) -> bool:
 	if data.is_empty():
 		push_error("[Combat] 없는 적: %s" % enemy_id)
 		return false
-	enemy = {"enemy_id": enemy_id, "name": data.name}
+	enemy = {"enemy_id": enemy_id, "name": data.name, "flee_chance": data.get("flee_chance"), "image": data.get("image", "")}
 	player_parts = player_state.duplicate(true) if not player_state.is_empty() else fresh_player_parts()
 	player_order.clear()
 	for p in DataLoader.player_parts:
@@ -98,14 +99,34 @@ func player_defend() -> void:
 	defending = true
 
 
+## 이 적에게서 도주할 확률 (%): Enemies.flee_chance, 비어 있으면 Config combat_flee_chance
+func flee_chance() -> float:
+	var c = enemy.get("flee_chance")
+	return float(c) if c != null else config_float("combat_flee_chance", 50)
+
+
+## 도주: 주사위 1~100 이 성공률 이하면 성공. 굴린 값은 last_flee = { roll, chance, success }
 func player_flee() -> bool:
 	defending = false
+	last_flee = {}
 	if not can_flee():
 		return false
-	if _roll() < config_float("combat_flee_chance", 50):
+	var chance := flee_chance()
+	var roll := clampi(int(_roll()) + 1, 1, 100)
+	last_flee = {"roll": roll, "chance": chance, "success": roll <= chance}
+	if last_flee.success:
 		outcome = "fled"
-		return true
-	return false
+	return last_flee.success
+
+
+## 아이템 사용으로 턴을 씀 (효과는 화면이 StoryRunner 로 적용)
+## TODO(기획 §7.1): 아이템 사용이 턴을 쓰는지 — 지금은 Config combat_item_uses_turn (기본 1 = 씀)
+func player_use_item() -> void:
+	defending = false
+
+
+static func item_uses_turn() -> bool:
+	return config_float("combat_item_uses_turn", 1) != 0
 
 
 # ---------------------------------------------------------------- 적 턴

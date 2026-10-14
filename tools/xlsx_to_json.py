@@ -82,6 +82,8 @@ OPTIONAL = {
     # dice: check=능력치, dc=목표값, mod=상황 보정, 실패 시 fail_effects·fail_next
     # combat: check=enemy_id, 이기면 effects·next_node, 도주하면 fail_effects·fail_next (필드 대화 전용)
     "Choices": ["type", "check", "dc", "mod", "fail_effects", "fail_next"],
+    "Enemies": ["flee_chance",      # 도주 성공률 % (비우면 Config combat_flee_chance)
+                "image"],           # 전투 화면 가운데 그림 (res://... 경로, 비우면 도형)
 }
 
 ID_RE = re.compile(r"^[A-Za-z0-9_]+$")
@@ -659,6 +661,18 @@ def validate_combat(d, rep, pparts, enemies, eparts):
         if p["hit_chance"] is not None and not (0 <= p["hit_chance"] <= 100):
             rep.err(w, "hit_chance 는 0~100 (%)")
     for e in d["Enemies"]:
+        w = f"Enemies {e['_row']}행 ({e['enemy_id']})"
+        if e["flee_chance"]:
+            try:
+                if not (0 <= float(e["flee_chance"]) <= 100):
+                    raise ValueError
+            except ValueError:
+                rep.err(w, f"flee_chance 는 0~100 (%): '{e['flee_chance']}'")
+        if e["image"]:
+            if not e["image"].startswith("res://"):
+                rep.err(w, f"image 는 res:// 경로: '{e['image']}'")
+            elif not (ROOT / e["image"][len("res://"):]).is_file():
+                rep.err(w, f"image 파일이 없음: '{e['image']}'")
         own = [p for p in d["EnemyParts"] if p["enemy_id"] == e["enemy_id"]]
         if not any(is_true(p["vital"]) for p in own):
             rep.err(f"Enemies {e['_row']}행 ({e['enemy_id']})", "vital(파괴 시 사망) 부위가 하나 이상 필요")
@@ -904,6 +918,7 @@ def export(d, maps):
         "abilities": clean(d["Abilities"]),
         "player_parts": [dict(r, key=r["key"].upper(), vital=is_true(r["vital"])) for r in clean(d["PlayerParts"])],
         "enemies": [dict(e,
+                         flee_chance=float(e["flee_chance"]) if e["flee_chance"] else None,
                          parts=[dict(p, vital=is_true(p["vital"])) for p in clean(d["EnemyParts"])
                                 if p["enemy_id"] == e["enemy_id"]],
                          attacks=[dict(a, strikes=parse_strikes(a["pattern"], a["targets"]))

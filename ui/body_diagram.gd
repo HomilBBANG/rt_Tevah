@@ -15,9 +15,20 @@ const LAYOUT := {
 	"right_leg": Rect2(0.51, 0.6, 0.16, 0.3),
 }
 const HIGHLIGHT := Color("ff9a3c")
+## figure 모드(전투 화면 '내 상태'): 사람 모양. 좌표는 175 x 340 단위 (머리는 원)
+const FIGURE_SIZE := Vector2(175, 340)
+const FIGURE := {
+	"head": Rect2(45, 0, 85, 85),
+	"torso": Rect2(45, 87, 85, 125),
+	"left_arm": Rect2(0, 87, 45, 125),
+	"right_arm": Rect2(130, 87, 45, 125),
+	"left_leg": Rect2(45, 212, 42.5, 128),
+	"right_leg": Rect2(87.5, 212, 42.5, 128),
+}
 
 var parts := {}               # part_id -> { name, hp, max_hp, broken, (hit_chance) }
 var order: Array = []
+var figure := false           # true = 사람 모양 (부위 안에 HP 숫자만)
 var selectable := false
 var show_hit_chance := false
 var highlight := ""           # 전조로 강조할 부위
@@ -41,6 +52,10 @@ func set_highlight(part_id: String) -> void:
 
 
 func part_rect(part_id: String) -> Rect2:
+	if figure and FIGURE.has(part_id):
+		var k := minf(size.x / FIGURE_SIZE.x, size.y / FIGURE_SIZE.y)
+		var origin := (size - FIGURE_SIZE * k) / 2.0
+		return Rect2(origin + FIGURE[part_id].position * k, FIGURE[part_id].size * k)
 	var r: Rect2
 	if LAYOUT.has(part_id):
 		r = LAYOUT[part_id]
@@ -72,6 +87,9 @@ func _part_at(pos: Vector2) -> String:
 
 
 func _draw() -> void:
+	if figure:
+		_draw_figure()
+		return
 	for id in order:
 		var p: Dictionary = parts[id]
 		var r := part_rect(id)
@@ -103,3 +121,36 @@ func _draw() -> void:
 			y += fs + 3
 		if p.broken:
 			draw_line(r.position + Vector2(10, 10), r.end - Vector2(10, 10), Color("884444"), 3)
+
+
+## 사람 모양: 밝은 회색 → 다칠수록 붉게, 파괴·절단은 어둡게 + X. 부위 안에 HP (절단·파괴는 글자)
+func _draw_figure() -> void:
+	for id in order:
+		var p: Dictionary = parts[id]
+		var r := part_rect(id)
+		var ratio := float(p.hp) / maxf(1.0, p.max_hp)
+		var fill := Color(0.16, 0.16, 0.17) if p.broken else Color("c3c3c3").lerp(Color("b02a2a"), 1.0 - ratio)
+		var border := Color("0e2433")
+		var bw := 3.0
+		if id == highlight:
+			border = HIGHLIGHT
+			bw = 7.0
+		if id == "head":
+			var c := r.get_center()
+			var rad := minf(r.size.x, r.size.y) / 2.0
+			draw_circle(c, rad, fill)
+			draw_arc(c, rad, 0, TAU, 48, border, bw, true)
+		else:
+			draw_rect(r, fill)
+			draw_rect(r.grow(-bw / 2.0), border, false, bw)
+		var text := ("절단" if not p.get("vital", false) else "파괴") if p.broken else "%d/%d" % [p.hp, p.max_hp]
+		var fs := 16
+		var tw := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		while tw > r.size.x - 6 and fs > 11:   # 좁은 팔·다리 칸에 맞게 줄임
+			fs -= 1
+			tw = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var pos := Vector2(r.get_center().x - tw / 2.0, r.get_center().y + fs / 3.0)
+		draw_string(_font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color("999999") if p.broken else Color("111111"))
+		if p.broken:
+			draw_line(r.position + Vector2(6, 6), r.end - Vector2(6, 6), Color("884444"), 3)
+			draw_line(Vector2(r.end.x - 6, r.position.y + 6), Vector2(r.position.x + 6, r.end.y - 6), Color("884444"), 3)

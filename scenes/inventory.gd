@@ -5,11 +5,13 @@ extends Control
 
 var _mode := "browse"
 var _selected := -1
+## 비어 있지 않으면 '사용' 버튼이 StoryRunner.use_item 대신 이것을 부른다 (전투: 칸 번호를 받음)
+var use_handler: Callable
 
 
 func _ready() -> void:
 	hide()
-	%UseButton.pressed.connect(func(): StoryRunner.use_item(_selected))
+	%UseButton.pressed.connect(_on_use)
 	%GiveUpButton.pressed.connect(_finish_discard.bind(-1))
 	%CloseButton.pressed.connect(hide)
 	GameState.inventory_changed.connect(func(): if visible: _refresh())
@@ -62,8 +64,15 @@ func _refresh() -> void:
 		%Desc.text = "아이템을 선택하세요." if _mode == "browse" else ""
 	else:
 		%Desc.text = "[%s] %s" % [item.type, item.description]
-	var story_over := StoryRunner.ended and StoryRunner.mode == "episode"   # 필드에서는 대화 밖에서도 사용 가능
+	var story_over := StoryRunner.ended and StoryRunner.mode == "episode" and not use_handler.is_valid()   # 필드에서는 대화 밖에서도 사용 가능
 	%UseButton.disabled = item.get("use_effects", "") == "" or story_over
+
+
+func _on_use() -> void:
+	if use_handler.is_valid():
+		use_handler.call(_selected)
+	else:
+		StoryRunner.use_item(_selected)
 
 
 func _on_slot(i: int) -> void:

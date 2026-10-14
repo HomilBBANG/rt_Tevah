@@ -2,6 +2,8 @@
  {
   "enemy_id": "enemy_test",
   "name": "적 A (테스트)",
+  "flee_chance": 50.0,
+  "image": "",
   "parts": [
    {
     "enemy_id": "enemy_test",

@@ -55,6 +55,13 @@ func _test_player_turn() -> void:
 	f.setup("enemy_test")
 	f.forced_rolls = [50.0]
 	check(not f.player_flee() and f.outcome == "", "도주 실패")
+	check(f.last_flee.roll == 51 and f.last_flee.chance == 50.0 and not f.last_flee.success, "도주 주사위 기록 (51 > 50)")
+	check(f.flee_chance() == 50.0, "도주 성공률 = Enemies.flee_chance (테스트 적 50)")
+	f.enemy.flee_chance = 20.0
+	f.forced_rolls = [30.0]
+	check(not f.player_flee(), "적마다 다른 성공률: 20% 적에게 31 → 실패")
+	f.enemy.flee_chance = null
+	check(f.flee_chance() == 50.0, "flee_chance 가 비면 Config combat_flee_chance")
 
 
 func _test_enemy_turn() -> void:
