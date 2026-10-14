@@ -126,6 +126,82 @@ func _ready() -> void:
 	var bc: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "basecamp.json"))
 	check(bc.objects.filter(func(o): return o.object_id == "bc_gate")[0].from == ["tt_to_camp", "test_travel:down"], "저장: 이어지는 곳 유지")
 
+	# ---------- 편집 기능: 실행 취소 · 사각형 · 영역 선택 · 복사/붙여넣기 · 묶음 편집 · 연결 · 목록 · 검색 · 필터
+	ed.open_map("test_field")
+	await _frames(2)
+	cv = ed.canvas
+	var before_tiles: Array = ed.map.tiles.duplicate()
+	ed.set_tool("wall")
+	cv.stroke_started.emit()
+	cv.fill_rect(Rect2i(14, 5, 3, 2))   # 바닥 위 3x2 사각형 벽
+	check(String(ed.map.tiles[5]).substr(14, 3) == "###" and String(ed.map.tiles[6]).substr(14, 3) == "###", "사각형 채우기 (벽 3x2)")
+	ed.undo()
+	check(ed.map.tiles == before_tiles, "실행 취소 → 원래대로")
+	ed.redo()
+	check(String(ed.map.tiles[5]).substr(14, 3) == "###", "다시 실행")
+	ed.undo()
+	# 영역 선택 → 복사 → 붙여넣기 (조사 지점 2개가 든 영역)
+	var looks: Array = cv.objects_in(Rect2i(8, 5, 4, 2))
+	cv.select_many(looks, Rect2i(8, 5, 4, 2))
+	check(cv.selection.size() == 2, "영역 선택: 물체 2개")
+	await _frames(1)
+	var sel_labels: Array = ed.inspector.find_children("*", "Label", true, false).map(func(l): return l.text)
+	check("2개 선택" in sel_labels, "여러 개 고르면 묶음 편집 칸")
+	ed.copy_selection()
+	var n0: int = ed.map.objects.size()
+	ed.paste_at(Vector2i(20, 9))
+	check(ed.map.objects.size() == n0 + 2 and cv.selection.size() == 2 and cv.selection[0].object_id != looks[0].object_id
+		and int(cv.selection[0].x) == 20, "붙여넣기: 새 ID 로 2개, (20, 9) 부터")
+	await _snap("pasted")
+	ed.undo()
+	check(ed.map.objects.size() == n0, "붙여넣기 실행 취소")
+	# 묶음 편집: 적 2명 고르고 순찰 방향 한꺼번에
+	var foes: Array = ed.map.objects.filter(func(o): return o.type == "enemy")
+	cv.select_many(foes)
+	await _frames(1)
+	ed._multi_option(foes, "순찰 방향", [["", "-"], ["up", "위"]], "patrol_dir")
+	ed.checkpoint("x")
+	for o in foes:
+		o.patrol_dir = "up"
+	check(foes.all(func(o): return o.patrol_dir == "up"), "묶음 편집: 적 2명 순찰 방향")
+	ed.undo()
+	check(not foes.is_empty(), "묶음 편집 실행 취소")
+	# 삭제 → 실행 취소
+	var npc1: Dictionary = ed.map.objects.filter(func(o): return o.object_id == "fo_npc1")[0]
+	cv.select(npc1)
+	ed.delete_selection()
+	check(not ed.map.objects.any(func(o): return o.object_id == "fo_npc1"), "선택 삭제")
+	ed.undo()
+	check(ed.map.objects.any(func(o): return o.object_id == "fo_npc1"), "삭제 실행 취소")
+	# 연결 표시: 문 → 베이스캠프, 잘못된 연결은 경고
+	var door: Dictionary = ed.map.objects.filter(func(o): return o.object_id == "fo_to_camp")[0]
+	check(cv.link_labels.fo_to_camp[1] and "basecamp" in cv.link_labels.fo_to_camp[0], "문 연결 표시: %s" % cv.link_labels.fo_to_camp[0])
+	ed.set_field(door, "ref", "no_such_map")
+	check(not cv.link_labels.fo_to_camp[1], "없는 맵 → 경고 (%s)" % cv.link_labels.fo_to_camp[0])
+	ed.undo()
+	check(cv.link_labels.fo_to_camp[1], "실행 취소로 연결 복구")
+	# 맵 목록 · 검색
+	check(ed.map_list.item_count == 3 and "→ basecamp" in ed.map_list.get_item_text(ed.map_ids.find("test_field")), "맵 목록에 이어지는 맵")
+	ed.search.text = "고양이"
+	ed._run_search()
+	check(ed.results.item_count == 1 and ed.results.get_item_metadata(0) == ["basecamp", "fo_cat"], "검색: 고양이 → basecamp")
+	ed.goto_object("basecamp", "fo_cat")
+	check(ed.map.map_id == "basecamp" and cv.selected.object_id == "fo_cat", "검색 결과로 이동·선택")
+	ed.search.text = ""
+	ed._run_search()
+	# 문 따라가기: test_travel 통로 → 베이스캠프 정문 P
+	ed.open_map("test_travel")
+	var pass_o: Dictionary = ed.map.objects.filter(func(o): return o.type == "passage")[0]
+	ed.follow_link(pass_o)
+	check(ed.map.map_id == "basecamp" and cv.selected.get("object_id", "") == "bc_gate", "통로 더블클릭 → 베이스캠프 정문 P")
+	check(cv.link_labels.bc_gate[0].begins_with("← ") and cv.link_labels.bc_gate[1], "정문 P 연결 표시: %s" % cv.link_labels.bc_gate[0])
+	# 표시 필터: NPC 끄면 안 보이고 못 고름
+	ed.filter_boxes.npc.button_pressed = false
+	check(cv.visible_object_at(Vector2i(9, 2)).is_empty() and not cv.object_at(Vector2i(9, 2)).is_empty(), "필터: NPC 숨김 → 고를 수 없음")
+	await _snap("filtered")
+	ed.filter_boxes.npc.button_pressed = true
+	ed.open_map("test_field")
+
 	# 새 맵 · 크기 바꾸기
 	check(ed.new_map("t_new", 12, 8), "새 맵 만들기")
 	check(ed.map.tiles.size() == 8 and String(ed.map.tiles[0]) == "############" and ed.map.start == [6, 4], "새 맵: 테두리 벽, P 가운데")

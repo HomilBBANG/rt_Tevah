@@ -1,12 +1,21 @@
 @tool
 extends Control
-## 맵 그리기 화면. 왼쪽 버튼 = 도구 사용(칠하기는 끌기 가능, 선택 도구는 물체 끌어 옮기기),
-## 가운데·오른쪽 버튼 끌기 = 화면 이동, 휠 = 확대/축소.
+## 맵 그리기 화면.
+##   왼쪽 버튼 = 도구 사용. 벽·바닥·빈 공간은 끌어서 칠하기, rect_mode(또는 Shift)면 사각형으로 채우기.
+##   선택 도구: 물체 클릭(Shift+클릭 = 여러 개), 빈 곳을 끌면 영역 선택(그 안의 물체·타일), 고른 물체 끌어 옮기기,
+##              문·통로·이용 더블클릭 = 이어진 맵 열기 (activated)
+##   가운데·오른쪽 버튼 끌기 = 화면 이동, 휠 = 확대/축소.
+##   단축키(캔버스를 누른 뒤): Ctrl+Z 실행 취소, Ctrl+Y·Ctrl+Shift+Z 다시 실행, Ctrl+C 복사, Ctrl+V 붙여넣기,
+##              Delete 선택 삭제, Ctrl+A 모두 선택, Esc 선택 해제 → request(동작 이름)
 
 signal changed
 signal selection_changed(obj: Dictionary)
+signal stroke_started             # 한 번의 누름(칠하기·옮기기)이 시작됨 — 실행 취소 단위
+signal request(action: String)    # 단축키
+signal activated(obj: Dictionary) # 더블클릭
 
 const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive"]
+const TRAVEL_TYPES := ["exit", "passage", "transit"]
 const COLORS := {
 	"enemy": Color("d05050"), "investigate": Color("e8c35a"), "npc": Color("5a8fd0"),
 	"camp": Color("5fae6a"), "exit": Color("a07850"),
@@ -15,20 +24,36 @@ const COLORS := {
 const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P"}
 const EDGE_NAME := {"up": "위", "down": "아래", "left": "왼쪽", "right": "오른쪽"}
 const DIR := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
+## 표시 필터 묶음: 물체 종류 → 필터 이름
+const FILTER_OF := {"enemy": "enemy", "investigate": "investigate", "npc": "npc", "camp": "camp",
+	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive"}
+const PAINT_TOOLS := ["wall", "floor", "void"]
 
-var map := {}                 # { map_id, tiles: [String], start, run_start, objects: [...] }
+var map := {}                 # { map_id, tiles: [String], start, run_start, objects: [...], edges }
 var tool := "select"
+var rect_mode := false        # 벽·바닥·빈 공간을 사각형으로 채우기
 var cell := 32.0
 var zoom := 1.0
 var pan := Vector2(24, 24)
 var sight_tiles := 5.0
-var selected := {}
+var selected := {}            # 마지막으로 고른 물체 (오른쪽 칸)
+var selection: Array = []     # 고른 물체들 (여러 개)
+var region := Rect2i()        # 영역 선택 (칸). size 0 = 없음
 var id_maker: Callable        # func(type) -> String
+## 표시 필터 (false = 숨김, 숨긴 물체는 고를 수도 없음)
+var filters := {"tiles": true, "enemy": true, "investigate": true, "npc": true, "camp": true, "travel": true,
+	"arrive": true, "sight": true, "names": true, "links": true}
+## 연결 표시: object_id → [글자, 맞으면 true] (편집기가 채움). 가장자리는 "edge:방향"
+var link_labels := {}
 
 var _hover := Vector2i(-1, -1)
 var _painting := false
 var _panning := false
-var _dragging := {}
+var _press_tile := Vector2i.ZERO
+var _moving := false              # 고른 물체들 옮기는 중
+var _move_from := {}              # 물체 → 원래 위치 Vector2i
+var _band := false                # 영역 선택 중
+var _rect_paint := false          # 사각형 칠하기 중
 var _font: Font
 
 
@@ -42,6 +67,8 @@ func _init() -> void:
 func set_map(m: Dictionary) -> void:
 	map = m
 	selected = {}
+	selection = []
+	region = Rect2i()
 	queue_redraw()
 
 
@@ -60,11 +87,22 @@ func is_floor(t: Vector2i) -> bool:
 	return in_bounds(t) and String(map.tiles[t.y])[t.x] == "."
 
 
+## 그 칸의 물체 (숨긴 것 포함 — 겹치기 검사용)
 func object_at(t: Vector2i) -> Dictionary:
 	for o in map.get("objects", []):
 		if int(o.x) == t.x and int(o.y) == t.y:
 			return o
 	return {}
+
+
+func is_visible_object(o: Dictionary) -> bool:
+	return filters.get(FILTER_OF.get(o.get("type", ""), ""), true)
+
+
+## 그 칸의 보이는 물체 (고르기용)
+func visible_object_at(t: Vector2i) -> Dictionary:
+	var o := object_at(t)
+	return o if not o.is_empty() and is_visible_object(o) else {}
 
 
 func _is_marker(t: Vector2i, key: String) -> bool:
@@ -82,31 +120,34 @@ func set_tile(t: Vector2i, ch: String) -> void:
 	changed.emit()
 
 
+## 화면 가운데에 칸 t 가 오게
+func center_on(t: Vector2i) -> void:
+	pan = size / 2.0 - (Vector2(t) + Vector2(0.5, 0.5)) * cell * zoom
+	queue_redraw()
+
+
 # ---------------------------------------------------------------- 도구
 ## 칸 t 에 지금 도구 사용. first = 이번 누름의 첫 칸 (물체 놓기·선택은 첫 칸에서만)
 func apply_tool(t: Vector2i, first := true) -> void:
 	if map.is_empty() or not in_bounds(t):
 		return
 	match tool:
-		"wall", "void":
-			if object_at(t).is_empty() and not _is_marker(t, "start") and not _is_marker(t, "run_start"):
-				set_tile(t, "#" if tool == "wall" else " ")
-		"floor":
-			set_tile(t, ".")
+		"wall", "void", "floor":
+			_paint(t, {"wall": "#", "void": " ", "floor": "."}[tool])
 		"start", "run_start":
 			if is_floor(t) and first:
 				map[tool] = [t.x, t.y]
 				changed.emit()
 		"select":
 			if first:
-				select(object_at(t))
-				_dragging = selected
+				select(visible_object_at(t))
 		"erase":
 			if not first:
 				return
-			var o := object_at(t)
+			var o := visible_object_at(t)
 			if not o.is_empty():
 				map.objects.erase(o)
+				selection.erase(o)
 				if selected == o:
 					select({})
 				changed.emit()
@@ -124,14 +165,55 @@ func apply_tool(t: Vector2i, first := true) -> void:
 	queue_redraw()
 
 
+## 칠하기 한 칸. 물체·P·S 가 있는 칸은 벽·빈 공간으로 안 바뀜
+func _paint(t: Vector2i, ch: String) -> void:
+	if ch != "." and (not object_at(t).is_empty() or _is_marker(t, "start") or _is_marker(t, "run_start")):
+		return
+	set_tile(t, ch)
+
+
+## 사각형 채우기 (지금 칠하기 도구로)
+func fill_rect(r: Rect2i) -> void:
+	var ch: String = {"wall": "#", "void": " ", "floor": "."}.get(tool, ".")
+	for y in range(r.position.y, r.end.y):
+		for x in range(r.position.x, r.end.x):
+			_paint(Vector2i(x, y), ch)
+	queue_redraw()
+
+
 func select(o: Dictionary) -> void:
 	selected = o
+	selection = [] if o.is_empty() else [o]
+	region = Rect2i()
 	selection_changed.emit(o)
 	queue_redraw()
 
 
+## 여러 개 고르기 (영역 선택·검색·붙여넣기)
+func select_many(objs: Array, r := Rect2i()) -> void:
+	selection = objs.duplicate()
+	region = r
+	selected = selection.back() if not selection.is_empty() else {}
+	selection_changed.emit(selected)
+	queue_redraw()
+
+
+## 영역 안의 보이는 물체
+func objects_in(r: Rect2i) -> Array:
+	return map.get("objects", []).filter(func(o): return r.has_point(Vector2i(int(o.x), int(o.y))) and is_visible_object(o))
+
+
+static func _rect_from(a: Vector2i, b: Vector2i) -> Rect2i:
+	var p := Vector2i(mini(a.x, b.x), mini(a.y, b.y))
+	return Rect2i(p, Vector2i(absi(a.x - b.x) + 1, absi(a.y - b.y) + 1))
+
+
+# ---------------------------------------------------------------- 입력
 func _gui_input(event: InputEvent) -> void:
 	if map.is_empty():
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		_key(event as InputEventKey)
 		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -144,28 +226,112 @@ func _gui_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_MIDDLE or mb.button_index == MOUSE_BUTTON_RIGHT:
 			_panning = mb.pressed
 		elif mb.button_index == MOUSE_BUTTON_LEFT:
-			_painting = mb.pressed
 			if mb.pressed:
-				apply_tool(tile_at(mb.position), true)
+				grab_focus()
+				_press(tile_at(mb.position), mb.shift_pressed, mb.double_click)
 			else:
-				_dragging = {}
+				_release(tile_at(mb.position))
 		accept_event()
 	elif event is InputEventMouseMotion:
 		var mm := event as InputEventMouseMotion
 		var t := tile_at(mm.position)
 		if t != _hover:
 			_hover = t
-			if _painting and tool in ["wall", "floor", "void"]:
+			if _painting and tool in PAINT_TOOLS and not _rect_paint:
 				apply_tool(t, false)
-			elif _painting and tool == "select" and not _dragging.is_empty() and is_floor(t) and object_at(t).is_empty():
-				_dragging.x = t.x
-				_dragging.y = t.y
-				changed.emit()
-				selection_changed.emit(_dragging)
+			elif _painting and _moving:
+				_move_selection(t - _press_tile)
 			queue_redraw()
 		if _panning:
 			pan += mm.relative
 			queue_redraw()
+
+
+func _press(t: Vector2i, shift: bool, double: bool) -> void:
+	_painting = true
+	_press_tile = t
+	stroke_started.emit()
+	if tool in PAINT_TOOLS and (rect_mode or shift):
+		_rect_paint = true
+		return
+	if tool != "select":
+		apply_tool(t, true)
+		return
+	var o := visible_object_at(t)
+	if double and not o.is_empty():
+		activated.emit(o)
+		return
+	if o.is_empty():
+		if not shift:
+			select({})
+		_band = true
+		return
+	if shift:
+		if o in selection:
+			selection.erase(o)
+		else:
+			selection.append(o)
+		select_many(selection)
+	elif not o in selection:
+		select(o)
+	else:
+		selected = o
+		selection_changed.emit(o)
+	_moving = true
+	_move_from = {}
+	for s in selection:
+		_move_from[s] = Vector2i(int(s.x), int(s.y))
+
+
+func _release(t: Vector2i) -> void:
+	if _rect_paint:
+		fill_rect(_rect_from(_press_tile, t))
+	elif _band:
+		var r := _rect_from(_press_tile, t)
+		var found := objects_in(r)
+		if Input.is_key_pressed(KEY_SHIFT):
+			for o in found:
+				if not o in selection:
+					selection.append(o)
+			found = selection
+		select_many(found, r)
+	_painting = false
+	_rect_paint = false
+	_band = false
+	_moving = false
+	queue_redraw()
+
+
+## 고른 물체들을 원래 자리 + d 로 (모두 바닥이고 다른 물체가 없을 때만)
+func _move_selection(d: Vector2i) -> void:
+	for o in selection:
+		var to: Vector2i = _move_from[o] + d
+		var there := object_at(to)
+		if not is_floor(to) or (not there.is_empty() and not there in selection):
+			return
+	for o in selection:
+		o.x = _move_from[o].x + d.x
+		o.y = _move_from[o].y + d.y
+	changed.emit()
+	selection_changed.emit(selected)
+
+
+func _key(k: InputEventKey) -> void:
+	var ctrl := k.ctrl_pressed or k.meta_pressed
+	var action := ""
+	match k.keycode:
+		KEY_Z when ctrl: action = "redo" if k.shift_pressed else "undo"
+		KEY_Y when ctrl: action = "redo"
+		KEY_C when ctrl: action = "copy"
+		KEY_V when ctrl: action = "paste"
+		KEY_A when ctrl:
+			select_many(map.objects.filter(is_visible_object))
+		KEY_DELETE, KEY_BACKSPACE: action = "delete"
+		KEY_ESCAPE: select({})
+		_: return
+	if action != "":
+		request.emit(action)
+	accept_event()
 
 
 # ---------------------------------------------------------------- 그리기
@@ -176,41 +342,48 @@ func _draw() -> void:
 		return
 	var s := cell * zoom
 	var tiles: Array = map.tiles
+	var dim: bool = not filters.tiles
 	for y in tiles.size():
 		var row := String(tiles[y])
 		for x in row.length():
 			var r := Rect2(pan + Vector2(x, y) * s, Vector2(s, s))
-			draw_rect(r, Color.BLACK if row[x] == " " else (Color("16171d") if row[x] == "#" else Color("3a3e4a")))
+			var col := Color.BLACK if row[x] == " " else (Color("16171d") if row[x] == "#" else Color("3a3e4a"))
+			if dim and row[x] != " ":
+				col = Color("202228")   # 타일 숨김: 벽·바닥 구분을 흐리게
+			draw_rect(r, col)
 			draw_rect(r, Color(1, 1, 1, 0.05), false, 1.0)
-	# 가장자리 이동 (edges): 맵 바깥쪽에 띠 + 이동할 맵 이름
+	# 가장자리 이동 (edges): 맵 바깥쪽에 띠 + 이동할 맵 이름 (잘못되면 빨강)
 	var h := tiles.size()
 	var w := 0
 	for row in tiles:
 		w = maxi(w, String(row).length())
-	for d in map.get("edges", {}):
-		var e: Dictionary = map.edges[d]
-		if e.get("ref", "") == "":
-			continue
-		var band := s * 0.35
-		var r: Rect2
-		match d:
-			"up": r = Rect2(pan + Vector2(0, -band), Vector2(w * s, band))
-			"down": r = Rect2(pan + Vector2(0, h * s), Vector2(w * s, band))
-			"left": r = Rect2(pan + Vector2(-band, 0), Vector2(band, h * s))
-			_: r = Rect2(pan + Vector2(w * s, 0), Vector2(band, h * s))
-		draw_rect(r, Color(0.43, 0.66, 0.86, 0.55))
-		_label("%s → %s" % [EDGE_NAME.get(d, d), e.ref], r.get_center(), Color.WHITE, maxf(10.0, s * 0.3))
+	if filters.travel:
+		for d in map.get("edges", {}):
+			var e: Dictionary = map.edges[d]
+			if e.get("ref", "") == "":
+				continue
+			var band := s * 0.35
+			var r: Rect2
+			match d:
+				"up": r = Rect2(pan + Vector2(0, -band), Vector2(w * s, band))
+				"down": r = Rect2(pan + Vector2(0, h * s), Vector2(w * s, band))
+				"left": r = Rect2(pan + Vector2(-band, 0), Vector2(band, h * s))
+				_: r = Rect2(pan + Vector2(w * s, 0), Vector2(band, h * s))
+			var info: Array = link_labels.get("edge:" + d, ["%s → %s" % [EDGE_NAME.get(d, d), e.ref], true])
+			draw_rect(r, Color(0.43, 0.66, 0.86, 0.55) if info[1] else Color(0.85, 0.25, 0.25, 0.6))
+			_label(info[0], r.get_center(), Color.WHITE, maxf(10.0, s * 0.3))
 	# 적 시야·순찰
-	for o in map.objects:
-		if o.type != "enemy":
-			continue
-		var c := _center(int(o.x), int(o.y))
-		draw_arc(c, sight_tiles * s, 0, TAU, 48, Color(1, 0.3, 0.3, 0.25), 1.0, true)
-		if o.get("patrol_dir", "") in DIR and int(o.get("patrol_len", 0)) > 0:
-			var d: Vector2i = DIR[o.patrol_dir]
-			var e := _center(int(o.x) + d.x * int(o.patrol_len), int(o.y) + d.y * int(o.patrol_len))
-			draw_line(c, e, Color(1, 0.5, 0.5, 0.8), 2.0)
-			draw_circle(e, s * 0.12, Color(1, 0.5, 0.5, 0.8))
+	if filters.sight and filters.enemy:
+		for o in map.objects:
+			if o.type != "enemy":
+				continue
+			var c := _center(int(o.x), int(o.y))
+			draw_arc(c, sight_tiles * s, 0, TAU, 48, Color(1, 0.3, 0.3, 0.25), 1.0, true)
+			if o.get("patrol_dir", "") in DIR and int(o.get("patrol_len", 0)) > 0:
+				var d: Vector2i = DIR[o.patrol_dir]
+				var e := _center(int(o.x) + d.x * int(o.patrol_len), int(o.y) + d.y * int(o.patrol_len))
+				draw_line(c, e, Color(1, 0.5, 0.5, 0.8), 2.0)
+				draw_circle(e, s * 0.12, Color(1, 0.5, 0.5, 0.8))
 	# P / S
 	for key in ["start", "run_start"]:
 		var p = map.get(key)
@@ -220,14 +393,29 @@ func _draw() -> void:
 			_label("P" if key == "start" else "S", r.get_center(), Color.WHITE, s * 0.5)
 	# 물체
 	for o in map.objects:
+		if not is_visible_object(o):
+			continue
 		var c := _center(int(o.x), int(o.y))
 		var col: Color = COLORS.get(o.type, Color.WHITE)
 		draw_circle(c, s * 0.38, col)
-		if o == selected:
-			draw_arc(c, s * 0.48, 0, TAU, 32, Color.WHITE, 2.0, true)
+		var info: Array = link_labels.get(o.object_id, [])
+		if filters.links and not info.is_empty() and not info[1]:
+			draw_arc(c, s * 0.46, 0, TAU, 32, Color("ff4040"), 3.0, true)   # 잘못된 연결
+		if o in selection:
+			draw_arc(c, s * 0.52, 0, TAU, 32, Color.WHITE, 2.0, true)
 		_label(LETTER.get(o.type, "?"), c, Color.BLACK, s * 0.42)
-		var nm: String = o.name if o.get("name", "") != "" else o.object_id
-		_label(nm, c + Vector2(0, -s * 0.62), Color(1, 1, 1, 0.85), maxf(10.0, s * 0.32))
+		if filters.names:
+			var nm: String = o.name if o.get("name", "") != "" else o.object_id
+			_label(nm, c + Vector2(0, -s * 0.62), Color(1, 1, 1, 0.85), maxf(10.0, s * 0.32))
+		if filters.links and not info.is_empty():
+			_label(info[0], c + Vector2(0, s * 0.72), Color("9cc4ec") if info[1] else Color("ff6060"), maxf(9.0, s * 0.28))
+	# 영역 선택·사각형 칠하기 미리보기
+	if not region.size == Vector2i.ZERO:
+		draw_rect(Rect2(pan + Vector2(region.position) * s, Vector2(region.size) * s), Color(0.5, 0.8, 1.0), false, 2.0)
+	if (_band or _rect_paint) and in_bounds(_hover):
+		var pr := _rect_from(_press_tile, _hover)
+		var pcol := Color(0.5, 0.8, 1.0, 0.25) if _band else Color(1, 0.85, 0.4, 0.3)
+		draw_rect(Rect2(pan + Vector2(pr.position) * s, Vector2(pr.size) * s), pcol)
 	if in_bounds(_hover):
 		draw_rect(Rect2(pan + Vector2(_hover) * s, Vector2(s, s)), Color(1, 1, 1, 0.5), false, 2.0)
 
