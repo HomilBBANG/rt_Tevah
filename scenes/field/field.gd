@@ -25,6 +25,7 @@ const EnemyScript = preload("res://scenes/field/field_enemy.gd")
 const WALL_LAYER := 1
 const ACTOR_LAYER := 2
 const NPC_LAYER := 4
+const DOOR_LAYER := 8            # 문(출구): 플레이어·적 모두 통과 못 함. 시야(벽 레이어)는 막지 않음
 const INTERACT_RANGE := 1.1      # 칸
 const TOAST_TIME := 3.0
 
@@ -143,7 +144,7 @@ func _build_actors() -> void:
 	player.radius = tile * 0.3
 	player.speed = cfg.call("field_player_speed", 4)
 	player.collision_layer = ACTOR_LAYER
-	player.collision_mask = WALL_LAYER | NPC_LAYER
+	player.collision_mask = WALL_LAYER | NPC_LAYER | DOOR_LAYER
 	# 새 회차는 맵 한복판(S)에서 깨어나고, 그 밖에는 P(출구로 들어온 곳·베이스캠프에서 깨어나는 곳)
 	var spawn: Array = map.get("run_start", map.start) if GameState.wake_at_run_start else map.start
 	GameState.wake_at_run_start = false
@@ -182,7 +183,7 @@ func _build_actors() -> void:
 				e.sight = cfg.call("field_enemy_sight", 5)
 				e.lose_sight = cfg.call("field_enemy_lose_sight", 8)
 				e.collision_layer = 0
-				e.collision_mask = WALL_LAYER
+				e.collision_mask = WALL_LAYER | DOOR_LAYER
 				e.position = pos
 				e.setup_patrol(pos, dirs.get(o.patrol_dir, Vector2.ZERO) * tile, int(o.patrol_len))
 				_add_circle_shape(e, e.radius * 0.8)
@@ -192,6 +193,8 @@ func _build_actors() -> void:
 				var kind: String = "spot" if o.type == "investigate" else o.type
 				spots.append({"kind": kind, "data": o, "pos": pos,
 					"done": GameState.field_has(map.map_id, "done", o.object_id)})
+				if o.type == "exit":
+					_add_door_body(pos)
 			"npc":
 				var n := StaticBody2D.new()
 				n.set_script(NpcScript)
@@ -230,6 +233,20 @@ static func in_schedule(schedule: Array, minute: int) -> bool:
 		if (start < end and minute >= start and minute < end) or (start > end and (minute >= start or minute < end)):
 			return true
 	return false
+
+
+## 문 칸을 막는 충돌체 (문 앞에서 조사 키로 이동)
+func _add_door_body(pos: Vector2) -> void:
+	var body := StaticBody2D.new()
+	body.collision_layer = DOOR_LAYER
+	body.collision_mask = 0
+	body.position = pos
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(tile, tile)
+	shape.shape = rect
+	body.add_child(shape)
+	%World.add_child(body)
 
 
 func _tile_center(x: float, y: float) -> Vector2:

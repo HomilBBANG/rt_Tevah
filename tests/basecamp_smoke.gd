@@ -93,8 +93,14 @@ func _ready() -> void:
 	await _press_button("닫기")
 	await _snap("cat_back")
 
-	# 탐험 맵으로
+	# 문은 통과 못 함: 출구 (7,6) 위에서 아래로 걸어도 막힘
 	_teleport(7, 5)   # 출구 (7,6) 위
+	await _wait(0.15)
+	Input.action_press("move_down")
+	await _wait(0.5)
+	Input.action_release("move_down")
+	check(f.player.position.y < 6.0 * f.tile, "문은 통과 못 함 (y=%.0f, 문 칸 위쪽 %.0f)" % [f.player.position.y, 6.0 * f.tile])
+	_teleport(7, 5)
 	await _wait(0.15)
 	_press("interact")
 	await _wait(0.3)
