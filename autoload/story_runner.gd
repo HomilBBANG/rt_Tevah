@@ -281,10 +281,17 @@ func _goto(target: String) -> void:
 		if ended:
 			return
 		var forced := _check_stats()
+		var kind: String = node.get("kind", "")
 		if forced != "":
 			target = forced
 		elif redirect != "":
 			target = redirect
+		elif kind == "effect":
+			# 효과 카드: on_enter 만 실행하고 화면에 보이지 않은 채 다음으로
+			target = node.next_node
+		elif kind == "branch":
+			# 조건 분기 카드: 맞으면 next_node, 아니면 fail_next
+			target = node.next_node if Expr.evaluate(node.get("condition", ""), GameState) else node.get("fail_next", "")
 		else:
 			_show_current()
 			SaveManager.save_episode()

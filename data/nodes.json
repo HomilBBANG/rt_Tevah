@@ -5,7 +5,10 @@
   "speaker_id": "",
   "text": "노드 0 (도입, 선택지 없음 → 계속)",
   "next_node": "t1_a",
-  "on_enter": "item:+bandage;setflag:intro_seen"
+  "on_enter": "item:+bandage;setflag:intro_seen",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "t1_a",
@@ -13,7 +16,10 @@
   "speaker_id": "char_npc",
   "text": "노드 A (조건부 선택지 테스트)",
   "next_node": "",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "t1_b",
@@ -21,7 +27,10 @@
   "speaker_id": "",
   "text": "노드 B (탐색·인벤토리 테스트)",
   "next_node": "",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "t1_c",
@@ -29,7 +38,10 @@
   "speaker_id": "char_t1",
   "text": "노드 C (칼 조건 통과)",
   "next_node": "t1_d",
-  "on_enter": "setflag:used_knife"
+  "on_enter": "setflag:used_knife",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "t1_d",
@@ -37,7 +49,10 @@
   "speaker_id": "",
   "text": "노드 D (결말·스탯 테스트)",
   "next_node": "",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "t1_timeout",
@@ -45,7 +60,10 @@
   "speaker_id": "",
   "text": "시간 초과 노드",
   "next_node": "END:end_t1_timeout",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "t2_a",
@@ -53,7 +71,10 @@
   "speaker_id": "char_t2",
   "text": "노드 A (에피소드 2)",
   "next_node": "",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "t2_timeout",
@@ -61,7 +82,10 @@
   "speaker_id": "",
   "text": "시간 초과 노드 (에피소드 2)",
   "next_node": "END:end_t2_timeout",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "t2_npc1",
@@ -69,7 +93,10 @@
   "speaker_id": "char_npc",
   "text": "노드 N1 (NPC 1 대사)",
   "next_node": "t2_npc2",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "t2_npc2",
@@ -77,7 +104,10 @@
   "speaker_id": "char_npc2",
   "text": "노드 N2 (NPC 2 대사)",
   "next_node": "t2_a",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "t1_e",
@@ -85,7 +115,10 @@
   "speaker_id": "",
   "text": "노드 E (주사위 판정 테스트)",
   "next_node": "",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "t1_dice_ok",
@@ -93,7 +126,10 @@
   "speaker_id": "",
   "text": "판정 성공 노드",
   "next_node": "t1_e",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "t1_dice_fail",
@@ -101,7 +137,10 @@
   "speaker_id": "",
   "text": "판정 실패 노드",
   "next_node": "t1_e",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "fd_cat_a",
@@ -109,7 +148,10 @@
   "speaker_id": "char_cat",
   "text": "고양이 노드 (테스트, 사람 말을 하지 않는다)",
   "next_node": "",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "fd_npc1_a",
@@ -117,7 +159,10 @@
   "speaker_id": "char_npc",
   "text": "필드 대화 노드 1 (NPC 1)",
   "next_node": "",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "fd_npc1_b",
@@ -125,7 +170,10 @@
   "speaker_id": "char_t1",
   "text": "필드 대화 노드 2 (주인공)",
   "next_node": "EXIT",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "fd_npc1_fail",
@@ -133,7 +181,10 @@
   "speaker_id": "char_npc",
   "text": "필드 대화 노드 3 (판정 실패)",
   "next_node": "EXIT",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "fd_npc2_a",
@@ -141,7 +192,10 @@
   "speaker_id": "char_npc2",
   "text": "필드 대화 노드 4 (NPC 2)",
   "next_node": "",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "fd_npc2_b",
@@ -149,7 +203,10 @@
   "speaker_id": "char_npc2",
   "text": "필드 대화 노드 5 (flag:showed_knife 일 때만)",
   "next_node": "EXIT",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "fd_npc2_win",
@@ -157,7 +214,10 @@
   "speaker_id": "char_npc2",
   "text": "필드 대화 노드 6 (전투 승리)",
   "next_node": "EXIT",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  },
  {
   "node_id": "fd_npc2_fled",
@@ -165,6 +225,53 @@
   "speaker_id": "char_npc2",
   "text": "필드 대화 노드 7 (전투 도주)",
   "next_node": "EXIT",
-  "on_enter": ""
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
+ },
+ {
+  "node_id": "fd_npc2_fx",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "fd_npc2_br",
+  "on_enter": "item:+water;setflag:fx_done",
+  "kind": "effect",
+  "condition": "",
+  "fail_next": ""
+ },
+ {
+  "node_id": "fd_npc2_br",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "fd_npc2_yes",
+  "on_enter": "",
+  "kind": "branch",
+  "condition": "has:water & flag:fx_done",
+  "fail_next": "fd_npc2_no"
+ },
+ {
+  "node_id": "fd_npc2_yes",
+  "episode_id": "",
+  "speaker_id": "char_npc2",
+  "text": "필드 대화 노드 8 (분기: 조건 맞음)",
+  "next_node": "EXIT",
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
+ },
+ {
+  "node_id": "fd_npc2_no",
+  "episode_id": "",
+  "speaker_id": "char_npc2",
+  "text": "필드 대화 노드 9 (분기: 조건 안 맞음)",
+  "next_node": "EXIT",
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": ""
  }
 ]

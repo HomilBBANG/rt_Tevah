@@ -24,6 +24,7 @@ OUT_DIR = ROOT / "data"
 
 STATS = {"hp", "sanity", "time"}
 SHOW_MODES = {"", "hide", "gray"}
+NODE_KINDS = {"", "line", "effect", "branch"}
 CHOICE_TYPES = {"", "normal", "item", "dice", "combat"}
 REQUIRED_CONFIG = ["inventory_slots", "hp_start", "hp_max", "sanity_start", "sanity_max", "time_start", "time_max"]
 
@@ -82,6 +83,9 @@ OPTIONAL = {
     # dice: check=능력치, dc=목표값, mod=상황 보정, 실패 시 fail_effects·fail_next
     # combat: check=enemy_id, 이기면 effects·next_node, 도주하면 fail_effects·fail_next (필드 대화 전용)
     "Choices": ["type", "check", "dc", "mod", "fail_effects", "fail_next"],
+    # 노드 종류(대화 에디터의 기능 카드): line(기본, 대사) / effect(on_enter 효과만 실행하고 next_node 로) /
+    # branch(condition 이 맞으면 next_node, 아니면 fail_next). effect·branch 는 화면에 보이지 않는다
+    "Nodes": ["kind", "condition", "fail_next"],
     "Enemies": ["flee_chance",      # 도주 성공률 % (비우면 Config combat_flee_chance)
                 "image"],           # 전투 화면 가운데 그림 (res://... 경로, 비우면 도형)
 }
@@ -528,6 +532,25 @@ def validate(d, rep):
                 out.add(n["next_node"])
         elif nid not in choices_by_node and not out:
             rep.err(w, "출구 없음 (선택지·next_node·END/EXIT 모두 없음)")
+        kind = n["kind"]
+        if kind not in NODE_KINDS:
+            rep.err(w, f"kind 는 line / effect / branch: '{kind}'")
+        if kind in ("effect", "branch") and nid in choices_by_node:
+            rep.err(w, "효과·조건 분기 카드에는 선택지를 달 수 없음")
+        if kind == "branch":
+            if not n["condition"]:
+                rep.err(w, "조건 분기 카드에 조건이 없음")
+            check_cond(w, n["condition"])
+            if not n["next_node"]:
+                rep.err(w, "조건 분기의 '맞으면' 출구가 없음")
+            if not n["fail_next"]:
+                rep.err(w, "조건 분기의 '아니면' 출구가 없음")
+            else:
+                check_target(w + " fail_next", n["fail_next"], ep)
+                if not n["fail_next"].startswith("END:"):
+                    out.add(n["fail_next"])
+        elif n["condition"] or n["fail_next"]:
+            rep.err(w, "condition·fail_next 는 조건 분기(kind=branch) 카드에서만")
         edges[nid] = out
 
     for c in d["Choices"]:
@@ -711,7 +734,7 @@ def read_dialogues(d, rep):
     """tools/dialogues/*.json (대화 에디터 파일) 의 노드·선택지를 엑셀 Nodes·Choices 뒤에 붙인다."""
     if not DIALOGUES_DIR.exists():
         return
-    node_cols = SCHEMA["Nodes"][1]
+    node_cols = SCHEMA["Nodes"][1] + OPTIONAL.get("Nodes", [])
     choice_cols = SCHEMA["Choices"][1] + OPTIONAL.get("Choices", [])
     for f in sorted(DIALOGUES_DIR.glob("*.json")):
         try:

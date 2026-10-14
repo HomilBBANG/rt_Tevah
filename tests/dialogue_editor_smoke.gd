@@ -4,6 +4,8 @@ extends Node
 
 const Editor = preload("res://addons/dialogue_editor/dialogue_editor.gd")
 const Card = preload("res://addons/dialogue_editor/dialogue_card.gd")
+const FuncCard = preload("res://addons/dialogue_editor/func_card.gd")
+const ExprRows = preload("res://addons/expr_rows.gd")
 const TEST_DIR := "user://test_dialogues/"
 
 var _fail := 0
@@ -14,7 +16,7 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(TEST_DIR)
 	for f in DirAccess.get_files_at(TEST_DIR):
 		DirAccess.remove_absolute(TEST_DIR + f)
-	for f in ["npc1", "cat"]:
+	for f in ["npc1", "cat", "npc2"]:
 		var src := FileAccess.get_file_as_string("res://tools/dialogues/%s.json" % f)
 		var w := FileAccess.open(TEST_DIR + f + ".json", FileAccess.WRITE)
 		w.store_string(src)
@@ -30,7 +32,7 @@ func _ready() -> void:
 	add_child(bg)
 	add_child(ed)
 	await _frames(2)
-	check(ed.files.item_count == 2, "대화 파일 2개 목록")
+	check(ed.files.item_count == 3, "대화 파일 3개 목록")
 	ed.open_dialogue("npc1")
 	await _frames(3)
 	var cards: Array = ed._cards()
@@ -76,6 +78,58 @@ func _ready() -> void:
 	await _frames(2)
 	check(ed._cards().size() == 4 and ed.graph.get_connection_list().size() == 9, "다시 열면 그대로 (연결 9)")
 	await _snap("npc1_edited")
+
+	# 조건·효과 고르기: 글자 ↔ 줄 목록
+	var lk: Dictionary = ed.lookups
+	check(not lk.items.is_empty() and "showed_knife" in lk.flags, "목록: 아이템 %d개, 플래그에 showed_knife" % lk.items.size())
+	var er: Node = ExprRows.new().setup("cond", "has:knife & !flag:met", lk)
+	check(er._rows.size() == 2 and er._rows[0].kind == "has" and er._rows[1].kind == "not_flag" and er.get_text() == "has:knife & !flag:met",
+		"조건 → 줄 2개 (아이템 있음, 플래그 꺼짐)")
+	er._rows.append(er._default_row("cut"))
+	er._emit()
+	check(er.get_text() == "has:knife & !flag:met & cut:any", "조건 줄 추가 → has:knife & !flag:met & cut:any (%s)" % er.get_text())
+	er._join = "|"
+	er._emit()
+	check(er.get_text() == "has:knife | !flag:met | cut:any", "또는(|) 로 바꾸기")
+	var ee: Node = ExprRows.new().setup("effect", "item:+food*2;surv:thirst+50;restore:left_arm;save", lk)
+	check(ee._rows.size() == 4 and ee._to_text() == "item:+food*2;surv:thirst+50;restore:left_arm;save", "효과 4줄 그대로 (%s)" % ee._to_text())
+	ee._rows[0].p.amount = 1
+	ee._emit()
+	check(ee.get_text().begins_with("item:+food;"), "수량 1 이면 *1 생략")
+	check(ExprRows.new().setup("cond", "(has:a | has:b) & flag:x", lk)._raw, "괄호 식 → 직접 입력만")
+	check(ExprRows.new().setup("effect", "goto:somewhere", lk)._raw, "goto 효과 → 직접 입력만")
+	for x in [er, ee]:
+		x.free()
+
+	# 기능 카드: npc2 의 효과 카드·조건 분기 카드
+	ed.open_dialogue("npc2")
+	await _frames(2)
+	var fx: GraphNode = ed.graph.get_node("fd_npc2_fx")
+	var br: GraphNode = ed.graph.get_node("fd_npc2_br")
+	check(fx is FuncCard and br is FuncCard and br.out_ports.size() == 2, "효과 카드·조건 분기 카드 (맞으면/아니면 2갈래)")
+	var br_conns: Array = ed.graph.get_connection_list().filter(func(c): return c.from_node == &"fd_npc2_br")
+	check(br_conns.size() == 2, "조건 분기 카드 연결선 2개")
+	ed._edit_choice(ed.graph.get_node("fd_npc2_a"), 0)
+	await _frames(2)
+	await _snap("npc2_func_cards")
+	var nb: GraphNode = ed.add_func_card("branch", Vector2(40, 900))
+	ed._on_connect(nb.name, 0, &"__EXIT__", 0)
+	ed._on_connect(nb.name, 1, &"fd_npc2_no", 0)
+	check(nb.data.next_node == "EXIT" and nb.data.fail_next == "fd_npc2_no", "새 조건 분기: 맞으면 EXIT, 아니면 fd_npc2_no")
+	nb.data.condition = "flag:fx_done"
+	var ne: GraphNode = ed.add_func_card("effect", Vector2(40, 1100))
+	ne.data.on_enter = "setflag:fx_done"
+	ed._on_connect(ne.name, 0, StringName(nb.name), 0)
+	var nb_name := String(nb.name)
+	var ne_name := String(ne.name)
+	ed.save()
+	ed.open_dialogue("npc1")
+	ed.open_dialogue("npc2")
+	await _frames(2)
+	var nb2: GraphNode = ed.graph.get_node(nb_name)
+	var ne2: GraphNode = ed.graph.get_node(ne_name)
+	check(nb2 is FuncCard and nb2.data.kind == "branch" and nb2.data.condition == "flag:fx_done" and nb2.data.fail_next == "fd_npc2_no"
+		and ne2.data.kind == "effect" and ne2.data.next_node == nb_name, "저장 후 다시 열어도 기능 카드 그대로")
 
 	# 새 대화
 	check(ed.new_dialogue("t_new"), "새 대화 만들기")

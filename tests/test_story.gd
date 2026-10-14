@@ -237,6 +237,22 @@ func _run() -> void:
 	check(node_id == "fd_npc2_win" and not StoryRunner.busy, "finish_combat(win) → 대화 계속")
 	await StoryRunner.continue_story()
 
+	# ---------- 기능 카드: 효과 카드(보이지 않고 효과만) → 조건 분기 카드(맞으면 / 아니면)
+	GameState.inventory = []
+	GameState.set_flag("fx_done", false)
+	await StoryRunner.start_dialogue("fd_npc2_a")
+	await StoryRunner.choose("fdc8")
+	check(node_id == "fd_npc2_yes" and GameState.item_count("water") == 1 and GameState.has_flag("fx_done"),
+		"효과 카드(물+1, 플래그) → 조건 분기 맞음 → 맞으면 카드 (%s)" % node_id)
+	await StoryRunner.continue_story()
+	await StoryRunner.start_dialogue("fd_npc2_br")
+	check(node_id == "fd_npc2_yes", "조건 분기 카드에서 바로 시작해도 판정")
+	await StoryRunner.continue_story()
+	GameState.inventory = []
+	await StoryRunner.start_dialogue("fd_npc2_br")
+	check(node_id == "fd_npc2_no", "물이 없으면 → 아니면 카드")
+	await StoryRunner.continue_story()
+
 
 func _fresh_to_d() -> void:
 	ending = ""

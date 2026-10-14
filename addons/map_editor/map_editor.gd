@@ -7,6 +7,7 @@ extends VBoxContainer
 
 const Canvas = preload("res://addons/map_editor/map_canvas.gd")
 const ToolCommon = preload("res://addons/tool_common.gd")
+const ExprRows = preload("res://addons/expr_rows.gd")
 
 const MAP_DIR := "res://tools/maps/"
 const PLAYTEST_FILE := "user://map_playtest.json"
@@ -38,7 +39,7 @@ const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]   (이 칸은 오른쪽 위 '❓
     · 조사: 얻는 것(엑셀 Loot 의 spot), 조사할 때 나오는 문구.
     · NPC: 대화(시작 노드 = 대화 탭의 첫 카드), 나타나는 시간대 (예: 06:00-12:00, 20:00-23:00).
     · 출구(문): 이동할 맵. 문으로 들어오면 그 맵의 P 에 도착합니다.
-    · 나타나는 조건: 예) flag:met 이면 그 플래그가 있을 때만 나타남.
+    · 나타나는 조건: [b]＋ 조건 추가[/b]로 골라 둡니다 (예: '플래그가 켜져 있다 met_cat' → 그 플래그가 켜졌을 때만 나타남).
 [b]5. 고치기[/b] — [b]선택·이동[/b] 도구: 물체를 클릭하면 세부, 끌면 옮김. 빈 칸 클릭 = 맵 크기 바꾸기.  [b]지우개[/b]: 물체를 지움.
 [b]6. 화면[/b] — 휠: 확대·축소,  휠 버튼 또는 오른쪽 버튼 누른 채 끌기: 화면 이동.
 [b]7. 반영하기[/b] — [b]저장[/b] → [b]변환·검사[/b] (오류는 맨 아래 칸) → [b]테스트 플레이[/b]로 이 맵에서 바로 실행 (진짜 저장은 건드리지 않음).
@@ -63,6 +64,7 @@ var enemies: Array = []              # [[id, 이름]]
 var dialogue_starts: Array = []      # 필드 대화 노드
 var loot_spots: Array = []
 var map_ids: Array = []
+var lookups := {}                    # 조건 고르기 (ToolCommon.load_lookups)
 
 
 func _init() -> void:
@@ -120,6 +122,7 @@ func _init() -> void:
 	split.add_child(canvas)
 	var side := ScrollContainer.new()
 	side.custom_minimum_size.x = 380
+	side.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED   # 긴 글자는 칸 폭에 맞춰 줄임
 	split.add_child(side)
 	inspector = VBoxContainer.new()
 	inspector.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -328,7 +331,12 @@ func _edit_object(o: Dictionary) -> void:
 			inspector.add_child(te)
 		"exit":
 			_option("이동할 맵", map_ids.map(func(m): return [m, m]), o.get("ref", ""), func(v): set_field(o, "ref", v))
-	_line("나타나는 조건 (condition)", o.get("condition", ""), func(v): set_field(o, "condition", v), "예: flag:met & !wflag:cat_away")
+	var cl := Label.new()
+	cl.text = "나타나는 조건 (맞을 때만 맵에 있음)"
+	inspector.add_child(cl)
+	var rows: Node = ExprRows.new().setup("cond", o.get("condition", ""), lookups)
+	rows.changed.connect(func(v): set_field(o, "condition", v))
+	inspector.add_child(rows)
 	var del := Button.new()
 	del.text = "이 물체 지우기"
 	del.pressed.connect(func():
@@ -346,6 +354,7 @@ func set_field(o: Dictionary, key: String, v: Variant) -> void:
 
 # ---------------------------------------------------------------- 도우미
 func _load_lookups() -> void:
+	lookups = ToolCommon.load_lookups()
 	enemies = []
 	for e in ToolCommon.read_json("res://data/enemies.json", []):
 		enemies.append([e.enemy_id, "%s  (%s)" % [e.name, e.enemy_id]])
@@ -455,6 +464,8 @@ func _option(label: String, items: Array, current: String, on_change: Callable) 
 	l.text = label
 	inspector.add_child(l)
 	var o := OptionButton.new()
+	o.fit_to_longest_item = false
+	o.clip_text = true
 	var list := items.duplicate()
 	if current != "" and not list.any(func(it): return it[0] == current):
 		list.push_front([current, current + "  (목록에 없음 — 변환·검사로 확인)"])

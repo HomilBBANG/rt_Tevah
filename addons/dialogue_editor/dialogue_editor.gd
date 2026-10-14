@@ -9,7 +9,16 @@ extends VBoxContainer
 ## 게임 실행 중(테스트)에서도 열 수 있도록 에디터 전용 기능은 Engine.is_editor_hint() 로 감싼다.
 
 const Card = preload("res://addons/dialogue_editor/dialogue_card.gd")
+const FuncCard = preload("res://addons/dialogue_editor/func_card.gd")
+const ExprRows = preload("res://addons/expr_rows.gd")
 const ToolCommon = preload("res://addons/tool_common.gd")
+## '＋ 카드' 메뉴 / 그래프 오른쪽 클릭 메뉴
+const ADD_MENU := [
+	["line", "대사 카드 — 말하기·상황 설명"],
+	["effect", "⚙ 효과 카드 — 아이템·플래그·생존 수치 등을 바꿈"],
+	["branch", "◇ 조건 분기 카드 — 조건에 따라 길이 갈림"],
+	["ending", "엔딩 카드 — 1단계 에피소드 대화의 끝"],
+]
 
 const DIALOGUE_DIR := "res://tools/dialogues/"
 const EXIT_NAME := "__EXIT__"
@@ -29,6 +38,7 @@ var log_view: TextEdit
 var speakers: Array = []             # [[char_id, name]]
 var abilities: Array = []            # [[ability_id, name]]
 var enemies: Array = []              # [[enemy_id, name]] (전투 선택지)
+var lookups := {}                    # 조건·효과 고르기·갈 곳 목록 (ToolCommon.load_lookups)
 var _selected_card: GraphNode
 var _counter := 0
 
@@ -46,8 +56,19 @@ func _init() -> void:
 	files.tooltip_text = "편집할 대화 파일 (tools/dialogues/). 다른 대화를 고르면 지금 대화는 자동 저장"
 	for b in [
 			["새 대화", _ask_new, "새 대화 파일을 만듭니다 (대화 ID: 영문·숫자·_)"],
-			["대사 추가", add_card_at_center, "화면 가운데에 새 대사 카드를 만듭니다"],
-			["엔딩 카드", _add_end_card, "에피소드 대화용 엔딩(END:id) 카드. 필드 대화는 '대화 끝 (EXIT)' 카드를 씁니다"],
+			["대사 추가", add_card_at_center, "화면 가운데에 새 대사 카드를 만듭니다"]]:
+		var btn := Button.new()
+		btn.text = b[0]
+		btn.tooltip_text = b[2]
+		btn.pressed.connect(b[1])
+		bar.add_child(btn)
+	var add_menu := MenuButton.new()
+	add_menu.text = "＋ 기능 카드 ▾"
+	add_menu.flat = false
+	add_menu.tooltip_text = "효과 카드·조건 분기 카드·엔딩 카드를 만듭니다.\n그래프 빈 곳을 오른쪽 클릭해도 같은 메뉴가 나옵니다"
+	_fill_add_menu(add_menu.get_popup(), Callable())
+	bar.add_child(add_menu)
+	for b in [
 			["저장", save, "지금 대화를 파일로 저장합니다"],
 			["변환·검사", run_convert, "저장한 뒤 변환기를 돌려 오류를 검사합니다. 결과는 맨 아래 칸에.\n오류가 없어야 게임에 반영됩니다"],
 			["미리보기", preview, "고른 카드(없으면 첫 카드)부터 실제 대화 화면으로 실행합니다"]]:
@@ -71,10 +92,12 @@ func _init() -> void:
 	graph.connection_request.connect(_on_connect)
 	graph.disconnection_request.connect(_on_disconnect)
 	graph.delete_nodes_request.connect(_on_delete)
+	graph.popup_request.connect(_on_graph_popup)
 	graph.node_selected.connect(func(n): if n is Card: _edit_node(n))
 	split.add_child(graph)
 	var side := ScrollContainer.new()
 	side.custom_minimum_size.x = 380
+	side.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED   # 긴 글자는 칸 폭에 맞춰 줄임
 	split.add_child(side)
 	inspector = VBoxContainer.new()
 	inspector.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -99,14 +122,16 @@ const HELP_TEXT := """[b]대화 탭 쓰는 법[/b]   (이 칸은 오른쪽 위 '
     · 대화를 끝내려면 [b]대화 끝 (EXIT)[/b] 카드에 잇습니다.
     · 선 끊기: 선이 들어가는 쪽 끝(카드 왼쪽 점)을 잡아 빈 곳으로 끌어 놓습니다.
 [b]4. 선택지[/b] — 카드 아래 [b]+ 선택지[/b]. 선택지 옆 [b]⋯[/b] 를 누르면 오른쪽 칸에서 종류·조건·효과를 고칩니다. [b]✕[/b] = 선택지 삭제.
-    · 종류: [b]일반[/b] / [b]아이템[/b](조건의 has: 아이템이 있으면 고를 수 있음) / [b]판정[/b](주사위 d20) / [b]전투[/b](적과 싸움, 지면 사망 처리)
-[b]5. 카드 세부[/b] — 화자 옆 [b]⋯[/b] : 카드 ID, 카드에 들어올 때 효과, 다른 파일로 가는 이동(직접 입력).
-[b]6. 카드 지우기[/b] — 카드를 클릭해 고른 뒤 Delete 키.   [b]화면[/b] — 휠: 확대·축소,  휠 버튼 누른 채 끌기: 화면 이동,  빈 곳 끌기: 여러 카드 고르기.
-[b]7. 반영하기[/b] — [b]저장[/b] → [b]변환·검사[/b] (오류는 맨 아래 칸) → [b]미리보기[/b]로 확인. 오류가 하나라도 있으면 게임에 반영되지 않습니다.
-[b]8. NPC에 붙이기[/b] — [b]맵[/b] 탭에서 NPC를 고르고 '대화 (시작 노드)'에 이 대화의 첫 카드를 고릅니다.
-
-[b]조건 예[/b]  has:knife  /  has:water>=2  /  flag:met  /  !flag:met  /  surv:hunger<30  /  cut:left_arm  /  count:death>=1   (그리고 &, 또는 |, 아님 !)
-[b]효과 예[/b]  item:+food*2  /  item:-water  /  setflag:met  /  surv:thirst+50  /  restore:left_arm  /  save   (여러 개는 ; 로 구분)
+    · 종류: [b]일반[/b] / [b]아이템[/b](그 아이템이 있으면 고를 수 있음) / [b]판정[/b](주사위 d20) / [b]전투[/b](적과 싸움, 지면 사망 처리)
+[b]5. 기능 카드[/b] — 도구줄 [b]＋ 기능 카드 ▾[/b] 또는 그래프 빈 곳 [b]오른쪽 클릭[/b]. 화면에는 안 보이고 지나가면서 일을 합니다.
+    · [color=#7fd48a]⚙ 효과 카드[/color] : 아이템 얻기·잃기, 플래그 켜기·끄기, 생존 수치·능력치 바꾸기, 잘린 팔다리 복구, 아이템 굴리기, 저장 … 을 골라 차례로 실행 → [b]다음 →[/b]
+    · [color=#b99be0]◇ 조건 분기 카드[/color] : 아이템이 있다, 플래그가 켜져 있다, 생존 수치가 몇 이하, 팔다리가 잘렸다, 죽은 횟수 … 를 골라 확인 → 맞으면 / [color=#e46a6a]아니면[/color]
+[b]6. 조건·효과 고르기[/b] — 오른쪽 칸과 기능 카드의 [b]＋ 조건 추가 / ＋ 효과 추가[/b] 를 눌러 종류를 고르고, 아이템·수치를 목록에서 고릅니다. 글자로 쓸 필요 없습니다.
+    · 플래그 = 이야기 진행을 기억하는 스위치. 이름은 영문으로 짓고(예: met_cat), 켜기 → 나중에 '플래그가 켜져 있다' 조건으로 확인. ▾ 로 이미 쓰는 이름을 고를 수 있습니다.
+    · 갈 곳도 오른쪽 칸 목록에서 고를 수 있습니다 (선으로 잇는 것과 같음, 다른 대화의 카드로 갈 때 사용).
+[b]7. 카드 지우기[/b] — 카드를 클릭해 고른 뒤 Delete 키.   [b]화면[/b] — 휠: 확대·축소,  휠 버튼 누른 채 끌기: 화면 이동,  빈 곳 끌기: 여러 카드 고르기.
+[b]8. 반영하기[/b] — [b]저장[/b] → [b]변환·검사[/b] (오류는 맨 아래 칸) → [b]미리보기[/b]로 확인. 오류가 하나라도 있으면 게임에 반영되지 않습니다.
+[b]9. NPC에 붙이기[/b] — [b]맵[/b] 탭에서 NPC를 고르고 '대화 (시작 노드)'에 이 대화의 첫 카드를 고릅니다.
 """
 
 
@@ -224,7 +249,9 @@ func _build_graph() -> void:
 
 
 func _make_card(data: Dictionary, node_choices: Array, pos: Vector2) -> GraphNode:
-	var card := Card.new()
+	var card: GraphNode = FuncCard.new() if data.get("kind", "") in ["effect", "branch"] else Card.new()
+	if card is FuncCard:
+		card.lookups = lookups
 	card.choice_id_maker = _new_choice_id
 	card.setup(data, node_choices, speakers)
 	card.position_offset = pos
@@ -255,6 +282,48 @@ func add_card(pos: Vector2) -> GraphNode:
 	dirty = true
 	_sync_connections()
 	return card
+
+
+## 기능 카드 (kind: effect / branch)
+func add_func_card(kind: String, pos: Vector2) -> GraphNode:
+	var data := {"node_id": _new_node_id(), "kind": kind, "speaker_id": "", "text": "", "next_node": "", "on_enter": ""}
+	if kind == "branch":
+		data.condition = ""
+		data.fail_next = ""
+	var card := _make_card(data, [], pos)
+	dirty = true
+	_sync_connections()
+	return card
+
+
+func _fill_add_menu(pm: PopupMenu, at: Callable) -> void:
+	for i in ADD_MENU.size():
+		pm.add_item(ADD_MENU[i][1], i)
+	pm.id_pressed.connect(func(i): _add_kind(ADD_MENU[i][0], at.call() if at.is_valid() else _center_pos()))
+
+
+## 그래프 빈 곳 오른쪽 클릭 → 그 자리에 카드 만들기 메뉴
+func _on_graph_popup(at_position: Vector2) -> void:
+	var pos := (graph.scroll_offset + at_position) / graph.zoom
+	var pm := PopupMenu.new()
+	_fill_add_menu(pm, func(): return pos)
+	add_child(pm)
+	pm.popup_hide.connect(pm.queue_free)
+	pm.popup_on_parent(Rect2i(Vector2i(get_global_mouse_position()), Vector2i.ZERO))
+
+
+func _center_pos() -> Vector2:
+	return (graph.scroll_offset + graph.size / 2.0) / graph.zoom - Vector2(210, 100)
+
+
+func _add_kind(kind: String, pos: Vector2) -> void:
+	if dialogue.is_empty():
+		_status("먼저 대화를 열거나 새로 만드세요")
+		return
+	match kind:
+		"line": _edit_node(add_card(pos))
+		"ending": _add_end_card()
+		_: _edit_node(add_func_card(kind, pos))
 
 
 func add_card_at_center() -> void:
@@ -363,13 +432,21 @@ func _edit_node(card: GraphNode) -> void:
 	_selected_card = card
 	_clear_inspector()
 	var d: Dictionary = card.data
+	if card is FuncCard:
+		var branch: bool = d.kind == "branch"
+		_title("조건 분기 카드" if branch else "효과 카드")
+		_line("카드 ID", d.node_id, func(v): _rename_node(card, v))
+		_hint(("조건은 카드 안에서 고릅니다. 맞으면 '맞으면 →', 아니면 빨간 '아니면 →' 으로 갑니다."
+			if branch else "효과는 카드 안에서 고릅니다. 실행한 뒤 '다음 →' 으로 갑니다.")
+			+ "\n화면에는 보이지 않습니다.")
+		_target("맞으면 갈 곳" if branch else "다음 갈 곳", d, "next_node", card)
+		if branch:
+			_target("아니면 갈 곳", d, "fail_next", card)
+		return
 	_title("대사 카드")
-	_line("node_id", d.node_id, func(v): _rename_node(card, v))
-	_line("들어올 때 효과 (on_enter)", d.get("on_enter", ""), _setter(d, "on_enter"),
-		"예: item:+bandage;setflag:met")
-	_line("이동 (직접 입력)", d.get("next_node", ""), func(v):
-		d.next_node = v
-		_after_target_change(card), "다른 파일·엑셀 노드로 갈 때 node_id. EXIT / END:id")
+	_line("카드 ID", d.node_id, func(v): _rename_node(card, v))
+	_expr("이 카드에 들어올 때 효과", "effect", d.get("on_enter", ""), _setter(d, "on_enter"))
+	_target("다음 갈 곳 (선택지가 없을 때)", d, "next_node", card)
 	_hint("선택지가 있으면 '다음 →' 대신 선택지가 나온다.")
 
 
@@ -399,32 +476,28 @@ func _edit_choice(card: GraphNode, index: int) -> void:
 		card.rebuild()
 		_after_target_change(card)
 		_edit_choice(card, index))
-	_line("조건 (condition)", c.get("condition", ""), _setter(c, "condition"), "예: has:knife & flag:met")
+	_expr("보이는 조건 (맞아야 고를 수 있음)", "cond", c.get("condition", ""), _setter(c, "condition"))
 	_option("조건이 안 맞을 때", ["gray", "hide"], ["회색으로 보임", "숨김"], c.get("show_mode", "") if c.get("show_mode", "") != "" else "gray",
 		_show_mode_setter(c))
-	_line("대가 표시 (cost)", c.get("cost", ""), _setter(c, "cost"), "표시만. 실제 차감은 효과에")
-	_line("효과 (effects)", c.get("effects", ""), _setter(c, "effects"), "예: item:-water;surv:thirst+50;save")
-	_line("이동 (직접 입력)", c.get("next_node", ""), func(v):
-		c.next_node = v
-		_after_target_change(card), "연결선 대신 node_id / EXIT / END:id")
+	_line("대가 표시 (cost)", c.get("cost", ""), _setter(c, "cost"), "버튼에 보이는 글자만. 실제 차감은 효과에")
+	_expr("고르면 일어나는 효과" if c.get("type", "normal") != "combat" else "이겼을 때 효과", "effect",
+		c.get("effects", ""), _setter(c, "effects"))
+	_target("갈 곳" if not c.get("type", "normal") in ["dice", "combat"] else ("성공하면 갈 곳" if c.type == "dice" else "이기면 갈 곳"),
+		c, "next_node", card)
 	if c.get("type", "normal") == "dice":
 		_title("판정")
 		_option("능력치 (check)", abilities.map(func(a): return a[0]), abilities.map(func(a): return a[1]), c.get("check", ""),
 			_setter(c, "check"))
 		_spin("목표값 (dc)", int(c.get("dc", 10)), 1, 40, _setter(c, "dc"))
 		_spin("상황 보정 (mod)", int(c.get("mod", 0)), -20, 20, _setter(c, "mod"))
-		_line("실패 효과 (fail_effects)", c.get("fail_effects", ""), _setter(c, "fail_effects"))
-		_line("실패 이동 (직접 입력)", c.get("fail_next", ""), func(v):
-			c.fail_next = v
-			_after_target_change(card))
+		_expr("실패했을 때 효과", "effect", c.get("fail_effects", ""), _setter(c, "fail_effects"))
+		_target("실패하면 갈 곳", c, "fail_next", card)
 	elif c.get("type", "normal") == "combat":
 		_title("전투")
 		_option("적 (check)", enemies.map(func(e): return e[0]), enemies.map(func(e): return e[1]), c.get("check", ""),
 			_setter(c, "check"))
-		_line("도주 효과 (fail_effects)", c.get("fail_effects", ""), _setter(c, "fail_effects"))
-		_line("도주 이동 (직접 입력)", c.get("fail_next", ""), func(v):
-			c.fail_next = v
-			_after_target_change(card))
+		_expr("도망쳤을 때 효과", "effect", c.get("fail_effects", ""), _setter(c, "fail_effects"))
+		_target("도망치면 갈 곳", c, "fail_next", card)
 		var note := Label.new()
 		note.text = "이기면 효과·이동, 도주하면 도주 효과·이동.\n지면 대화가 끝나고 사망 처리 (부활 규칙)."
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -483,6 +556,7 @@ func _all_targets() -> Array:
 	var out := []
 	for n in dialogue.get("nodes", []):
 		out.append(n.get("next_node", ""))
+		out.append(n.get("fail_next", ""))
 	for c in dialogue.get("choices", []):
 		out.append(c.get("next_node", ""))
 		out.append(c.get("fail_next", ""))
@@ -525,6 +599,7 @@ func _load_lookups() -> void:
 	abilities = []
 	for a in _read_json("res://data/abilities.json", []):
 		abilities.append([a.ability_id, "%s  (%s)" % [a.name, a.ability_id]])
+	lookups = ToolCommon.load_lookups()
 	enemies = []
 	for e in _read_json("res://data/enemies.json", []):
 		enemies.append([e.enemy_id, "%s  (%s)" % [e.name, e.enemy_id]])
@@ -570,6 +645,43 @@ func _clear_inspector() -> void:
 	for c in inspector.get_children():
 		inspector.remove_child(c)
 		c.queue_free()
+
+
+## 조건·효과 칸: 직접 입력 대신 목록에서 고르기 (addons/expr_rows.gd)
+func _expr(label: String, mode: String, value: String, on_change: Callable) -> void:
+	var l := Label.new()
+	l.text = label
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	inspector.add_child(l)
+	var rows: Node = ExprRows.new().setup(mode, value, lookups)
+	rows.changed.connect(func(t): on_change.call(t))
+	inspector.add_child(rows)
+
+
+## 갈 곳 고르기: 대화 끝 / 엔딩 / 이 대화의 카드 / 다른 대화·엑셀의 노드 (같은 에피소드 범위만)
+func _target(label: String, d: Dictionary, key: String, card: GraphNode) -> void:
+	var episode: String = dialogue.get("episode_id", "")
+	var opts := [["", "(없음 · 연결선으로 정함)"]]
+	if episode == "":
+		opts.append(["EXIT", "대화 끝 (EXIT)"])
+	for e in lookups.get("endings", []):
+		if episode != "" and e[1] == episode:
+			opts.append(["END:" + e[0], "엔딩: " + e[0]])
+	var here := {}
+	for c in _cards():
+		var id: String = c.data.node_id
+		here[id] = true
+		var what: String = ("(조건 분기)" if c.data.kind == "branch" else "(효과 카드)") if c is FuncCard else String(c.data.get("text", "")).left(18)
+		opts.append([id, "이 대화: %s — %s" % [id, what]])
+	for n in lookups.get("nodes", []):
+		if not here.has(n[0]) and n[1] == episode:
+			opts.append([n[0], "다른 곳: %s — %s" % [n[0], n[2]]])
+	var cur: String = d.get(key, "")
+	if cur != "" and not opts.any(func(o): return o[0] == cur):
+		opts.append([cur, "%s (목록에 없음)" % cur])
+	_option(label, opts.map(func(o): return o[0]), opts.map(func(o): return o[1]), cur, func(v):
+		d[key] = v
+		_after_target_change(card))
 
 
 ## 아무것도 고르지 않았을 때 오른쪽 칸 안내
@@ -622,6 +734,8 @@ func _option(label: String, values: Array, labels: Array, current: String, on_ch
 	l.text = label
 	inspector.add_child(l)
 	var o := OptionButton.new()
+	o.fit_to_longest_item = false
+	o.clip_text = true
 	for i in values.size():
 		o.add_item(labels[i], i)
 		if values[i] == current:

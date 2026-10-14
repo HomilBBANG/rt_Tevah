@@ -61,6 +61,67 @@ static func add_help(parent: Container, index: int, bar: HBoxContainer, key: Str
 	return panel
 
 
+## 조건·효과 고르기(addons/expr_rows.gd)와 이동 대상 목록에 쓰는 이름표들 (data/*.json 에서).
+## items·survival·abilities·parts·loot·nodes: [[id, 보이는 이름]], flags·wflags·traits: [이름] (이미 쓰이는 것)
+static func load_lookups() -> Dictionary:
+	var lk := {"items": [], "survival": [], "abilities": [], "parts": [], "loot": [], "nodes": [], "endings": [],
+		"flags": [], "wflags": [], "traits": []}
+	for i in read_json("res://data/items.json", []):
+		lk.items.append([i.item_id, "%s (%s)" % [i.name, i.item_id]])
+	for s in read_json("res://data/survival.json", []):
+		lk.survival.append([s.param_id, s.name])
+	for a in read_json("res://data/abilities.json", []):
+		lk.abilities.append([a.ability_id, a.name])
+	for p in read_json("res://data/player_parts.json", []):
+		if not p.get("vital", false):
+			lk.parts.append([p.part_id, p.name])
+	var spots := {}
+	for l in read_json("res://data/loot.json", []):
+		if not spots.has(l.spot_id):
+			spots[l.spot_id] = true
+			lk.loot.append([l.spot_id, l.spot_id])
+	for e in read_json("res://data/endings.json", []):
+		lk.endings.append([e.ending_id, e.get("episode_id", "")])
+	var names := {}
+	var traits := {}
+	for c in read_json("res://data/characters.json", []):
+		names[c.char_id] = c.name
+		for t in c.get("traits", []):
+			traits[t] = true
+	lk.traits = traits.keys()
+	# 이미 쓰이는 플래그 이름 모으기
+	var texts := PackedStringArray()
+	for n in read_json("res://data/nodes.json", []):
+		var kind: String = n.get("kind", "")
+		var label := "(효과 카드)" if kind == "effect" else ("(조건 분기)" if kind == "branch" else
+			"%s: %s" % [names.get(n.speaker_id, "내레이션") if n.speaker_id != "" else "내레이션", String(n.text).left(16)])
+		lk.nodes.append([n.node_id, n.get("episode_id", ""), label])
+		texts.append(n.get("on_enter", ""))
+		texts.append(n.get("condition", ""))
+	for c in read_json("res://data/choices.json", []):
+		texts.append_array([c.get("condition", ""), c.get("effects", ""), c.get("fail_effects", "")])
+	for m in read_json("res://data/maps.json", []):
+		for o in m.get("objects", []):
+			texts.append(o.get("condition", ""))
+	for f in ["camp_actions", "revivals"]:
+		for r in read_json("res://data/%s.json" % f, []):
+			texts.append_array([r.get("condition", ""), r.get("effects", "")])
+	for i in read_json("res://data/items.json", []):
+		texts.append(i.get("use_effects", ""))
+	var all := " ".join(texts)
+	var flags := {}
+	var wflags := {}
+	for m in RegEx.create_from_string("\\b(?:setflag|clearflag|flag):(\\w+)").search_all(all):
+		flags[m.get_string(1)] = true
+	for m in RegEx.create_from_string("\\b(?:setwflag|wflag):(\\w+)").search_all(all):
+		wflags[m.get_string(1)] = true
+	lk.flags = flags.keys()
+	lk.flags.sort()
+	lk.wflags = wflags.keys()
+	lk.wflags.sort()
+	return lk
+
+
 static func read_json(path: String, default: Variant) -> Variant:
 	if not FileAccess.file_exists(path):
 		return default

@@ -169,4 +169,6 @@ tools/
   - 연결선은 데이터(next_node 등)를 따른다: 연결/끊기 → 데이터 수정 → 다시 그림 (`_sync_connections`).
   - 버튼: 새 대화 / 대사 추가 / 엔딩 카드 / 저장 / 변환·검사(`tools/xlsx_to_json.py --log`, 결과는 UTF-8 로그 파일로 받음) / 미리보기(`addons/dialogue_editor/preview.tscn`, 고른 카드부터 실제 대화 화면, save 효과는 저장 안 함).
   - 맥은 `python3`, 윈도우는 `python` 으로 변환기를 실행.
+- **기능 카드** (노드 `kind`, 엑셀 Nodes 에서도 선택 열): `effect` = on_enter 효과만 실행하고 next_node 로 (화면에 안 보임) / `branch` = `condition` 이 맞으면 next_node, 아니면 `fail_next`. 기본(빈 값·line) = 대사. 도구줄 '＋ 기능 카드' 또는 그래프 오른쪽 클릭.
+- **직접 입력 대신 고르기**: 조건·효과 칸은 `addons/expr_rows.gd` (줄마다 종류·아이템·수치를 목록에서 고름, 괄호 식·goto 는 '직접 입력 보기'로만). 이동 칸은 갈 곳 목록. 목록 이름표는 `ToolCommon.load_lookups()` (data/*.json, 쓰이는 플래그 이름 포함). 맵 탭 물체의 '나타나는 조건'도 같은 부품. 문법을 바꾸면 expr_rows 의 EFFECTS·CONDS 도 맞출 것.
 - 테스트: `tests/dialogue_editor_smoke.tscn` (에디터 화면을 게임 안에서 띄워 열기·연결·저장·새 대화·변환 확인).
