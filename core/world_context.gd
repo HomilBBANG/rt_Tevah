@@ -11,4 +11,5 @@ func has_flag(_name: String) -> bool: return false
 func has_wflag(name: String) -> bool: return GameState.has_wflag(name)
 func has_trait(_name: String) -> bool: return false
 func is_severed(_part_id: String) -> bool: return false
+func has_status(_id: String) -> bool: return false
 func get_count(name: String) -> int: return GameState.get_count(name)

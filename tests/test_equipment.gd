@@ -5,6 +5,8 @@ extends Node
 ## knife(손, 무게 1), junk(무게 2), water(무게 1, 5개씩), Config inventory_slots 4,
 ## carry_heavy_weight 20, carry_max_weight 30, carry_heavy_speed_mult 0.5
 
+const Expr = preload("res://core/expr.gd")
+
 var _pass := 0
 var _fail := 0
 
@@ -61,6 +63,13 @@ func _ready() -> void:
 	GameState.equipment = {"right_hand": "knife"}
 	check(GameState.remove_item("knife", 1) == 1 and GameState.equipment.is_empty(), "item:-knife → 손에 든 칼이 빠짐")
 
+	# 상태이상: 효과 status:+id / status:-id, 조건 status:id
+	await StoryRunner.run_effects("status:+bleeding;status:+panic;status:+bleeding")
+	check(GameState.statuses == ["bleeding", "panic"], "상태이상 걸기 (같은 것 두 번은 한 번만)")
+	check(Expr.evaluate("status:bleeding & !status:nausea", GameState), "조건 status:")
+	await StoryRunner.run_effects("status:-panic")
+	check(GameState.statuses == ["bleeding"], "상태이상 풀기")
+
 	# 저장·불러오기
 	GameState.add_item("small_bag", 1)
 	GameState.equip(0)
@@ -68,6 +77,7 @@ func _ready() -> void:
 	GameState.reset_run()
 	GameState.run_from_dict(JSON.parse_string(JSON.stringify(d)))
 	check(GameState.equipment.get("bag") == "small_bag" and GameState.slot_count() == 8, "저장·불러오기: 장비 유지")
+	check(GameState.statuses == ["bleeding"], "저장·불러오기: 상태이상 유지")
 
 	# 판정 보정: 손에 든 칼의 dice_bonus(strength+1)
 	var dp := StoryRunner.dice_preview({"check": "strength", "dc": 10, "mod": 0})

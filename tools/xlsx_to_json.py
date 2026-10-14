@@ -63,6 +63,8 @@ SCHEMA = {
     "Endings": ("ending_id", ["ending_id", "episode_id", "world_flags_set"], {}),
     "Config": ("key", ["key", "value"], {}),   # 값은 숫자 또는 문자열(예: protagonist_id)
     "Abilities": ("ability_id", ["ability_id", "name"], {}),
+    # 상태이상: 효과 status:+id / status:-id, 조건 status:id. description = 장비창 능력치 탭에서 마우스를 올리면 뜨는 설명
+    "StatusEffects": ("status_id", ["status_id", "name", "description"], {}),
     # ---- 전투 (기획서 §7–9)
     # attack = 부위별 공격력 (TODO 기획: 전투 피해 공식에 아직 안 쓰임 — 플레이어 피해는 Config combat_player_damage,
     #          NPC 피해는 NpcAttacks.damage)
@@ -83,7 +85,7 @@ SCHEMA = {
 }
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
-OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots",
+OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "StatusEffects",
                    "Survival", "CampActions", "Revivals"}
 FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit"}
 CAMP_KINDS = {"", "sleep"}   # sleep: 1시간 단위로 골라 자고, 자고 나면 저장 (effects 는 1시간마다)
@@ -133,7 +135,7 @@ class Report:
 # ---------------------------------------------------------------- 조건·효과 문법
 # 런타임 파서(core/expr.gd)와 같은 문법. 한쪽을 바꾸면 다른 쪽도 맞춰야 한다.
 COUNTS = {"run", "death"}   # count: 조건 (월드 run_count·death_count)
-ATOM_RE = re.compile(r"(has|flag|wflag|stat|trait|abil|surv|cut|count):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\d+(?:\.\d+)?))?")
+ATOM_RE = re.compile(r"(has|flag|wflag|stat|trait|abil|surv|cut|count|status):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\d+(?:\.\d+)?))?")
 
 
 class ExprError(Exception):
@@ -170,7 +172,7 @@ def parse_condition(text):
                 raise ExprError(f"'{m.group(0)}': surv 조건에는 비교식이 필요 (예: surv:hunger<30)")
             elif kind == "abil" and not op:
                 raise ExprError(f"'{m.group(0)}': abil 조건에는 비교식이 필요 (예: abil:strength>=3)")
-            elif kind in ("flag", "wflag", "trait", "cut") and op:
+            elif kind in ("flag", "wflag", "trait", "cut", "status") and op:
                 raise ExprError(f"'{m.group(0)}': {kind} 조건에는 비교식을 쓸 수 없음")
             tokens.append((kind, ident))
             i = m.end()
@@ -229,6 +231,7 @@ EFFECT_RES = [
     ("surv", re.compile(r"^surv:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
     ("simple", re.compile(r"^(setflag|clearflag|setwflag|loot|goto|restore):([A-Za-z0-9_]+)$")),
     ("save", re.compile(r"^save$")),   # 회차 저장 (베이스캠프 안에서만 동작)
+    ("status", re.compile(r"^status:([+-])([A-Za-z0-9_]+)$")),   # 상태이상 걸기·풀기
 ]
 
 
@@ -254,6 +257,8 @@ def parse_effects(text):
                 refs.append((kind, m.group(1)))
             elif kind == "save":
                 pass
+            elif kind == "status":
+                refs.append(("status", m.group(2)))
             else:
                 refs.append((m.group(1), m.group(2)))
             break
@@ -364,6 +369,7 @@ def validate(d, rep):
         rep.err(loc("Npcs", npcs[pid]), f"ID '{pid}' 가 Player 시트에도 있음 (플레이어·NPC ID 는 서로 달라야 함)")
     config, abils = index("Config"), index("Abilities")
     survs = index("Survival")
+    stats_fx = index("StatusEffects")
     pparts, eparts, eattacks = index("PlayerParts"), index("NpcParts"), index("NpcAttacks")
     # 부위나 공격이 있는 NPC = 싸울 수 있는 NPC (맵의 적·대화 전투 선택지 대상)
     fighters = {r["npc_id"] for r in d["NpcParts"]} | {r["npc_id"] for r in d["NpcAttacks"]}
@@ -386,6 +392,8 @@ def validate(d, rep):
                 rep.err(where, f"없는 생존 파라미터 '{rid}' (Survival 시트)")
             elif kind == "restore":
                 check_limb(where, rid, "all")
+            elif kind == "status" and rid not in stats_fx:
+                rep.err(where, f"없는 상태이상 '{rid}' (content.xlsx StatusEffects)")
             elif kind == "loot" and rid not in spots:
                 rep.err(where, f"없는 spot_id '{rid}' (Loot 시트)")
             elif kind == "goto":
@@ -431,6 +439,8 @@ def validate(d, rep):
                     rep.err(where, f"조건의 없는 ability_id '{rid}'")
                 elif kind == "cut":
                     check_limb(where, rid, "any")
+                elif kind == "status" and rid not in stats_fx:
+                    rep.err(where, f"조건의 없는 상태이상 '{rid}' (content.xlsx StatusEffects)")
                 elif kind == "surv" and rid not in survs:
                     rep.err(where, f"조건의 없는 생존 파라미터 '{rid}'")
         except ExprError as e:
@@ -1005,6 +1015,7 @@ def export(d, maps):
                       + [character(r, "npc_id", False) for r in clean(d["Npcs"])],
         "abilities": clean(d["Abilities"]),
         "equip_slots": clean(d["EquipSlots"]),
+        "status_effects": clean(d["StatusEffects"]),
         "player_parts": [dict(r, key=r["key"].upper(), vital=is_true(r["vital"])) for r in clean(d["PlayerParts"])],
         # 싸울 수 있는 NPC (부위·공격이 있는 것). enemy_id = npc_id
         "enemies": [{"enemy_id": e["npc_id"], "name": e["name"], "image": e["image"],

@@ -61,9 +61,16 @@ func _ready() -> void:
 	await _wait(0.1)
 	check(not GameState.equipment.has("bag") and GameState.slot_count() == 4, "가방 칸 우클릭 → 벗기, 4칸")
 
-	# 능력치 탭: 내 상태 + 육각형
+	# 능력치 탭: 왼쪽 몸 상태, 오른쪽 위 상태이상(마우스 설명), 오른쪽 아래 육각형
+	await StoryRunner.run_effects("status:+bleeding;status:+nausea;status:+panic")
+	StoryRunner.enter_field()
 	eq.open(1)
 	await _wait(0.2)
+	var rows: Array = eq._status_list.get_children()
+	check(rows.size() == 3 and rows[0].get_child(0).text == "출혈" and "효과 설명" in rows[0].tooltip_text,
+		"상태이상 3개, 이름에 설명 툴팁 (%s)" % (rows[0].tooltip_text if rows.size() > 0 else ""))
+	check(eq._body.global_position.x < eq._status_list.global_position.x
+		and eq._status_list.global_position.y < eq._hex.global_position.y, "배치: 왼쪽 몸, 오른쪽 위 상태, 오른쪽 아래 육각형")
 	check(eq._hex.values.size() == 6 and eq._hex.values[0][0] == "근력" and eq._hex.values[0][1] == 3, "능력치 탭: 6개, 근력 3")
 	await _snap("stats_tab")
 

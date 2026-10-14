@@ -1,0 +1,17 @@
+[
+ {
+  "status_id": "bleeding",
+  "name": "출혈",
+  "description": "(테스트) 효과 설명 — 기획 TODO"
+ },
+ {
+  "status_id": "nausea",
+  "name": "매스꺼움",
+  "description": "(테스트) 효과 설명 — 기획 TODO"
+ },
+ {
+  "status_id": "panic",
+  "name": "공황",
+  "description": "(테스트) 효과 설명 — 기획 TODO"
+ }
+]

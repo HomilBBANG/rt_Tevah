@@ -7,6 +7,7 @@ signal stats_changed
 signal body_changed
 signal inventory_changed
 signal equipment_changed
+signal statuses_changed
 signal flags_changed
 signal survival_changed
 signal clock_changed
@@ -31,6 +32,7 @@ var current_map := ""
 var clock := 0.0              # 회차 시작부터 흐른 게임 시간 (분). 1일차 0:00 = 0
 var survival := {}            # param_id -> float (0 ~ max, 높을수록 좋음)
 var player_body := {}         # 전투 부위 상태 (부상·절단), 전투 사이에 이어짐
+var statuses: Array = []      # 걸려 있는 상태이상 status_id (StatusEffects 시트). 효과 status:+id / status:-id
 var equipment := {}           # 장비: slot_id(EquipSlots) -> item_id. 장착한 것은 인벤토리 칸을 차지하지 않는다
 var field_state := {}         # map_id -> { "removed": [object_id], "done": [object_id] }
 var wake_at_run_start := false   # 다음 맵 로드 때 그 맵의 S(회차 시작 위치)에서 깨어남 (저장 안 함)
@@ -79,6 +81,8 @@ func reset_run() -> void:
 	player_body = Combat.fresh_player_parts()
 	equipment = {}
 	equipment_changed.emit()
+	statuses = []
+	statuses_changed.emit()
 	field_state = {}
 	wake_at_run_start = true
 	survival_changed.emit()
@@ -426,6 +430,24 @@ func has_trait(name: String) -> bool:
 	return name in traits
 
 
+## 조건 status:id — 상태이상에 걸려 있나
+func has_status(id: String) -> bool:
+	return id in statuses
+
+
+## 상태이상 걸기(on=true)·풀기. 이미 같은 상태면 아무 일 없음. 바뀌었으면 true.
+## TODO(기획): 상태이상의 실제 효과(체력 감소·판정 보정 등)와 지속 시간 — 지금은 표시·조건용
+func set_status(id: String, on: bool) -> bool:
+	if on == has_status(id):
+		return false
+	if on:
+		statuses.append(id)
+	else:
+		statuses.erase(id)
+	statuses_changed.emit()
+	return true
+
+
 ## 조건 count:run / count:death (월드 기록)
 func get_count(name: String) -> int:
 	match name:
@@ -514,6 +536,7 @@ func run_to_dict() -> Dictionary:
 		"field_state": field_state.duplicate(true),
 		"inventory": inventory.duplicate(true),
 		"equipment": equipment.duplicate(),
+		"statuses": statuses.duplicate(),
 		"flags": ep_flags.keys(),
 		"abilities": abilities.duplicate(),
 	}
@@ -534,6 +557,9 @@ func run_from_dict(d: Dictionary) -> void:
 	inventory = []
 	for slot in d.get("inventory", []):
 		inventory.append({"id": str(slot.id), "count": int(slot.count)})
+	statuses = []
+	for st in d.get("statuses", []):
+		statuses.append(str(st))
 	equipment = {}
 	for k in d.get("equipment", {}):
 		equipment[str(k)] = str(d.equipment[k])

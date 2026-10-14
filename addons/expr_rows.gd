@@ -18,6 +18,8 @@ const EFFECTS := [
 	["surv", "생존 수치 바꾸기", ["surv", "op_change", "num"]],
 	["abil", "능력치 바꾸기", ["abil", "op_change", "num"]],
 	["restore", "잘린 팔다리 복구", ["part_all"]],
+	["status_add", "상태이상 걸기", ["status"]],
+	["status_remove", "상태이상 풀기", ["status"]],
 	["loot", "아이템 굴리기 (Loot 표)", ["loot"]],
 	["save", "저장하기 (베이스캠프에서만)", []],
 	["stat", "스탯 바꾸기 (1단계 에피소드용)", ["stat", "op_change", "num"]],
@@ -33,6 +35,8 @@ const CONDS := [
 	["abil", "능력치", ["abil", "op_cmp", "num"]],
 	["cut", "팔다리가 잘렸다", ["part_any"]],
 	["not_cut", "팔다리가 잘리지 않았다", ["part_any"]],
+	["status", "상태이상에 걸려 있다", ["status"]],
+	["not_status", "상태이상에 걸려 있지 않다", ["status"]],
 	["count", "죽은 횟수 · 회차 수", ["count_kind", "op_cmp", "num"]],
 	["trait", "주인공 능력이 있다", ["trait"]],
 	["stat", "스탯 (1단계 에피소드용)", ["stat", "op_cmp", "num"]],
@@ -113,6 +117,10 @@ func _row_text(r: Dictionary) -> String:
 			return "" if v == "" else "%s:%s" % [r.kind, v]
 		"save":
 			return "save"
+		"status_add", "status_remove":
+			return "" if p.status == "" else "status:%s%s" % ["+" if r.kind == "status_add" else "-", p.status]
+		"status", "not_status":
+			return "" if p.status == "" else "%sstatus:%s" % ["!" if r.kind == "not_status" else "", p.status]
 		"has":
 			if p.item == "":
 				return ""
@@ -158,6 +166,9 @@ func _parse_effect(e: String) -> Dictionary:
 			"op_change": m.get_string(3), "num": m.get_string(4).to_int()}}
 	if e == "save":
 		return {"kind": "save", "p": {}}
+	m = _rx("status_fx", "^status:([+-])(\\w+)$").search(e)
+	if m:
+		return {"kind": "status_add" if m.get_string(1) == "+" else "status_remove", "p": {"status": m.get_string(2)}}
 	return {}
 
 
@@ -167,7 +178,7 @@ func _parse_cond(c: String) -> Dictionary:
 		if m.get_string(1) == "!":
 			return {} if m.get_string(3) != "" else {"kind": "not_has", "p": {"item": m.get_string(2)}}
 		return {"kind": "has", "p": {"item": m.get_string(2), "atleast": maxi(1, m.get_string(3).to_int())}}
-	m = _rx("flag", "^(!?)(flag|wflag|cut):(\\w+)$").search(c)
+	m = _rx("flag", "^(!?)(flag|wflag|cut|status):(\\w+)$").search(c)
 	if m:
 		var k := m.get_string(2)
 		var key: String = _params_of(k)[0]
@@ -218,6 +229,7 @@ func _options(param: String) -> Array:
 		"part_all": return [["all", "잘린 곳 모두"]] + lookups.get("parts", [])
 		"part_any": return [["any", "아무 팔다리나"]] + lookups.get("parts", [])
 		"loot": return lookups.get("loot", [])
+		"status": return lookups.get("statuses", [])
 		"stat": return STATS
 		"count_kind": return COUNT_KINDS
 		"op_change": return OP_CHANGE

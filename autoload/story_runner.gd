@@ -389,6 +389,10 @@ func _apply_effects(effects: Array) -> String:
 				redirect = e.id
 			"save":
 				await _save_run()
+			"status":
+				if GameState.set_status(e.id, e.op == "+"):
+					var nm: String = DataLoader.status_effects.get(e.id, {}).get("name", e.id)
+					message.emit(("%s 상태가 되었다." if e.op == "+" else "%s 이(가) 나았다.") % nm)
 			"restore":
 				var restored := GameState.restore_limb(e.id)
 				if restored.is_empty():

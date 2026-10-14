@@ -23,6 +23,7 @@ class FakeCtx:
 	func has_trait(name: String) -> bool: return name in traits
 	func is_severed(part_id: String) -> bool: return part_id in ["left_arm", "any"]
 	func get_count(name: String) -> int: return {"run": 3, "death": 2}.get(name, 0)
+	func has_status(id: String) -> bool: return id == "bleeding"
 
 
 var _fail := 0
@@ -65,6 +66,9 @@ func _ready() -> void:
 	cond(ctx, "count:death>2", false)
 	cond_err(ctx, "count:death")
 	cond_err(ctx, "count:kills>1")
+	cond(ctx, "status:bleeding", true)
+	cond(ctx, "!status:panic", true)
+	cond_err(ctx, "status:bleeding>=1")
 	# --- 조건: 연산자
 	cond(ctx, "!has:rope", true)
 	cond(ctx, "!!has:rope", false)
@@ -115,6 +119,8 @@ func _ready() -> void:
 	eff("restore:left_arm;item:-gold", [{"type": "restore", "id": "left_arm"}, {"type": "item", "id": "gold", "amount": -1}], 0)
 	eff("restore:all", [{"type": "restore", "id": "all"}], 0)
 	eff("restore:", [], 1)
+	eff("status:+bleeding;status:-panic", [{"type": "status", "op": "+", "id": "bleeding"}, {"type": "status", "op": "-", "id": "panic"}], 0)
+	eff("status:bleeding", [], 1)
 	eff("", [], 0)
 	eff(";;", [], 0)
 	eff("item:+", [], 1)

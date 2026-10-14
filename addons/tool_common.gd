@@ -64,10 +64,12 @@ static func add_help(parent: Container, index: int, bar: HBoxContainer, key: Str
 ## 조건·효과 고르기(addons/expr_rows.gd)와 이동 대상 목록에 쓰는 이름표들 (data/*.json 에서).
 ## items·survival·abilities·parts·loot·nodes: [[id, 보이는 이름]], flags·wflags·traits: [이름] (이미 쓰이는 것)
 static func load_lookups() -> Dictionary:
-	var lk := {"items": [], "survival": [], "abilities": [], "parts": [], "loot": [], "nodes": [], "endings": [],
+	var lk := {"items": [], "survival": [], "abilities": [], "parts": [], "loot": [], "nodes": [], "endings": [], "statuses": [],
 		"flags": [], "wflags": [], "traits": []}
 	for i in read_json("res://data/items.json", []):
 		lk.items.append([i.item_id, "%s (%s)" % [i.name, i.item_id]])
+	for st in read_json("res://data/status_effects.json", []):
+		lk.statuses.append([st.status_id, "%s (%s)" % [st.name, st.status_id]])
 	for s in read_json("res://data/survival.json", []):
 		lk.survival.append([s.param_id, s.name])
 	for a in read_json("res://data/abilities.json", []):
