@@ -3,7 +3,8 @@ extends Control
 ##
 ## 배치: 왼쪽 위 적 이름 / 가운데 적 그림 / 왼쪽 아래 내 상태(부위 HP) / 가운데 아래 텍스트 창 / 그 오른쪽 행동 버튼
 ## 텍스트 창: 시스템 메시지 + 행동 세부 선택지(공격할 부위 등)
-## 플레이어 턴: 공격(텍스트 창에서 적 부위 선택) / 아이템(인벤토리, 소모품 사용) / 도주(주사위 1~100 ≤ 적의 도주 성공률)
+## 플레이어 턴: 공격(텍스트 창에서 적 부위 선택) / 특수(스킬·무기 던지기 등, 아직 없음) / 아이템(인벤토리, 소모품 사용)
+##   / 도주(주사위 1~100 ≤ 적의 도주 성공률)
 ## 적 턴: 공격 전조 → 회피 원이 고리에 닿는 순간 맞는 방향키(W/A/S/D 또는 방향키·패드) 입력
 
 const Combat = preload("res://core/combat/combat.gd")
@@ -28,7 +29,7 @@ var combat := Combat.new()
 var embedded := false
 var enemy_id_override := ""
 var player_state := {}
-var _state := ""              # player / target / item / rolling / enemy / over
+var _state := ""              # player / target / special / item / rolling / enemy / over
 var _log: PackedStringArray = []
 var _prompt := ""             # 텍스트 창 마지막 줄 (안내·주사위 등)
 var _intro := ""              # "적 이(가) 나타났다." — 첫 행동 결과가 나오기 전까지만 보임 (로그에 남기지 않음)
@@ -52,6 +53,7 @@ func _ready() -> void:
 	%PlayerBody.order = combat.player_order
 	%PlayerBody.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	%AttackButton.pressed.connect(_on_attack)
+	%SpecialButton.pressed.connect(_on_special)
 	%ItemButton.pressed.connect(_on_item)
 	%FleeButton.pressed.connect(_on_flee)
 	%Inventory.use_handler = _on_item_used
@@ -83,6 +85,7 @@ func _player_turn() -> void:
 
 func _set_actions(on: bool) -> void:
 	%AttackButton.disabled = not on or not combat.can_attack()
+	%SpecialButton.disabled = not on
 	%ItemButton.disabled = not on
 	%FleeButton.disabled = not on or not combat.can_flee()
 
@@ -124,6 +127,19 @@ func _on_target_chosen(part_id: String) -> void:
 		else:
 			_add_log("%s 명중 (-%d)" % [part_name, res.damage])
 	await _after_player_action()
+
+
+## 특수 → 텍스트 창에 특수 행동 목록 (스킬 사용·무기 던지기 등)
+## TODO(기획): 특수 행동 데이터(스킬 시트, 신성력 소모, 던질 수 있는 무기)가 정해지면 목록을 채운다. 지금은 비어 있음
+func _on_special() -> void:
+	if _state != "player":
+		return
+	_state = "special"
+	_set_actions(false)
+	_clear_options()
+	_set_prompt("아직 쓸 수 있는 특수 행동이 없다.")
+	_option_button("취소").pressed.connect(_player_turn)
+	%Options.visible = true
 
 
 ## 아이템 → 인벤토리 (소모품 사용). TODO(기획): 장비 착용 — 장비 시스템이 아직 없음
@@ -291,7 +307,7 @@ func _redraw_text() -> void:
 	var lines := PackedStringArray()
 	# 텍스트 창은 4줄 남짓: 선택지·결과 버튼이 뜨면 최근 메시지 하나만, 안내가 길면 그만큼 덜
 	var keep := LOG_LINES
-	if _state in ["target", "over"]:
+	if _state in ["target", "special", "over"]:
 		keep = 1
 	elif _prompt != "":
 		keep = clampi(4 - _prompt.count("\n") - 1, 1, LOG_LINES)

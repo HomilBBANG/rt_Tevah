@@ -4,6 +4,7 @@
   "name": "머리",
   "key": "W",
   "hp": 20,
+  "attack": 0,
   "vital": true
  },
  {
@@ -11,6 +12,7 @@
   "name": "몸통",
   "key": "S",
   "hp": 50,
+  "attack": 0,
   "vital": true
  },
  {
@@ -18,6 +20,7 @@
   "name": "왼팔",
   "key": "A",
   "hp": 25,
+  "attack": 10,
   "vital": false
  },
  {
@@ -25,6 +28,7 @@
   "name": "오른팔",
   "key": "D",
   "hp": 25,
+  "attack": 10,
   "vital": false
  },
  {
@@ -32,6 +36,7 @@
   "name": "왼다리",
   "key": "A",
   "hp": 25,
+  "attack": 5,
   "vital": false
  },
  {
@@ -39,6 +44,7 @@
   "name": "오른다리",
   "key": "D",
   "hp": 25,
+  "attack": 5,
   "vital": false
  }
 ]

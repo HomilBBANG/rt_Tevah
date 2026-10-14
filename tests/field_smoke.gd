@@ -28,6 +28,18 @@ func _ready() -> void:
 	await _wait(0.5)
 	Input.action_release("move_right")
 	check(f.player.position.x - x0 > f.tile * 1.5, "오른쪽 이동 (%.0f px)" % (f.player.position.x - x0))
+	check(is_equal_approx(f.player.speed, 4 * f.tile) and is_equal_approx(f.player.run_speed, 6 * f.tile),
+		"이동 속도 = Player 시트 걷기 4 · 달리기 6 (칸/초)")
+	check(is_equal_approx(f.enemies[0].patrol_speed, 2 * f.tile) and is_equal_approx(f.enemies[0].chase_speed, 3.2 * f.tile),
+		"적 속도 = Npcs 시트 걷기(순찰) 2 · 달리기(추격) 3.2")
+	var x1: float = f.player.position.x
+	Input.action_press("run")
+	Input.action_press("move_left")
+	await _wait(0.5)
+	Input.action_release("move_left")
+	Input.action_release("run")
+	check(x1 - f.player.position.x > f.tile * 2.3, "Shift 달리기: 0.5초에 약 3칸 (%.0f px)" % (x1 - f.player.position.x))
+	f.player.position.x = x1
 	# 벽: 위쪽은 벽이라 못 올라감
 	var y0: float = f.player.position.y
 	Input.action_press("move_up")

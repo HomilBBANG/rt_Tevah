@@ -28,6 +28,9 @@ NODE_KINDS = {"", "line", "effect", "branch"}
 CHOICE_TYPES = {"", "normal", "item", "dice", "combat"}
 REQUIRED_CONFIG = ["inventory_slots", "hp_start", "hp_max", "sanity_start", "sanity_max", "time_start", "time_max"]
 
+# 능력치 6개 (Player·Npcs 의 열 이름 = Abilities 시트의 ability_id). 주사위 판정 check 와 abil: 조건·효과에 쓴다
+ABILITY_COLS = ["strength", "endurance", "intelligence", "health", "mental", "divinity"]
+
 # 시트 → (ID 열, 열 목록, 숫자 열 {이름: (타입, 기본값)})
 SCHEMA = {
     "Episodes": ("episode_id", ["episode_id", "title", "protagonist_id", "start_node", "unlock_condition",
@@ -39,16 +42,21 @@ SCHEMA = {
               {"stack_max": (int, 1)}),
     "Loot": ("loot_id", ["loot_id", "spot_id", "item_id", "amount", "chance", "time_cost"],
              {"amount": (int, 1), "chance": (float, 100.0), "time_cost": (int, 0)}),
-    "Characters": ("char_id", ["char_id", "name", "traits"], {}),
+    # ---- 등장인물: 플레이어(주인공)와 NPC(적 포함 — NPC 와도 싸울 수 있다). 능력치 6개는 주사위 판정에도 쓴다
+    "Player": ("player_id", ["player_id", "name", "walk_speed", "run_speed"] + ABILITY_COLS,
+               dict({"walk_speed": (float, None), "run_speed": (float, None)}, **{a: (int, 0) for a in ABILITY_COLS})),
+    "Npcs": ("npc_id", ["npc_id", "name"],
+             dict({"walk_speed": (float, 0.0), "run_speed": (float, 0.0)}, **{a: (int, 0) for a in ABILITY_COLS})),
     "Endings": ("ending_id", ["ending_id", "episode_id", "world_flags_set"], {}),
     "Config": ("key", ["key", "value"], {}),   # 값은 숫자 또는 문자열(예: protagonist_id)
     "Abilities": ("ability_id", ["ability_id", "name"], {}),
     # ---- 전투 (기획서 §7–9)
-    "PlayerParts": ("part_id", ["part_id", "name", "key", "hp", "vital"], {"hp": (int, None)}),
-    "Enemies": ("enemy_id", ["enemy_id", "name"], {}),
-    "EnemyParts": ("part_id", ["enemy_id", "part_id", "name", "hp", "hit_chance", "vital"],
-                   {"hp": (int, None), "hit_chance": (float, None)}),
-    "EnemyAttacks": ("attack_id", ["attack_id", "enemy_id", "name", "part", "pattern", "targets", "windup",
+    # attack = 부위별 공격력 (TODO 기획: 전투 피해 공식에 아직 안 쓰임 — 플레이어 피해는 Config combat_player_damage,
+    #          NPC 피해는 NpcAttacks.damage)
+    "PlayerParts": ("part_id", ["part_id", "name", "key", "hp", "attack", "vital"], {"hp": (int, None), "attack": (int, 0)}),
+    "NpcParts": ("part_id", ["npc_id", "part_id", "name", "hp", "attack", "hit_chance", "vital"],
+                 {"hp": (int, None), "attack": (int, 0), "hit_chance": (float, None)}),
+    "NpcAttacks": ("attack_id", ["attack_id", "npc_id", "name", "part", "pattern", "targets", "windup",
                                    "damage", "weight"],
                      {"windup": (float, None), "damage": (int, None), "weight": (int, 1)}),
     # ---- 탐험 필드. 맵 모양은 tools/maps/<map_id>.txt, 맵 위 물체는 이 시트
@@ -62,32 +70,32 @@ SCHEMA = {
 }
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
-OPTIONAL_SHEETS = {"Abilities", "PlayerParts", "Enemies", "EnemyParts", "EnemyAttacks",
+OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks",
                    "Survival", "CampActions", "Revivals"}
 FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit"}
 CAMP_KINDS = {"", "sleep"}   # sleep: 1시간 단위로 골라 자고, 자고 나면 저장 (effects 는 1시간마다)
 PATROL_DIRS = {"": (0, 0), "up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
 MAP_TILES = {"#", ".", " "}   # 벽 / 바닥 / 빈 공간(검은색, 지나갈 수 없음)
 # ID 중복 검사를 여러 열 조합으로 하는 시트
-DUP_KEYS = {"EnemyParts": ("enemy_id", "part_id")}
+DUP_KEYS = {"NpcParts": ("npc_id", "part_id")}
 DODGE_KEYS = {"W", "A", "S", "D"}
 ATTACK_PATTERNS = {"normal", "quick", "combo", "feint"}
 TRUE_WORDS = {"y", "yes", "true", "1", "o", "v"}
 
 # 없어도 되는 열 (시트에 없으면 빈 값으로 본다)
 OPTIONAL = {
-    "Characters": ["name_color",    # 대화 이름표 색 (#RRGGBB). 비우면 기본색
-                   "abilities"],    # 능력치 기본값 "stat_a=3, stat_b=1" (없는 능력치는 0)
-    "Items": ["dice_bonus"],        # 소지 시 판정 보정 "stat_a+2, all+1"
+    "Player": ["name_color",        # 대화 이름표 색 (#RRGGBB). 비우면 기본색
+               "traits"],           # 능력(trait:) 쉼표로 여러 개
+    # walk_speed·run_speed: 필드 이동 속도(칸/초) — 순찰은 걷기, 추격은 달리기. 부위·공격(NpcParts·NpcAttacks)이 있으면 전투 가능
+    "Npcs": ["name_color", "traits", "image", "flee_chance", "walk_speed", "run_speed"] + ABILITY_COLS,
+    "Items": ["dice_bonus"],        # 소지 시 판정 보정 "strength+2, all+1"
     # 선택지 종류: normal(기본) / item / dice
     # dice: check=능력치, dc=목표값, mod=상황 보정, 실패 시 fail_effects·fail_next
-    # combat: check=enemy_id, 이기면 effects·next_node, 도주하면 fail_effects·fail_next (필드 대화 전용)
+    # combat: check=npc_id(싸울 수 있는 NPC), 이기면 effects·next_node, 도주하면 fail_effects·fail_next (필드 대화 전용)
     "Choices": ["type", "check", "dc", "mod", "fail_effects", "fail_next"],
     # 노드 종류(대화 에디터의 기능 카드): line(기본, 대사) / effect(on_enter 효과만 실행하고 next_node 로) /
     # branch(condition 이 맞으면 next_node, 아니면 fail_next). effect·branch 는 화면에 보이지 않는다
     "Nodes": ["kind", "condition", "fail_next"],
-    "Enemies": ["flee_chance",      # 도주 성공률 % (비우면 Config combat_flee_chance)
-                "image"],           # 전투 화면 가운데 그림 (res://... 경로, 비우면 도형)
 }
 
 ID_RE = re.compile(r"^[A-Za-z0-9_]+$")
@@ -145,7 +153,7 @@ def parse_condition(text):
             elif kind == "surv" and not op:
                 raise ExprError(f"'{m.group(0)}': surv 조건에는 비교식이 필요 (예: surv:hunger<30)")
             elif kind == "abil" and not op:
-                raise ExprError(f"'{m.group(0)}': abil 조건에는 비교식이 필요 (예: abil:stat_a>=3)")
+                raise ExprError(f"'{m.group(0)}': abil 조건에는 비교식이 필요 (예: abil:strength>=3)")
             elif kind in ("flag", "wflag", "trait", "cut") and op:
                 raise ExprError(f"'{m.group(0)}': {kind} 조건에는 비교식을 쓸 수 없음")
             tokens.append((kind, ident))
@@ -322,11 +330,18 @@ def validate(d, rep):
         return seen
 
     eps, nodes, choices = index("Episodes"), index("Nodes"), index("Choices")
-    items, loots, chars, endings = index("Items"), index("Loot"), index("Characters"), index("Endings")
+    items, loots, endings = index("Items"), index("Loot"), index("Endings")
+    players, npcs = index("Player"), index("Npcs")
+    chars = dict(npcs, **players)   # 대화 화자 = 플레이어 + NPC
+    for pid in set(players) & set(npcs):
+        rep.err(loc("Npcs", npcs[pid]), f"ID '{pid}' 가 Player 시트에도 있음 (플레이어·NPC ID 는 서로 달라야 함)")
     config, abils = index("Config"), index("Abilities")
     survs = index("Survival")
-    pparts, enemies, eparts, eattacks = index("PlayerParts"), index("Enemies"), index("EnemyParts"), \
-        index("EnemyAttacks")
+    pparts, eparts, eattacks = index("PlayerParts"), index("NpcParts"), index("NpcAttacks")
+    # 부위나 공격이 있는 NPC = 싸울 수 있는 NPC (맵의 적·대화 전투 선택지 대상)
+    fighters = {r["npc_id"] for r in d["NpcParts"]} | {r["npc_id"] for r in d["NpcAttacks"]}
+    enemies = {k: v for k, v in npcs.items() if k in fighters}
+    d["_enemy_ids"] = set(enemies)
     spots = {r["spot_id"] for r in d["Loot"] if r["spot_id"]}
     choices_by_node = {}
     for c in d["Choices"]:
@@ -414,22 +429,26 @@ def validate(d, rep):
     for key, r in config.items():
         if r["value"] == "":
             rep.err(f"Config {r['_row']}행", f"{key} 값이 비어 있음")
-    if "protagonist_id" in config and config["protagonist_id"]["value"] not in chars:
-        rep.err("Config", f"protagonist_id 는 Characters 의 char_id: '{config['protagonist_id']['value']}'")
+    if "protagonist_id" in config and config["protagonist_id"]["value"] not in players:
+        rep.err("Config", f"protagonist_id 는 Player 시트의 player_id: '{config['protagonist_id']['value']}'")
 
-    # Characters
-    for c in d["Characters"]:
-        if c["name_color"] and not COLOR_RE.match(c["name_color"]):
-            rep.err(f"Characters {c['_row']}행", f"name_color 는 #RRGGBB 형식: '{c['name_color']}'")
-        for t in split_list(c["traits"]):
-            if not ID_RE.match(t):
-                rep.err(f"Characters {c['_row']}행", f"능력 이름 '{t}' 에는 영문·숫자·_ 만")
-        for a in split_list(c["abilities"]):
-            m = ABIL_VALUE_RE.match(a)
-            if not m:
-                rep.err(f"Characters {c['_row']}행", f"abilities 는 '능력치=숫자' 형식: '{a}'")
-            elif m.group(1) not in abils:
-                rep.err(f"Characters {c['_row']}행", f"없는 ability_id '{m.group(1)}'")
+    # 능력치: Abilities 시트는 Player·Npcs 의 능력치 열과 같은 6개 (이름만 바꿀 수 있음)
+    if set(abils) != set(ABILITY_COLS):
+        rep.err("Abilities", f"ability_id 는 {', '.join(ABILITY_COLS)} 6개 (Player·Npcs 의 열 이름과 같아야 함)")
+    # Player·Npcs
+    for sheet in ("Player", "Npcs"):
+        for c in d[sheet]:
+            w = loc(sheet, c)
+            if c["name_color"] and not COLOR_RE.match(c["name_color"]):
+                rep.err(w, f"name_color 는 #RRGGBB 형식: '{c['name_color']}'")
+            for t in split_list(c["traits"]):
+                if not ID_RE.match(t):
+                    rep.err(w, f"능력 이름 '{t}' 에는 영문·숫자·_ 만")
+            if (c["walk_speed"] or 0) < 0 or (c["run_speed"] or 0) < 0:
+                rep.err(w, "walk_speed·run_speed 는 0 이상 (칸/초)")
+    for c in d["Player"]:
+        if c["walk_speed"] is not None and c["walk_speed"] <= 0:
+            rep.err(loc("Player", c), "walk_speed(걷기 속도)는 0보다 커야 함")
 
     # Items
     for it in d["Items"]:
@@ -501,8 +520,8 @@ def validate(d, rep):
     for ep in d["Episodes"]:
         eid = ep["episode_id"]
         w = f"Episodes {ep['_row']}행 ({eid})"
-        if ep["protagonist_id"] not in chars:
-            rep.err(w, f"없는 char_id '{ep['protagonist_id']}'")
+        if ep["protagonist_id"] not in players:
+            rep.err(w, f"protagonist_id 는 Player 시트의 player_id: '{ep['protagonist_id']}'")
         for col in ("start_node", "timeout_node"):
             if not ep[col]:
                 rep.err(w, f"{col} 가 비어 있음")
@@ -580,7 +599,7 @@ def validate(d, rep):
             if ep != "":
                 rep.err(w, "combat 선택지는 필드 대화(episode_id 가 빈 노드)에서만")
             if c["check"] not in enemies:
-                rep.err(w, f"combat 선택지의 check 는 Enemies 의 enemy_id: '{c['check']}'")
+                rep.err(w, f"combat 선택지의 check 는 싸울 수 있는 NPC(NpcParts·NpcAttacks 가 있는 npc_id): '{c['check']}'")
             for col in ("dc", "mod"):
                 if c[col]:
                     rep.err(w, f"{col} 은 dice 선택지에서만 쓸 수 있음 (type='combat')")
@@ -675,16 +694,16 @@ def validate_combat(d, rep, pparts, enemies, eparts):
             rep.err(w, f"key 는 W/A/S/D: '{p['key']}'")
         if p["hp"] is not None and p["hp"] < 1:
             rep.err(w, "hp 는 1 이상")
-    for p in d["EnemyParts"]:
-        w = f"EnemyParts {p['_row']}행 ({p['enemy_id']}.{p['part_id']})"
-        if p["enemy_id"] not in enemies:
-            rep.err(w, f"없는 enemy_id '{p['enemy_id']}'")
+    for p in d["NpcParts"]:
+        w = f"NpcParts {p['_row']}행 ({p['npc_id']}.{p['part_id']})"
+        if p["npc_id"] not in enemies:
+            rep.err(w, f"Npcs 시트에 없는 npc_id '{p['npc_id']}'")
         if p["hp"] is not None and p["hp"] < 1:
             rep.err(w, "hp 는 1 이상")
         if p["hit_chance"] is not None and not (0 <= p["hit_chance"] <= 100):
             rep.err(w, "hit_chance 는 0~100 (%)")
-    for e in d["Enemies"]:
-        w = f"Enemies {e['_row']}행 ({e['enemy_id']})"
+    for e in enemies.values():
+        w = f"Npcs {e['_row']}행 ({e['npc_id']})"
         if e["flee_chance"]:
             try:
                 if not (0 <= float(e["flee_chance"]) <= 100):
@@ -696,17 +715,17 @@ def validate_combat(d, rep, pparts, enemies, eparts):
                 rep.err(w, f"image 는 res:// 경로: '{e['image']}'")
             elif not (ROOT / e["image"][len("res://"):]).is_file():
                 rep.err(w, f"image 파일이 없음: '{e['image']}'")
-        own = [p for p in d["EnemyParts"] if p["enemy_id"] == e["enemy_id"]]
+        own = [p for p in d["NpcParts"] if p["npc_id"] == e["npc_id"]]
         if not any(is_true(p["vital"]) for p in own):
-            rep.err(f"Enemies {e['_row']}행 ({e['enemy_id']})", "vital(파괴 시 사망) 부위가 하나 이상 필요")
-        if not any(a["enemy_id"] == e["enemy_id"] for a in d["EnemyAttacks"]):
-            rep.err(f"Enemies {e['_row']}행 ({e['enemy_id']})", "공격(EnemyAttacks)이 하나도 없음")
-    for a in d["EnemyAttacks"]:
-        w = f"EnemyAttacks {a['_row']}행 ({a['attack_id']})"
-        if a["enemy_id"] not in enemies:
-            rep.err(w, f"없는 enemy_id '{a['enemy_id']}'")
-        if a["part"] and (a["enemy_id"], a["part"]) not in eparts:
-            rep.err(w, f"part '{a['part']}' 는 {a['enemy_id']} 의 EnemyParts 에 없음")
+            rep.err(w, "싸울 수 있는 NPC: NpcParts 에 vital(파괴 시 사망) 부위가 하나 이상 필요")
+        if not any(a["npc_id"] == e["npc_id"] for a in d["NpcAttacks"]):
+            rep.err(w, "싸울 수 있는 NPC: 공격(NpcAttacks)이 하나도 없음")
+    for a in d["NpcAttacks"]:
+        w = f"NpcAttacks {a['_row']}행 ({a['attack_id']})"
+        if a["npc_id"] not in enemies:
+            rep.err(w, f"Npcs 시트에 없는 npc_id '{a['npc_id']}'")
+        if a["part"] and (a["npc_id"], a["part"]) not in eparts:
+            rep.err(w, f"part '{a['part']}' 는 {a['npc_id']} 의 NpcParts 에 없음")
         if a["pattern"] not in ATTACK_PATTERNS:
             rep.err(w, f"pattern 은 normal / quick / combo / feint: '{a['pattern']}'")
             continue
@@ -850,7 +869,10 @@ def validate_field(d, maps, rep, enemies):
             if t not in FIELD_TYPES:
                 rep.err(w, f"type 은 enemy / investigate / npc / camp / exit: '{t}'")
             elif t == "enemy" and ref not in enemies:
-                rep.err(w, f"적 종류(ref)는 Enemies 의 enemy_id: '{ref}'")
+                rep.err(w, f"적 종류(ref)는 싸울 수 있는 NPC(NpcParts·NpcAttacks 가 있는 npc_id): '{ref}'")
+            elif t == "enemy" and not all(n["walk_speed"] > 0 and n["run_speed"] > 0
+                                          for n in d["Npcs"] if n["npc_id"] == ref):
+                rep.err(w, f"맵의 적 '{ref}' 는 Npcs 의 walk_speed(순찰)·run_speed(추격)가 0보다 커야 함")
             elif t == "npc" and (ref not in nodes or nodes[ref]["episode_id"] != ""):
                 rep.err(w, f"NPC 의 대화(ref)는 필드 대화 시작 노드: '{ref}'")
             elif t == "exit" and ref not in maps:
@@ -919,8 +941,10 @@ def export(d, maps):
     def clean(rows):
         return [{k: v for k, v in r.items() if k != "_row"} for r in rows]
 
-    def abil_values(text):
-        return {m.group(1): int(m.group(2)) for m in (ABIL_VALUE_RE.match(a) for a in split_list(text))}
+    def character(r, id_col, is_player):
+        return {"char_id": r[id_col], "name": r["name"], "name_color": r["name_color"], "traits": split_list(r["traits"]),
+                "abilities": {a: r[a] for a in ABILITY_COLS}, "walk_speed": r["walk_speed"], "run_speed": r["run_speed"],
+                "is_player": is_player}
 
     def bonuses(text):
         return [{"ability": m.group(1), "value": int(m.group(2))}
@@ -936,17 +960,21 @@ def export(d, maps):
         "choices": [choice(r) for r in clean(d["Choices"])],
         "items": [dict(r, dice_bonus=bonuses(r["dice_bonus"])) for r in clean(d["Items"])],
         "loot": clean(d["Loot"]),
-        "characters": [dict(r, traits=split_list(r["traits"]), abilities=abil_values(r["abilities"]))
-                       for r in clean(d["Characters"])],
+        # 대화 화자·주인공 능력치: 플레이어 + NPC (char_id = player_id / npc_id)
+        "characters": [character(r, "player_id", True) for r in clean(d["Player"])]
+                      + [character(r, "npc_id", False) for r in clean(d["Npcs"])],
         "abilities": clean(d["Abilities"]),
         "player_parts": [dict(r, key=r["key"].upper(), vital=is_true(r["vital"])) for r in clean(d["PlayerParts"])],
-        "enemies": [dict(e,
-                         flee_chance=float(e["flee_chance"]) if e["flee_chance"] else None,
-                         parts=[dict(p, vital=is_true(p["vital"])) for p in clean(d["EnemyParts"])
-                                if p["enemy_id"] == e["enemy_id"]],
-                         attacks=[dict(a, strikes=parse_strikes(a["pattern"], a["targets"]))
-                                  for a in clean(d["EnemyAttacks"]) if a["enemy_id"] == e["enemy_id"]])
-                    for e in clean(d["Enemies"])],
+        # 싸울 수 있는 NPC (부위·공격이 있는 것). enemy_id = npc_id
+        "enemies": [{"enemy_id": e["npc_id"], "name": e["name"], "image": e["image"],
+                     "flee_chance": float(e["flee_chance"]) if e["flee_chance"] else None,
+                     "walk_speed": e["walk_speed"], "run_speed": e["run_speed"],
+                     "abilities": {a: e[a] for a in ABILITY_COLS},
+                     "parts": [dict(p, vital=is_true(p["vital"])) for p in clean(d["NpcParts"])
+                               if p["npc_id"] == e["npc_id"]],
+                     "attacks": [dict(a, strikes=parse_strikes(a["pattern"], a["targets"]))
+                                 for a in clean(d["NpcAttacks"]) if a["npc_id"] == e["npc_id"]]}
+                    for e in clean(d["Npcs"]) if e["npc_id"] in d["_enemy_ids"]],
         "maps": export_maps(d, maps),
         "survival": clean(d["Survival"]),
         "camp_actions": clean(d["CampActions"]),
@@ -1004,7 +1032,7 @@ def _run(path, say):
     data["_maps"] = maps
     data["FieldObjects"] = field_objects(maps)
     validate(data, rep)
-    validate_field(data, maps, rep, {e["enemy_id"] for e in data["Enemies"]})
+    validate_field(data, maps, rep, data.get("_enemy_ids", set()))
     if rep.errors:
         say(f"오류 {len(rep.errors)}개 — JSON을 쓰지 않았습니다.")
         for e in rep.errors:

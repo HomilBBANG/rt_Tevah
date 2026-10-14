@@ -17,7 +17,7 @@
   "stack_max": 1,
   "dice_bonus": [
    {
-    "ability": "stat_a",
+    "ability": "strength",
     "value": 1
    }
   ]

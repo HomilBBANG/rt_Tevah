@@ -152,7 +152,10 @@ func _build_actors() -> void:
 	player.set_script(PlayerScript)
 	player.field = self
 	player.radius = tile * 0.3
-	player.speed = cfg.call("field_player_speed", 4)
+	# 이동 속도는 주인공(Player 시트)의 walk_speed·run_speed (칸/초)
+	var me: Dictionary = DataLoader.characters.get(GameState.protagonist_id, {})
+	player.speed = float(me.get("walk_speed", 4)) * tile
+	player.run_speed = float(me.get("run_speed", me.get("walk_speed", 4))) * tile
 	player.collision_layer = ACTOR_LAYER
 	player.collision_mask = WALL_LAYER | NPC_LAYER | DOOR_LAYER
 	# 새 회차는 맵 한복판(S)에서 깨어나고, 그 밖에는 P(출구로 들어온 곳·베이스캠프에서 깨어나는 곳)
@@ -188,8 +191,10 @@ func _build_actors() -> void:
 				e.field = self
 				e.data = o
 				e.radius = tile * 0.32
-				e.patrol_speed = cfg.call("field_enemy_speed", 2)
-				e.chase_speed = cfg.call("field_enemy_chase_speed", 3.2)
+				# 순찰 = 걷기, 추격 = 달리기 (Npcs 시트의 walk_speed·run_speed, 칸/초)
+				var npc: Dictionary = DataLoader.enemies.get(o.ref, {})
+				e.patrol_speed = float(npc.get("walk_speed", 2)) * tile
+				e.chase_speed = float(npc.get("run_speed", 3.2)) * tile
 				e.sight = cfg.call("field_enemy_sight", 5)
 				e.lose_sight = cfg.call("field_enemy_lose_sight", 8)
 				e.collision_layer = 0

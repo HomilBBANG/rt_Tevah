@@ -1,10 +1,10 @@
 extends RefCounted
 ## 조건·효과 문법 파서. tools/xlsx_to_json.py 의 검사기와 같은 문법 — 한쪽을 바꾸면 다른 쪽도 맞출 것.
 ##
-## 조건: has:id, has:id>=2, flag:x, wflag:x, stat:hp>=30, abil:stat_a>=3, surv:hunger<30, trait:x,
+## 조건: has:id, has:id>=2, flag:x, wflag:x, stat:hp>=30, abil:strength>=3, surv:hunger<30, trait:x,
 ##       cut:left_arm / cut:any (팔다리 절단), count:death>=1 / count:run>=2 (월드 기록) / 연산자 ! & | ( )  (우선순위 ! > & > |)
 ## 효과(; 구분): item:+id, item:-id, item:+id*2, stat:hp-10 / +10 / =10, setflag:x, clearflag:x,
-##              setwflag:x, loot:spot, goto:node, abil:stat_a+1 / -1 / =3, surv:hunger+40, save,
+##              setwflag:x, loot:spot, goto:node, abil:strength+1 / -1 / =3, surv:hunger+40, save,
 ##              restore:left_arm / restore:all (잘린 팔다리 복구, §10 거래)
 ##
 ## 문법 오류는 크래시하지 않는다: push_error 로 남기고 조건은 false, 효과는 그 항목만 건너뛴다.

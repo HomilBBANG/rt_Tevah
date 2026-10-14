@@ -2,38 +2,52 @@
  {
   "enemy_id": "enemy_test",
   "name": "적 A (테스트)",
-  "flee_chance": 50.0,
   "image": "",
+  "flee_chance": 50.0,
+  "walk_speed": 2.0,
+  "run_speed": 3.2,
+  "abilities": {
+   "strength": 0,
+   "endurance": 0,
+   "intelligence": 0,
+   "health": 0,
+   "mental": 0,
+   "divinity": 0
+  },
   "parts": [
    {
-    "enemy_id": "enemy_test",
+    "npc_id": "enemy_test",
     "part_id": "head",
     "name": "머리",
     "hp": 10,
+    "attack": 12,
     "hit_chance": 50.0,
     "vital": true
    },
    {
-    "enemy_id": "enemy_test",
+    "npc_id": "enemy_test",
     "part_id": "torso",
     "name": "몸통",
     "hp": 30,
+    "attack": 0,
     "hit_chance": 90.0,
     "vital": true
    },
    {
-    "enemy_id": "enemy_test",
+    "npc_id": "enemy_test",
     "part_id": "left_arm",
     "name": "왼팔",
     "hp": 15,
+    "attack": 8,
     "hit_chance": 70.0,
     "vital": false
    },
    {
-    "enemy_id": "enemy_test",
+    "npc_id": "enemy_test",
     "part_id": "right_arm",
     "name": "오른팔",
     "hp": 15,
+    "attack": 10,
     "hit_chance": 70.0,
     "vital": false
    }
@@ -41,7 +55,7 @@
   "attacks": [
    {
     "attack_id": "atk_normal",
-    "enemy_id": "enemy_test",
+    "npc_id": "enemy_test",
     "name": "일반 공격 (테스트)",
     "part": "right_arm",
     "pattern": "normal",
@@ -58,7 +72,7 @@
    },
    {
     "attack_id": "atk_quick",
-    "enemy_id": "enemy_test",
+    "npc_id": "enemy_test",
     "name": "속공 (테스트)",
     "part": "left_arm",
     "pattern": "quick",
@@ -75,7 +89,7 @@
    },
    {
     "attack_id": "atk_combo",
-    "enemy_id": "enemy_test",
+    "npc_id": "enemy_test",
     "name": "연속 공격 (테스트)",
     "part": "right_arm",
     "pattern": "combo",
@@ -96,7 +110,7 @@
    },
    {
     "attack_id": "atk_feint",
-    "enemy_id": "enemy_test",
+    "npc_id": "enemy_test",
     "name": "기만 공격 (테스트)",
     "part": "head",
     "pattern": "feint",

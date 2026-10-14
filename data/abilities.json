@@ -1,10 +1,26 @@
 [
  {
-  "ability_id": "stat_a",
-  "name": "능력치 A"
+  "ability_id": "strength",
+  "name": "근력"
  },
  {
-  "ability_id": "stat_b",
-  "name": "능력치 B"
+  "ability_id": "endurance",
+  "name": "지구력"
+ },
+ {
+  "ability_id": "intelligence",
+  "name": "지능"
+ },
+ {
+  "ability_id": "health",
+  "name": "건강"
+ },
+ {
+  "ability_id": "mental",
+  "name": "정신력"
+ },
+ {
+  "ability_id": "divinity",
+  "name": "신성력"
  }
 ]

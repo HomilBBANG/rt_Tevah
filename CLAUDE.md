@@ -49,7 +49,8 @@ tools/
 | Choices | choice_id, node_id, text, condition, show_mode, cost, effects, next_node |
 | Items | item_id, name, type, description, use_effects, stack_max |
 | Loot | loot_id, spot_id, item_id, amount, chance, time_cost |
-| Characters | char_id, name, traits |
+| Player | player_id, name, name_color, traits, walk_speed, run_speed, 능력치 6개 (주인공) |
+| Npcs | npc_id, name, name_color, traits, image, flee_chance, walk_speed, run_speed, 능력치 6개 (모든 NPC·적) |
 | Endings | ending_id, episode_id, world_flags_set |
 
 - 노드에 선택지가 없으면 `next_node`로 진행. `next_node`가 `END:<ending_id>`면 엔딩.
@@ -108,7 +109,7 @@ tools/
 - `dice` 판정: **d20 + 보정치 ≥ dc** 이면 성공. 성공 확률 = `(21 − (dc − 보정치)) / 20` 을 선택지에 표시.
   - 성공 → `effects`·`next_node`, 실패 → `fail_effects`·`fail_next`
 - 보정치 = 능력치 + 소지 아이템 `dice_bonus` + 선택지 `mod`(상황 보정)
-  - 능력치: `Abilities` 시트(ability_id, name), 캐릭터별 기본값 `Characters.abilities` (`stat_a=3, stat_b=1`)
+  - 능력치 6개 (확정): strength 근력 / endurance 지구력 / intelligence 지능 / health 건강 / mental 정신력 / divinity 신성력(스킬용). `Abilities` 시트는 이름만, 값은 `Player`·`Npcs` 시트의 같은 이름 열
   - 육성: 효과 `abil:stat_a+1` (에피소드 안에서 유지), 조건 `abil:stat_a>=3`
   - 아이템: `Items.dice_bonus` (`stat_a+2` 또는 `all+1`), 소지 중이면 개수와 무관하게 1번 적용
 - 추가 열·시트는 모두 선택(없어도 변환됨). 변환기가 check/dc/실패 출구 누락과 없는 ability_id 를 오류로 잡는다.
@@ -118,7 +119,12 @@ tools/
 ## 전투 프로토타입 (진행 중, 기획서 §7–9)
 범위: 부위 선택 공격, 적 공격 전조, WASD 방향+타이밍 회피, 부위 파괴·사지 절단. 아트 없이 도형·텍스트 placeholder.
 - 전투 로직은 `core/combat/` (UI 없이 테스트 가능), 화면은 `scenes/combat.tscn`. 타이틀의 "전투 테스트"로 진입.
-- 데이터: 엑셀 `PlayerParts`, `Enemies`(flee_chance, image), `EnemyParts`, `EnemyAttacks` 시트 + Config 의 `combat_*` 키.
+- 데이터: 엑셀 `PlayerParts`(hp, attack), `Npcs`(flee_chance, image), `NpcParts`(hp, attack, hit_chance), `NpcAttacks` 시트 + Config 의 `combat_*` 키.
+  - **플레이어·NPC 시트 분리** (2026-10-14): NPC 와도 싸울 수 있어서 적은 따로 없고 `Npcs` 에 모두 둔다. `NpcParts`·`NpcAttacks` 가 있는 NPC = 싸울 수 있음 (변환 결과 `data/enemies.json`, enemy_id = npc_id). 대화 화자 = Player + Npcs (`data/characters.json`).
+  - 부위별 공격력(`attack`)은 값만 저장 — TODO(기획): 피해 공식. 지금 플레이어 피해는 Config `combat_player_damage`, NPC 피해는 `NpcAttacks.damage`.
+  - 이동 속도(칸/초): 플레이어 `walk_speed`, Shift(패드 L1, 액션 `run`) 누르는 동안 `run_speed`. 맵의 적은 순찰 = walk, 추격 = run.
+  - 행동 버튼: 공격 / **특수** / 아이템 / 도주. 특수 = 스킬·무기 던지기 등 — TODO(기획): 데이터가 없어 지금은 '없다' 안내만. 신성력은 스킬용(아직 안 쓰임).
+  - 텍스트 창 배경 불투명도 30%.
 - 회피 키: 머리 W / 왼팔·왼다리 A / 몸통 S / 오른팔·오른다리 D. 판정 완벽·일반·실패(기획서 §8.3).
 - **화면 배치** (사용자 시안): 왼쪽 위 적 이름(밑줄) / 가운데 적 그림(Enemies.image, 비우면 실루엣 `ui/enemy_figure.gd`) / 왼쪽 아래 '내 상태' 사람 모양(`body_diagram.figure`) / 가운데 아래 텍스트 창(시스템 메시지 + 공격할 부위 같은 세부 선택지) / 그 오른쪽 행동 버튼 **공격·아이템·도주** (방어 버튼은 시안에 없어 뺐다, 규칙 코드는 남아 있음).
 - 아이템: 인벤토리를 열어 소모품 사용 (`StoryRunner.use_item_in_combat`, 효과가 전투 중 몸 상태에 바로 적용). Config `combat_item_uses_turn`(1 = 턴 씀). TODO(기획): 장비 착용 — 장비 시스템 없음.
