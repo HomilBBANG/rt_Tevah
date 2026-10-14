@@ -148,6 +148,22 @@ func _ready() -> void:
 		"치명 부위만 회복, 잘린 왼팔은 그대로")
 	check(SaveManager.has_run_save() and GameState.death_count == deaths + 1 and GameState.run_count == runs,
 		"저장 유지, 사망 횟수 +1, 회차는 그대로")
+	check(Expr.evaluate("count:death>=%d & count:run==%d" % [deaths + 1, runs], GameState), "조건 count:death·count:run")
+
+	# ---------- 사지 복구 거래 (§10): 조건 cut:, 대가는 즉시 지불, 효과 restore:
+	check(Expr.evaluate("cut:left_arm & cut:any & !cut:right_arm", GameState), "조건 cut: (잘린 왼팔)")
+	messages.clear()
+	await StoryRunner.run_effects("item:-water;restore:left_arm")
+	check(not GameState.player_body.left_arm.broken and GameState.player_body.left_arm.hp == GameState.player_body.left_arm.max_hp
+		and GameState.item_count("water") == 0, "대가(물) 지불 + 왼팔 복구")
+	check(messages.has("%s 이(가) 돌아왔다." % GameState.player_body.left_arm.name), "복구 메시지: %s" % [messages])
+	check(not Expr.evaluate("cut:any", GameState), "복구 후 잘린 곳 없음")
+	GameState.player_body.left_leg.broken = true
+	GameState.player_body.right_leg.broken = true
+	GameState.player_body.left_leg.hp = 0
+	GameState.player_body.right_leg.hp = 0
+	check(GameState.restore_limb("all").size() == 2 and not GameState.is_severed("any"), "restore:all → 두 다리 모두")
+	check(GameState.restore_limb("head").is_empty(), "치명 부위는 restore 대상 아님")
 
 	# ---------- 사망 → 저장 삭제, 회차 수 유지
 	SaveManager.end_run()

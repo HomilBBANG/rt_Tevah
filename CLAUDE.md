@@ -141,7 +141,8 @@ tools/
   - **새 회차** `SaveManager.begin_run()`: `run_count`+1, Config `start_map`(test_field) 의 **S(맵 한복판)** 에서 깨어남. 게임 첫 시작도 같다.
   - **사망** (§11): 엑셀 `Revivals` 에서 condition 이 참인 첫 행이 있으면 **부활** — effects 적용(아이템 소모 등), text 표시, `revive_run()`: 소지품·시간·생존·부상·플래그 모두 유지한 채 **베이스캠프 P** 에서 깨어남, 저장 유지. 맞는 행이 없으면 `end_run()`: **게임 처음부터**.
     - TODO(기획 확인): 부활 시 치명 부위(머리·몸통)만 최대 HP로 회복, 잘린 팔다리는 유지(§9 거래로만 복구).
-    - 월드 `death_count`: 부활 포함 모든 사망 횟수 (초월적 존재의 반복 부활 인식용, 아직 조건 문법에는 없음).
+    - 월드 `death_count`: 부활 포함 모든 사망 횟수 (초월적 존재의 반복 부활 인식용). 조건 `count:death>=1`, `count:run>=2` (run_count).
+  - **사지 복구 거래** (§9, §10): 조건 `cut:left_arm` / `cut:any` (vital 아닌 부위가 잘렸나), 효과 `restore:left_arm` / `restore:all` (최대 HP로 복구). 대가는 같은 선택지 effects 에 함께 적어 즉시 지불 (`item:-relic;restore:left_arm`). 거래는 초월체 필드 대화의 선택지로 만든다. TODO(기획 §10): 존재별 거래 조건·대가 종류.
   - **영구 능력치 강화는 없다** (확정).
   - **저장 슬롯 여러 개** (Config `save_slots`=5, 파일 `user://saves/run_<n>.json`). 잠에서 깨거나 효과 `save`(고양이) 때 슬롯 선택 창(`ui/save_slot_picker.gd`)이 뜬다. 이미 쓴 슬롯은 두 번 눌러야 덮어씀, "저장하지 않기" 가능. 타이틀 '이어하기'도 슬롯을 골라 불러온다. 예전 `run.json` 은 슬롯 1로 자동 이동. 효과 save 는 `StoryRunner.save_slot_requested` 로 화면에 슬롯을 물어본다 (테스트는 `save_slot_override`).
   - **사망해도 저장 슬롯은 지우지 않는다** (기획 변경, 기획서 §13 '죽음 취소 불가'와 다름). 새 회차에서 저장하면 덮어쓴다. 그래서 타이틀 '이어하기'로 죽기 전 저장을 불러올 수 있다.

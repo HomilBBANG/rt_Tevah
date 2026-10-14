@@ -1,9 +1,10 @@
 extends Node
 ## 게임 상태: 스탯·인벤토리·에피소드 플래그(에피소드마다 초기화)와 월드 플래그(영구).
 ## 조건 해석기(core/expr.gd)의 컨텍스트 역할도 한다:
-## item_count / get_stat / get_ability / has_flag / has_wflag / has_trait.
+## item_count / get_stat / get_ability / has_flag / has_wflag / has_trait / is_severed / get_count.
 
 signal stats_changed
+signal body_changed
 signal inventory_changed
 signal flags_changed
 signal survival_changed
@@ -303,6 +304,37 @@ func set_wflag(name: String) -> void:
 
 func has_trait(name: String) -> bool:
 	return name in traits
+
+
+## 조건 count:run / count:death (월드 기록)
+func get_count(name: String) -> int:
+	match name:
+		"run": return run_count
+		"death": return death_count
+	return 0
+
+
+# ---------------------------------------------------------------- 사지 절단·복구 (§9, §10)
+## 조건 cut:part_id / cut:any — 잘린(파괴된 비치명) 팔다리
+func is_severed(part_id: String) -> bool:
+	for p in player_body.values():
+		if p.broken and not p.vital and (part_id == "any" or p.part_id == part_id):
+			return true
+	return false
+
+
+## 효과 restore:part_id / restore:all — 잘린 팔다리를 최대 HP로 되돌린다 (초월체 거래, §10).
+## 복구한 부위 이름 목록을 돌려준다 (잘려 있지 않으면 아무 일 없음).
+func restore_limb(part_id: String) -> Array:
+	var restored := []
+	for p in player_body.values():
+		if p.broken and not p.vital and (part_id == "all" or p.part_id == part_id):
+			p.hp = p.max_hp
+			p.broken = false
+			restored.append(p.name)
+	if not restored.is_empty():
+		body_changed.emit()
+	return restored
 
 
 # ---------------------------------------------------------------- 직렬화

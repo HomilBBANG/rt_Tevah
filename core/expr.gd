@@ -1,16 +1,20 @@
 extends RefCounted
 ## 조건·효과 문법 파서. tools/xlsx_to_json.py 의 검사기와 같은 문법 — 한쪽을 바꾸면 다른 쪽도 맞출 것.
 ##
-## 조건: has:id, has:id>=2, flag:x, wflag:x, stat:hp>=30, abil:stat_a>=3, surv:hunger<30, trait:x / 연산자 ! & | ( )  (우선순위 ! > & > |)
+## 조건: has:id, has:id>=2, flag:x, wflag:x, stat:hp>=30, abil:stat_a>=3, surv:hunger<30, trait:x,
+##       cut:left_arm / cut:any (팔다리 절단), count:death>=1 / count:run>=2 (월드 기록) / 연산자 ! & | ( )  (우선순위 ! > & > |)
 ## 효과(; 구분): item:+id, item:-id, item:+id*2, stat:hp-10 / +10 / =10, setflag:x, clearflag:x,
-##              setwflag:x, loot:spot, goto:node, abil:stat_a+1 / -1 / =3, surv:hunger+40, save
+##              setwflag:x, loot:spot, goto:node, abil:stat_a+1 / -1 / =3, surv:hunger+40, save,
+##              restore:left_arm / restore:all (잘린 팔다리 복구, §10 거래)
 ##
 ## 문법 오류는 크래시하지 않는다: push_error 로 남기고 조건은 false, 효과는 그 항목만 건너뛴다.
 ##
 ## 컨텍스트(ctx)는 다음 메서드를 가진 객체: item_count(id)->int, get_stat(name)->int,
-## get_ability(id)->int, get_survival(id)->float, has_flag(name)->bool, has_wflag(name)->bool, has_trait(name)->bool
+## get_ability(id)->int, get_survival(id)->float, has_flag(name)->bool, has_wflag(name)->bool, has_trait(name)->bool,
+## is_severed(part_id 또는 "any")->bool, get_count(name)->int
 
 const STATS := ["hp", "sanity", "time"]
+const COUNTS := ["run", "death"]   # count: 조건 (월드 run_count·death_count)
 
 ## 테스트용: 지금까지 기록된 오류 메시지
 static var errors: PackedStringArray = []
@@ -84,12 +88,12 @@ static func parse_effects(text: String) -> Array:
 static func _init_regex() -> void:
 	if _atom_re != null:
 		return
-	_atom_re = RegEx.create_from_string("^(has|flag|wflag|stat|trait|abil|surv):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\\d+(?:\\.\\d+)?))?")
+	_atom_re = RegEx.create_from_string("^(has|flag|wflag|stat|trait|abil|surv|cut|count):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\\d+(?:\\.\\d+)?))?")
 	_item_re = RegEx.create_from_string("^item:([+-])([A-Za-z0-9_]+)(?:\\*(\\d+))?$")
 	_stat_re = RegEx.create_from_string("^stat:([A-Za-z0-9_]+)([+\\-=])(\\d+)$")
 	_abil_re = RegEx.create_from_string("^abil:([A-Za-z0-9_]+)([+\\-=])(\\d+)$")
 	_surv_re = RegEx.create_from_string("^surv:([A-Za-z0-9_]+)([+\\-=])(\\d+)$")
-	_simple_re = RegEx.create_from_string("^(setflag|clearflag|setwflag|loot|goto):([A-Za-z0-9_]+)$")
+	_simple_re = RegEx.create_from_string("^(setflag|clearflag|setwflag|loot|goto|restore):([A-Za-z0-9_]+)$")
 
 
 static func _err(msg: String) -> void:
@@ -143,10 +147,17 @@ static func _tokenize(expr: String) -> Variant:
 				if atom.op == "":
 					_err("조건 '%s': stat 조건에는 비교식이 필요" % expr)
 					return null
+			elif atom.kind == "count":
+				if not atom.id in COUNTS:
+					_err("조건 '%s': 알 수 없는 기록 '%s' (가능: run, death)" % [expr, atom.id])
+					return null
+				if atom.op == "":
+					_err("조건 '%s': count 조건에는 비교식이 필요" % expr)
+					return null
 			elif (atom.kind == "abil" or atom.kind == "surv") and atom.op == "":
 				_err("조건 '%s': %s 조건에는 비교식이 필요" % [expr, atom.kind])
 				return null
-			elif not atom.kind in ["has", "abil", "surv"] and atom.op != "":
+			elif not atom.kind in ["has", "abil", "surv", "count"] and atom.op != "":
 				_err("조건 '%s': %s 에는 비교식을 쓸 수 없음" % [expr, atom.kind])
 				return null
 			tokens.append(atom)
@@ -215,6 +226,8 @@ static func _eval(n: Dictionary, ctx: Object) -> bool:
 		"stat": return _compare(ctx.get_stat(a.id), a.op, a.num)
 		"abil": return _compare(ctx.get_ability(a.id), a.op, a.num)
 		"surv": return _compare(ctx.get_survival(a.id), a.op, a.num)
+		"cut": return ctx.is_severed(a.id)
+		"count": return _compare(ctx.get_count(a.id), a.op, a.num)
 	return false
 
 

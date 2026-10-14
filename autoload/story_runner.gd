@@ -335,6 +335,12 @@ func _apply_effects(effects: Array) -> String:
 				redirect = e.id
 			"save":
 				await _save_run()
+			"restore":
+				var restored := GameState.restore_limb(e.id)
+				if restored.is_empty():
+					push_warning("[StoryRunner] restore:%s — 잘린 부위가 없음" % e.id)
+				else:
+					message.emit("%s 이(가) 돌아왔다." % ", ".join(restored))
 	return redirect
 
 

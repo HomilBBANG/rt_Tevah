@@ -21,6 +21,8 @@ class FakeCtx:
 	func has_flag(name: String) -> bool: return name in flags
 	func has_wflag(name: String) -> bool: return name in wflags
 	func has_trait(name: String) -> bool: return name in traits
+	func is_severed(part_id: String) -> bool: return part_id in ["left_arm", "any"]
+	func get_count(name: String) -> int: return {"run": 3, "death": 2}.get(name, 0)
 
 
 var _fail := 0
@@ -54,6 +56,15 @@ func _ready() -> void:
 	cond(ctx, "surv:hunger<30", true)
 	cond(ctx, "surv:hunger>=26", false)
 	cond_err(ctx, "surv:hunger")
+	cond(ctx, "cut:left_arm", true)
+	cond(ctx, "cut:right_leg", false)
+	cond(ctx, "cut:any & !cut:right_leg", true)
+	cond_err(ctx, "cut:left_arm>=1")
+	cond(ctx, "count:death>=2", true)
+	cond(ctx, "count:run==3", true)
+	cond(ctx, "count:death>2", false)
+	cond_err(ctx, "count:death")
+	cond_err(ctx, "count:kills>1")
 	# --- 조건: 연산자
 	cond(ctx, "!has:rope", true)
 	cond(ctx, "!!has:rope", false)
@@ -101,6 +112,9 @@ func _ready() -> void:
 		{"type": "surv", "param": "sleep", "op": "=", "value": 10}], 0)
 	eff("save;setflag:x", [{"type": "save"}, {"type": "setflag", "id": "x"}], 0)
 	eff("save:now", [], 1)
+	eff("restore:left_arm;item:-gold", [{"type": "restore", "id": "left_arm"}, {"type": "item", "id": "gold", "amount": -1}], 0)
+	eff("restore:all", [{"type": "restore", "id": "all"}], 0)
+	eff("restore:", [], 1)
 	eff("", [], 0)
 	eff(";;", [], 0)
 	eff("item:+", [], 1)

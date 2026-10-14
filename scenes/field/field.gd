@@ -70,6 +70,7 @@ func _ready() -> void:
 	GameState.clock_changed.connect(_update_hud)
 	GameState.clock_changed.connect(_refresh_presence)
 	GameState.inventory_changed.connect(_update_hud)
+	GameState.body_changed.connect(_update_hud)
 	%TitleButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
 	%InventoryButton.pressed.connect(_open_inventory)
 	%NewRunButton.pressed.connect(_new_run)

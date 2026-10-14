@@ -101,7 +101,8 @@ class Report:
 
 # ---------------------------------------------------------------- 조건·효과 문법
 # 런타임 파서(core/expr.gd)와 같은 문법. 한쪽을 바꾸면 다른 쪽도 맞춰야 한다.
-ATOM_RE = re.compile(r"(has|flag|wflag|stat|trait|abil|surv):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\d+(?:\.\d+)?))?")
+COUNTS = {"run", "death"}   # count: 조건 (월드 run_count·death_count)
+ATOM_RE = re.compile(r"(has|flag|wflag|stat|trait|abil|surv|cut|count):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\d+(?:\.\d+)?))?")
 
 
 class ExprError(Exception):
@@ -129,11 +130,16 @@ def parse_condition(text):
                     raise ExprError(f"알 수 없는 스탯 '{ident}' (가능: {', '.join(sorted(STATS))})")
                 if not op:
                     raise ExprError(f"'{m.group(0)}': stat 조건에는 비교식이 필요 (예: stat:hp>=10)")
+            elif kind == "count":
+                if ident not in COUNTS:
+                    raise ExprError(f"알 수 없는 기록 '{ident}' (가능: run, death)")
+                if not op:
+                    raise ExprError(f"'{m.group(0)}': count 조건에는 비교식이 필요 (예: count:death>=1)")
             elif kind == "surv" and not op:
                 raise ExprError(f"'{m.group(0)}': surv 조건에는 비교식이 필요 (예: surv:hunger<30)")
             elif kind == "abil" and not op:
                 raise ExprError(f"'{m.group(0)}': abil 조건에는 비교식이 필요 (예: abil:stat_a>=3)")
-            elif kind in ("flag", "wflag", "trait") and op:
+            elif kind in ("flag", "wflag", "trait", "cut") and op:
                 raise ExprError(f"'{m.group(0)}': {kind} 조건에는 비교식을 쓸 수 없음")
             tokens.append((kind, ident))
             i = m.end()
@@ -190,7 +196,7 @@ EFFECT_RES = [
     ("stat", re.compile(r"^stat:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
     ("abil", re.compile(r"^abil:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
     ("surv", re.compile(r"^surv:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
-    ("simple", re.compile(r"^(setflag|clearflag|setwflag|loot|goto):([A-Za-z0-9_]+)$")),
+    ("simple", re.compile(r"^(setflag|clearflag|setwflag|loot|goto|restore):([A-Za-z0-9_]+)$")),
     ("save", re.compile(r"^save$")),   # 회차 저장 (베이스캠프 안에서만 동작)
 ]
 
@@ -329,6 +335,8 @@ def validate(d, rep):
                 rep.err(where, f"없는 ability_id '{rid}' (Abilities 시트)")
             elif kind == "surv" and rid not in survs:
                 rep.err(where, f"없는 생존 파라미터 '{rid}' (Survival 시트)")
+            elif kind == "restore":
+                check_limb(where, rid, "all")
             elif kind == "loot" and rid not in spots:
                 rep.err(where, f"없는 spot_id '{rid}' (Loot 시트)")
             elif kind == "goto":
@@ -354,6 +362,15 @@ def validate(d, rep):
         elif episode is not None and nodes[target]["episode_id"] != episode:
             rep.err(where, f"노드 '{target}' 는 {_scope(nodes[target]['episode_id'])} 소속 (여기는 {_scope(episode)})")
 
+    def check_limb(where, part_id, wildcard):
+        """cut:/restore: 의 대상은 PlayerParts 의 vital 이 아닌 부위 (또는 any / all)"""
+        if part_id == wildcard:
+            return
+        if part_id not in pparts:
+            rep.err(where, f"없는 PlayerParts part_id '{part_id}' (팔다리 또는 '{wildcard}')")
+        elif is_true(pparts[part_id]["vital"]):
+            rep.err(where, f"'{part_id}' 는 치명 부위라 절단·복구 대상이 아님")
+
     def check_cond(where, text):
         if not text:
             return
@@ -363,6 +380,8 @@ def validate(d, rep):
                     rep.err(where, f"조건의 없는 item_id '{rid}'")
                 elif kind == "abil" and rid not in abils:
                     rep.err(where, f"조건의 없는 ability_id '{rid}'")
+                elif kind == "cut":
+                    check_limb(where, rid, "any")
                 elif kind == "surv" and rid not in survs:
                     rep.err(where, f"조건의 없는 생존 파라미터 '{rid}'")
         except ExprError as e:
