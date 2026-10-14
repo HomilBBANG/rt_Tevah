@@ -255,6 +255,7 @@ EFFECT_RES = [
     ("simple", re.compile(r"^(setflag|clearflag|setwflag|loot|goto|restore):([A-Za-z0-9_]+)$")),
     ("save", re.compile(r"^save$")),   # 회차 저장 (베이스캠프 안에서만 동작)
     ("status", re.compile(r"^status:([+-])([A-Za-z0-9_]+)$")),   # 상태이상 걸기·풀기
+    ("trait_fx", re.compile(r"^trait:([+-])([A-Za-z0-9_]+)$")),   # 특성 얻기·잃기 (사건·거래)
     ("move", re.compile(r"^move:([A-Za-z0-9_]+)(?:@([A-Za-z0-9_]+))?$")),   # 맵 이동 (도착 지점)
 ]
 
@@ -283,6 +284,8 @@ def parse_effects(text):
                 pass
             elif kind == "status":
                 refs.append(("status", m.group(2)))
+            elif kind == "trait_fx":
+                refs.append(("trait_fx", m.group(2)))
             elif kind == "move":
                 refs.append(("move", (m.group(1), m.group(2) or "")))
             else:
@@ -449,6 +452,8 @@ def validate(d, rep):
                 check_limb(where, rid, "all")
             elif kind == "status" and rid not in stats_fx:
                 rep.err(where, f"없는 상태이상 '{rid}' (status.xlsx StatusEffects)")
+            elif kind == "trait_fx" and rid not in traits:
+                rep.err(where, f"없는 특성 '{rid}' (player.xlsx Traits)")
             elif kind == "move":
                 err = travel_error(d.get("_maps", {}), rid[0], rid[1])
                 if err:

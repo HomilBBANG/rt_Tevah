@@ -8,6 +8,7 @@ signal body_changed
 signal inventory_changed
 signal equipment_changed
 signal statuses_changed
+signal traits_changed
 signal flags_changed
 signal survival_changed
 signal clock_changed
@@ -23,7 +24,11 @@ var stats := {}               # name -> int
 var inventory: Array = []     # 칸 목록: [{ "id": String, "count": int }, ...]
 var ep_flags := {}            # name -> true
 var protagonist_id := ""      # 현재 주인공 char_id (대화 화면에서 주인공 대사 구분)
-var traits: Array = []        # 현재 주인공 능력
+var traits: Array = []        # 주인공 기본 능력 (Player.traits 열)
+## 가진 특성 [{trait_id, from}] — from: creation(캐릭터 생성) / event(사건·거래). 회차가 바뀌어도 남는다 (월드 저장),
+## 회차 저장에도 들어가서 슬롯을 불러오면 그 저장의 특성으로 돌아간다 (기획 §5.4 안 B)
+var owned_traits: Array = []
+var character_created := false   # 캐릭터 생성을 마쳤나 (안 했으면 타이틀 '새 게임' = 생성 화면)
 var abilities := {}           # 주사위 능력치 ability_id -> int (주인공 기본값 + 에피소드 중 성장)
 var timed_out := false        # 시간 초과 노드로 이미 보냈는지 (중복 이동 방지)
 
@@ -433,7 +438,39 @@ func set_wflag(name: String) -> void:
 
 
 func has_trait(name: String) -> bool:
-	return name in traits
+	return name in traits or owned_traits.any(func(t): return t.trait_id == name)
+
+
+func owned_trait_ids() -> Array:
+	return owned_traits.map(func(t): return t.trait_id)
+
+
+## 특성 얻기(on)·잃기. 같은 특성은 한 번만. 바뀌었으면 true
+func set_trait(id: String, on: bool, from := "event") -> bool:
+	var have := id in owned_trait_ids()
+	if on == have:
+		return false
+	if on:
+		owned_traits.append({"trait_id": id, "from": from})
+	else:
+		owned_traits = owned_traits.filter(func(t): return t.trait_id != id)
+	traits_changed.emit()
+	return true
+
+
+## 캐릭터 생성 확정: 고른 특성으로 (예전 특성은 모두 버림)
+func create_character(trait_ids: Array) -> void:
+	owned_traits = trait_ids.map(func(id): return {"trait_id": id, "from": "creation"})
+	character_created = true
+	traits_changed.emit()
+
+
+## 완전히 새 게임: 월드 기록(플래그·회차·사망 수)과 특성을 지운다. 저장 슬롯은 그대로
+func reset_world() -> void:
+	world_from_dict({})
+	owned_traits = []
+	character_created = false
+	traits_changed.emit()
 
 
 ## 조건 status:id — 상태이상에 걸려 있나
@@ -527,7 +564,8 @@ func episode_from_dict(d: Dictionary) -> void:
 
 
 func world_to_dict() -> Dictionary:
-	return {"world_flags": world_flags.keys(), "run_count": run_count, "death_count": death_count}
+	return {"world_flags": world_flags.keys(), "run_count": run_count, "death_count": death_count,
+		"owned_traits": owned_traits.duplicate(true), "character_created": character_created}
 
 
 func world_from_dict(d: Dictionary) -> void:
@@ -536,7 +574,19 @@ func world_from_dict(d: Dictionary) -> void:
 		world_flags[f] = true
 	run_count = int(d.get("run_count", 0))
 	death_count = int(d.get("death_count", 0))
+	owned_traits = _read_traits(d.get("owned_traits", []))
+	character_created = bool(d.get("character_created", false))
 	flags_changed.emit()
+	traits_changed.emit()
+
+
+static func _read_traits(arr: Variant) -> Array:
+	var out := []
+	if arr is Array:
+		for t in arr:
+			if t is Dictionary and str(t.get("trait_id", "")) != "":
+				out.append({"trait_id": str(t.trait_id), "from": str(t.get("from", "event"))})
+	return out
 
 
 ## 탐험 회차 저장 내용 (베이스캠프에서 저장)
@@ -548,6 +598,7 @@ func run_to_dict() -> Dictionary:
 		"player_body": player_body.duplicate(true),
 		"field_state": field_state.duplicate(true),
 		"talk_counts": talk_counts.duplicate(),
+		"owned_traits": owned_traits.duplicate(true),
 		"inventory": inventory.duplicate(true),
 		"equipment": equipment.duplicate(),
 		"statuses": statuses.duplicate(),
@@ -568,6 +619,10 @@ func run_from_dict(d: Dictionary) -> void:
 			player_body[k].hp = int(body[k].hp)
 			player_body[k].broken = bool(body[k].broken)
 	field_state = d.get("field_state", {}).duplicate(true)
+	# 기획 §5.4 안 B: 저장 슬롯의 특성으로 되돌린다 (예전 저장에 특성 기록이 없으면 지금 특성 그대로)
+	if d.has("owned_traits"):
+		owned_traits = _read_traits(d.owned_traits)
+		traits_changed.emit()
 	talk_counts = {}
 	for k in d.get("talk_counts", {}):
 		talk_counts[str(k)] = int(d.talk_counts[k])

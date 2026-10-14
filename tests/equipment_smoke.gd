@@ -73,6 +73,18 @@ func _ready() -> void:
 		and eq._status_list.global_position.y < eq._hex.global_position.y, "배치: 왼쪽 몸, 오른쪽 위 상태, 오른쪽 아래 육각형")
 	check(eq._hex.values.size() == 6 and eq._hex.values[0][0] == "근력" and eq._hex.values[0][1] == 3, "능력치 탭: 6개, 근력 3")
 	await _snap("stats_tab")
+	# 특성 탭 (세 번째): 긍정 / 부정 나눠서, 마우스를 올리면 효과
+	GameState.create_character(["high_intellect", "heavy_smoker"])
+	GameState.set_trait("brave", true)
+	eq.open(2)
+	await _wait(0.2)
+	var pos_rows: Array = eq._trait_lists.positive.get_children()
+	var neg_rows: Array = eq._trait_lists.negative.get_children()
+	check(eq._tabs.get_tab_title(2) == "특성" and pos_rows.size() == 2 and neg_rows.size() == 1
+		and pos_rows[0].get_child(0).text == "고지능자" and "지식" in pos_rows[0].tooltip_text
+		and pos_rows[1].get_child(1).text == "사건" and neg_rows[0].get_child(0).text == "골초",
+		"특성 탭: 긍정 2 (고지능자·용감함=사건), 부정 1 (골초), 툴팁에 효과")
+	await _snap("traits_tab")
 
 	_press("equipment")
 	_press("inventory")

@@ -20,6 +20,8 @@ const EFFECTS := [
 	["restore", "잘린 팔다리 복구", ["part_all"]],
 	["status_add", "상태이상 걸기", ["status"]],
 	["status_remove", "상태이상 풀기", ["status"]],
+	["trait_add", "특성 얻기 (사건·거래, 다음 회차에도 남음)", ["trait_pick"]],
+	["trait_remove", "특성 잃기", ["trait_pick"]],
 	["loot", "아이템 굴리기 (Loot 표)", ["loot"]],
 	["save", "저장하기 (베이스캠프에서만)", []],
 	["move", "맵 이동 (필드 대화·아이템)", ["dest"]],
@@ -124,6 +126,8 @@ func _row_text(r: Dictionary) -> String:
 			return "" if p.status == "" else "status:%s%s" % ["+" if r.kind == "status_add" else "-", p.status]
 		"status", "not_status":
 			return "" if p.status == "" else "%sstatus:%s" % ["!" if r.kind == "not_status" else "", p.status]
+		"trait_add", "trait_remove":
+			return "" if p.trait_pick == "" else "trait:%s%s" % ["+" if r.kind == "trait_add" else "-", p.trait_pick]
 		"has":
 			if p.item == "":
 				return ""
@@ -175,6 +179,9 @@ func _parse_effect(e: String) -> Dictionary:
 	m = _rx("status_fx", "^status:([+-])(\\w+)$").search(e)
 	if m:
 		return {"kind": "status_add" if m.get_string(1) == "+" else "status_remove", "p": {"status": m.get_string(2)}}
+	m = _rx("trait_fx", "^trait:([+-])(\\w+)$").search(e)
+	if m:
+		return {"kind": "trait_add" if m.get_string(1) == "+" else "trait_remove", "p": {"trait_pick": m.get_string(2)}}
 	return {}
 
 
@@ -236,6 +243,7 @@ func _options(param: String) -> Array:
 		"part_any": return [["any", "아무 팔다리나"]] + lookups.get("parts", [])
 		"loot": return lookups.get("loot", [])
 		"status": return lookups.get("statuses", [])
+		"trait_pick": return lookups.get("trait_list", [])
 		"dest": return lookups.get("dests", [])
 		"stat": return STATS
 		"count_kind": return COUNT_KINDS

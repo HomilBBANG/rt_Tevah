@@ -5,7 +5,7 @@ extends RefCounted
 ##       cut:left_arm / cut:any (팔다리 절단), count:death>=1 / count:run>=2 (월드 기록) / count:talk==0 (이 대화를 전에 한 횟수, 첫 대화 = 0), status:bleeding (상태이상) / 연산자 ! & | ( )  (우선순위 ! > & > |)
 ## 효과(; 구분): item:+id, item:-id, item:+id*2, stat:hp-10 / +10 / =10, setflag:x, clearflag:x,
 ##              setwflag:x, loot:spot, goto:node, abil:strength+1 / -1 / =3, surv:hunger+40, save,
-##              restore:left_arm / restore:all (잘린 팔다리 복구, §10 거래), status:+bleeding / status:-bleeding (상태이상),
+##              restore:left_arm / restore:all (잘린 팔다리 복구, §10 거래), status:+bleeding / status:-bleeding (상태이상), trait:+brave / trait:-brave (특성 얻기·잃기),
 ##              move:map_id / move:map_id@arrive_id (맵 이동, 필드에서만)
 ##
 ## 문법 오류는 크래시하지 않는다: push_error 로 남기고 조건은 false, 효과는 그 항목만 건너뛴다.
@@ -26,6 +26,7 @@ static var _stat_re: RegEx
 static var _abil_re: RegEx
 static var _surv_re: RegEx
 static var _status_re: RegEx
+static var _trait_re: RegEx
 static var _move_re: RegEx
 static var _simple_re: RegEx
 static var _cond_cache := {}   # 조건 문자열 -> AST (오류면 null)
@@ -87,6 +88,10 @@ static func parse_effects(text: String) -> Array:
 		if m:
 			out.append({"type": "status", "op": m.get_string(1), "id": m.get_string(2)})
 			continue
+		m = _trait_re.search(e)
+		if m:
+			out.append({"type": "trait", "op": m.get_string(1), "id": m.get_string(2)})
+			continue
 		m = _simple_re.search(e)
 		if m:
 			out.append({"type": m.get_string(1), "id": m.get_string(2)})
@@ -105,6 +110,7 @@ static func _init_regex() -> void:
 	_abil_re = RegEx.create_from_string("^abil:([A-Za-z0-9_]+)([+\\-=])(\\d+)$")
 	_surv_re = RegEx.create_from_string("^surv:([A-Za-z0-9_]+)([+\\-=])(\\d+)$")
 	_status_re = RegEx.create_from_string("^status:([+-])([A-Za-z0-9_]+)$")
+	_trait_re = RegEx.create_from_string("^trait:([+-])([A-Za-z0-9_]+)$")
 	_move_re = RegEx.create_from_string("^move:([A-Za-z0-9_]+)(?:@([A-Za-z0-9_]+))?$")
 	_simple_re = RegEx.create_from_string("^(setflag|clearflag|setwflag|loot|goto|restore):([A-Za-z0-9_]+)$")
 

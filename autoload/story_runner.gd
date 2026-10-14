@@ -409,6 +409,11 @@ func _apply_effects(effects: Array) -> String:
 				if GameState.set_status(e.id, e.op == "+"):
 					var nm: String = DataLoader.status_effects.get(e.id, {}).get("name", e.id)
 					message.emit(("%s 상태가 되었다." if e.op == "+" else "%s 이(가) 나았다.") % nm)
+			"trait":
+				if GameState.set_trait(e.id, e.op == "+"):
+					var tn: String = DataLoader.traits.get(e.id, {}).get("name", e.id)
+					message.emit(("특성을 얻었다: %s" if e.op == "+" else "특성을 잃었다: %s") % tn)
+					SaveManager.save_world()   # 사건으로 얻은 특성은 다음 회차에도 (기획 §5.2)
 			"restore":
 				var restored := GameState.restore_limb(e.id)
 				if restored.is_empty():

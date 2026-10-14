@@ -87,7 +87,7 @@ static func add_help_window(owner: Control, bar: HBoxContainer, title: String, b
 ## items·survival·abilities·parts·loot·nodes: [[id, 보이는 이름]], flags·wflags·traits: [이름] (이미 쓰이는 것)
 static func load_lookups() -> Dictionary:
 	var lk := {"items": [], "survival": [], "abilities": [], "parts": [], "loot": [], "nodes": [], "endings": [], "statuses": [], "dests": [],
-		"flags": [], "wflags": [], "traits": []}
+		"flags": [], "wflags": [], "traits": [], "trait_list": []}
 	for i in read_json("res://data/items.json", []):
 		lk.items.append([i.item_id, "%s (%s)" % [i.name, i.item_id]])
 	for st in read_json("res://data/status_effects.json", []):
@@ -115,6 +115,7 @@ static func load_lookups() -> Dictionary:
 	# 특성: player.xlsx Traits (+ 예전 데이터의 능력 이름)
 	for t in read_json("res://data/traits.json", []):
 		traits[t.trait_id] = true
+		lk.trait_list.append([t.trait_id, "%s (%s) %+d" % [t.name, t.trait_id, int(t.points)]])
 	lk.traits = traits.keys()
 	lk.traits.sort()
 	# 이미 쓰이는 플래그 이름 모으기

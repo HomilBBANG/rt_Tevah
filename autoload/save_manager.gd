@@ -116,6 +116,7 @@ func load_run(slot: int) -> bool:
 	if not d is Dictionary or not DataLoader.maps.has(d.get("current_map", "")):
 		return false
 	GameState.run_from_dict(d)
+	save_world()   # 불러온 슬롯의 특성(안 B)을 월드에도 — 이 뒤로 죽어도 이 특성이 이어진다
 	return true
 
 
@@ -148,6 +149,12 @@ func end_run() -> void:
 func revive_run() -> void:
 	GameState.death_count += 1
 	GameState.restore_after_revival()
+	save_world()
+
+
+## 완전히 새 게임 (캐릭터 생성부터): 월드 기록·특성을 지운다. 저장 슬롯은 지우지 않는다.
+func new_game() -> void:
+	GameState.reset_world()
 	save_world()
 
 

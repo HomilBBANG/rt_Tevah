@@ -32,5 +32,6 @@
  "text_speed_default": "normal",
  "text_speed_slow": 15,
  "text_speed_normal": 35,
- "text_speed_fast": 70
+ "text_speed_fast": 70,
+ "creation_start_points": 5
 }

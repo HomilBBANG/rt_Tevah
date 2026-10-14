@@ -3,6 +3,7 @@ extends Control
 ##   장비 탭  — EquipSlots 칸(엑셀 col·row 위치)마다 장착한 아이템. 소지품에서 끌어와 놓으면 장착,
 ##              칸을 우클릭하거나 소지품으로 끌면 벗기. 손 칸에는 아무 아이템이나 들 수 있다
 ##   능력치 탭 — 왼쪽 내 몸 상태(부위 HP), 오른쪽 위 상태이상 목록(이름에 마우스를 올리면 설명), 오른쪽 아래 능력치 6개 육각형
+##   특성 탭   — 가진 특성 (긍정 / 부정 나눠서, 마우스를 올리면 효과). 죽어도 다음 회차에 남는다
 
 const ItemCell = preload("res://ui/item_cell.gd")
 const BodyDiagram = preload("res://ui/body_diagram.gd")
@@ -17,6 +18,7 @@ var _status: Label
 var _body: Control
 var _hex: Control
 var _status_list: VBoxContainer   # 상태이상 이름들
+var _trait_lists := {}            # "positive" / "negative" -> VBoxContainer (특성 탭)
 
 
 func _ready() -> void:
@@ -95,6 +97,30 @@ func _ready() -> void:
 	_hex.custom_minimum_size = Vector2(0, 300)
 	hex_box.add_child(_hex)
 
+	# ---- 특성 탭: 위 긍정 특성 | 아래 부정 특성
+	var traits_tab := VBoxContainer.new()
+	traits_tab.name = "특성"
+	traits_tab.add_theme_constant_override("separation", 10)
+	_tabs.add_child(traits_tab)
+	for pol in [["positive", "긍정적 특성", Color("7fd48a")], ["negative", "부정적 특성", Color("ff8a7a")]]:
+		var head := Label.new()
+		head.text = pol[1]
+		head.add_theme_font_size_override("font_size", 30)
+		head.add_theme_color_override("font_color", pol[2])
+		traits_tab.add_child(head)
+		var box := _boxed(Color.BLACK)
+		box.size_flags_vertical = SIZE_EXPAND_FILL
+		traits_tab.add_child(box)
+		var list := VBoxContainer.new()
+		list.add_theme_constant_override("separation", 6)
+		box.add_child(list)
+		_trait_lists[pol[0]] = list
+	var thint := Label.new()
+	thint.text = "특성은 죽어도 다음 회차에 남는다. 이름에 마우스를 올리면 효과."
+	thint.add_theme_font_size_override("font_size", 20)
+	thint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+	traits_tab.add_child(thint)
+
 	var bottom := HBoxContainer.new()
 	vb.add_child(bottom)
 	_status = Label.new()
@@ -108,7 +134,8 @@ func _ready() -> void:
 	close.pressed.connect(hide)
 	bottom.add_child(close)
 
-	for sig in [GameState.equipment_changed, GameState.inventory_changed, GameState.body_changed, GameState.statuses_changed]:
+	for sig in [GameState.equipment_changed, GameState.inventory_changed, GameState.body_changed, GameState.statuses_changed,
+			GameState.traits_changed]:
 		sig.connect(func(): if visible: refresh())
 
 
@@ -181,6 +208,43 @@ func refresh() -> void:
 		none.text = "없음"
 		none.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 		_status_list.add_child(none)
+
+
+	_refresh_traits()
+
+
+## 특성 탭: 가진 특성을 긍정/부정으로 (얻은 곳: 생성 / 사건)
+func _refresh_traits() -> void:
+	for pol in _trait_lists:
+		var list: VBoxContainer = _trait_lists[pol]
+		for c in list.get_children():
+			list.remove_child(c)
+			c.queue_free()
+	for t in GameState.owned_traits:
+		var def: Dictionary = DataLoader.traits.get(t.trait_id, {})
+		var pol: String = def.get("polarity", "positive")
+		var row := HBoxContainer.new()
+		row.mouse_filter = MOUSE_FILTER_STOP
+		row.tooltip_text = "%s
+%s" % [def.get("name", t.trait_id), def.get("description", "")]
+		var l := Label.new()
+		l.text = def.get("name", t.trait_id)
+		l.size_flags_horizontal = SIZE_EXPAND_FILL
+		l.mouse_filter = MOUSE_FILTER_IGNORE
+		row.add_child(l)
+		var src := Label.new()
+		src.text = "생성" if t.get("from", "") == "creation" else "사건"
+		src.add_theme_font_size_override("font_size", 20)
+		src.add_theme_color_override("font_color", Color(0.55, 0.55, 0.58))
+		src.mouse_filter = MOUSE_FILTER_IGNORE
+		row.add_child(src)
+		_trait_lists.get(pol, _trait_lists.positive).add_child(row)
+	for pol in _trait_lists:
+		if _trait_lists[pol].get_child_count() == 0:
+			var none := Label.new()
+			none.text = "없음"
+			none.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
+			_trait_lists[pol].add_child(none)
 
 
 ## 테두리 있는 칸 (상태이상 목록·육각형)
