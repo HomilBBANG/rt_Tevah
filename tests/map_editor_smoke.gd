@@ -13,7 +13,7 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(TEST_DIR)
 	for f in DirAccess.get_files_at(TEST_DIR):
 		DirAccess.remove_absolute(TEST_DIR + f)
-	for f in ["test_field", "basecamp"]:
+	for f in ["test_field", "basecamp", "test_travel"]:
 		var w := FileAccess.open(TEST_DIR + f + ".json", FileAccess.WRITE)
 		w.store_string(FileAccess.get_file_as_string("res://tools/maps/%s.json" % f))
 		w.close()
@@ -28,7 +28,7 @@ func _ready() -> void:
 	add_child(bg)
 	add_child(ed)
 	await _frames(2)
-	check(ed.files.item_count == 2, "맵 2개 목록")
+	check(ed.files.item_count == 3, "맵 3개 목록")
 	ed.open_map("test_field")
 	await _frames(2)
 	var cv = ed.canvas
@@ -89,6 +89,23 @@ func _ready() -> void:
 	ed.open_map("basecamp")
 	ed.open_map("test_field")
 	check(ed.map.objects.size() == 9 and ed.map.run_start == [20, 5], "다시 열면 그대로")
+
+	# 맵 이동: 통로·이용·도착 지점·가장자리 (test_travel)
+	ed.open_map("test_travel")
+	await _frames(2)
+	ed.canvas.select({})
+	await _frames(2)
+	var labels: Array = ed.inspector.find_children("*", "Label", true, false).map(func(l): return l.text)
+	check("가장자리로 나가면" in labels and "왼쪽 →" in labels, "맵 설정에 가장자리 4방향")
+	check(ed._arrive_options("basecamp").any(func(a): return a[0] == "bc_gate"), "도착 지점 목록: 베이스캠프 정문(bc_gate)")
+	await _snap("test_travel")
+	var passage: Dictionary = ed.map.objects.filter(func(o): return o.type == "passage")[0]
+	ed.canvas.select(passage)
+	await _frames(2)
+	await _snap("passage_selected")
+	ed.save()
+	var tt: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_travel.json"))
+	check(tt.edges.left.ref == "test_field" and tt.objects[0].arrive == "bc_gate", "저장: 가장자리·도착 지점 유지")
 
 	# 새 맵 · 크기 바꾸기
 	check(ed.new_map("t_new", 12, 8), "새 맵 만들기")

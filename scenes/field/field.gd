@@ -52,6 +52,8 @@ var _collected: PackedStringArray = []
 var _toast_t := 0.0
 var _death_revival := {}        # 사망 패널: 적용된 부활 규칙 (비면 처음부터)
 var _sleep_pick := {}            # 잠잘 시간 고르는 중: { action, hours }
+var _pending_travel := []          # 대화 중 move 효과 → 대화가 끝나면 [map_id, arrive]
+var _travel_lock := Vector2i(-999, -999)   # 도착한 칸: 한 번 벗어나기 전에는 통로·가장자리가 다시 작동하지 않음
 var _sleep_value: Label
 var _sleep_wake: Label
 
@@ -68,6 +70,7 @@ func _ready() -> void:
 	StoryRunner.inventory_full.connect(_on_inventory_full)
 	StoryRunner.save_slot_requested.connect(_on_save_slot_requested)
 	StoryRunner.combat_requested.connect(_on_dialogue_combat)
+	StoryRunner.travel_requested.connect(_on_travel_requested)
 	GameState.survival_changed.connect(_update_hud)
 	GameState.clock_changed.connect(_update_hud)
 	GameState.clock_changed.connect(_refresh_presence)
@@ -86,7 +89,8 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	for pair in [[StoryRunner.message, _on_story_message], [StoryRunner.inventory_full, _on_inventory_full],
-			[StoryRunner.save_slot_requested, _on_save_slot_requested], [StoryRunner.combat_requested, _on_dialogue_combat]]:
+			[StoryRunner.save_slot_requested, _on_save_slot_requested], [StoryRunner.combat_requested, _on_dialogue_combat],
+			[StoryRunner.travel_requested, _on_travel_requested]]:
 		if pair[0].is_connected(pair[1]):
 			pair[0].disconnect(pair[1])
 
@@ -161,9 +165,15 @@ func _build_actors() -> void:
 	player.run_speed = float(me.get("run_speed", me.get("walk_speed", 4))) * tile
 	player.collision_layer = ACTOR_LAYER
 	player.collision_mask = WALL_LAYER | NPC_LAYER | DOOR_LAYER
-	# 새 회차는 맵 한복판(S)에서 깨어나고, 그 밖에는 P(출구로 들어온 곳·베이스캠프에서 깨어나는 곳)
+	# 새 회차는 맵 한복판(S)에서 깨어나고, 이동해 왔으면 고른 도착 지점(arrive), 그 밖에는 P
 	var spawn: Array = map.get("run_start", map.start) if GameState.wake_at_run_start else map.start
+	if not GameState.wake_at_run_start and GameState.arrive_at != "":
+		for o in map.objects:
+			if o.type == "arrive" and o.object_id == GameState.arrive_at:
+				spawn = [o.x, o.y]
 	GameState.wake_at_run_start = false
+	GameState.arrive_at = ""
+	_travel_lock = Vector2i(int(spawn[0]), int(spawn[1]))
 	player.position = _tile_center(spawn[0], spawn[1])
 	_add_circle_shape(player, player.radius)
 	var cam := Camera2D.new()
@@ -207,7 +217,7 @@ func _build_actors() -> void:
 				_add_circle_shape(e, e.radius * 0.8)
 				%World.add_child(e)
 				enemies.append(e)
-			"investigate", "camp", "exit":
+			"investigate", "camp", "exit", "passage", "transit":
 				var kind: String = "spot" if o.type == "investigate" else o.type
 				spots.append({"kind": kind, "data": o, "pos": pos,
 					"done": GameState.field_has(map.map_id, "done", o.object_id)})
@@ -304,9 +314,18 @@ func _physics_process(delta: float) -> void:
 		if e.grace == 0.0 and e.global_position.distance_to(player.global_position) < player.radius + e.radius:
 			_start_combat(e)
 			return
-	for s in spots:
-		if s.kind == "exit" and s.open and Rect2(s.pos - Vector2(tile, tile) / 2.0, Vector2(tile, tile)).has_point(player.global_position):
-			load_map(s.data.ref)
+	# 맵 이동: 열린 문·통로 칸에 들어서거나, 가장자리(edges)가 있는 쪽 맨 끝 칸에 닿으면
+	var here := Vector2i(floori(player.global_position.x / tile), floori(player.global_position.y / tile))
+	if here != _travel_lock:
+		_travel_lock = Vector2i(-999, -999)
+		for s in spots:
+			if (s.kind == "passage" or (s.kind == "exit" and s.open)) \
+					and Rect2(s.pos - Vector2(tile, tile) / 2.0, Vector2(tile, tile)).has_point(player.global_position):
+				travel(s.data.ref, s.data.get("arrive", ""))
+				return
+		var edge := _edge_at(here)
+		if not edge.is_empty():
+			travel(edge.ref, edge.get("arrive", ""))
 			return
 	_update_near_spot()
 
@@ -345,11 +364,14 @@ func _update_near_spot() -> void:
 		_near_spot = best
 		%Prompt.visible = not best.is_empty()
 		if not best.is_empty():
-			var verb: String = {"npc": "대화", "camp": "거점", "exit": "문 열기", "spot": "조사"}[best.kind]
+			var verb: String = {"npc": "대화", "camp": "거점", "exit": "문 열기", "spot": "조사", "transit": "이용",
+				"passage": "통로"}[best.kind]
 			var extra := "  (조사함)" if best.kind == "spot" and best.done else ""
 			if best.kind == "exit" and best.open:
 				verb = "문 닫기"
 				extra = "   —   열린 문으로 걸어가면 나감"
+			if best.kind == "passage":
+				extra = "   —   걸어 들어가면 이동"
 			%Prompt.text = "[E / Space]  %s: %s%s" % [verb, best.data.name, extra]
 
 
@@ -362,7 +384,33 @@ func interact() -> void:
 		"npc": _start_dialogue(s)
 		"camp": _open_camp()
 		"exit": toggle_door(s)
+		"transit": travel(s.data.ref, s.data.get("arrive", ""))
 		"spot": await _investigate(s)
+
+
+## 맵 이동: map_id 의 도착 지점 arrive(비면 P)로
+func travel(map_id: String, arrive := "") -> void:
+	GameState.arrive_at = arrive
+	load_map(map_id)
+
+
+## 가장자리 이동: 플레이어가 맵 맨 끝 칸(edges 가 정해진 쪽)에 있으면 그 edge { ref, arrive }
+func _edge_at(t: Vector2i) -> Dictionary:
+	var edges: Dictionary = map.get("edges", {})
+	for d in edges:
+		var hit: bool = (d == "left" and t.x <= 0) or (d == "right" and t.x >= int(map.width) - 1) \
+			or (d == "up" and t.y <= 0) or (d == "down" and t.y >= int(map.height) - 1)
+		if hit:
+			return edges[d]
+	return {}
+
+
+## 효과 move: (대화 중이면 대화가 끝난 뒤) 이동
+func _on_travel_requested(map_id: String, arrive: String) -> void:
+	if _dialogue_ui != null:
+		_pending_travel = [map_id, arrive]
+	else:
+		travel.call_deferred(map_id, arrive)
 
 
 ## 조사: 텍스트 + (처음 한 번) Loot 굴림. 시간은 Loot 의 time_cost 만큼 흐른다.
@@ -634,6 +682,10 @@ func _on_dialogue_finished() -> void:
 	StoryRunner.enter_field()
 	frozen = false
 	_update_hud()
+	if not _pending_travel.is_empty():
+		var t := _pending_travel
+		_pending_travel = []
+		travel(t[0], t[1])
 
 
 # ---------------------------------------------------------------- 전투

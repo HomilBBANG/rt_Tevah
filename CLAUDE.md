@@ -140,6 +140,7 @@ tools/
 - 화면 `scenes/field/field.tscn` (타이틀 "탐험 테스트"). 플레이어 신체 상태(부상·절단)는 한 회차 동안 전투 사이에 이어진다.
 - 맵: **`tools/maps/<map_id>.json`** (Godot '맵' 탭 = addons/map_editor 로 편집). tiles(`#` 벽 `.` 바닥), start(P 도착), run_start(S 회차 시작), objects(x,y 좌표). 아트가 들어오면 TileMap 으로 옮길 것.
 - 맵 위 물체(맵 파일 objects): enemy(ref=enemy_id, patrol_dir·patrol_len 왕복) / investigate(text, ref=Loot spot_id) / npc / camp / exit. 조정값 Config `field_*`. 맵 에디터 '테스트 플레이'는 user://playtest_saves/ 만 쓴다.
+- **맵 이동** (2026-10-14): 문(exit, E 로 열고 걸어 들어감) / 통로(passage, 밟으면 바로) / 이용(transit, 사다리 등 E) / 가장자리(맵 파일 `edges` {up/down/left/right: {ref, arrive}}, 그쪽 맨 끝 칸에 닿으면) / 효과 `move:map_id` · `move:map_id@arrive_id` (대화 중이면 대화가 끝난 뒤). 도착: 물체 `arrive` 에 그 맵의 도착 지점(type=arrive) id, 비면 P. 도착한 칸을 한 번 벗어나기 전에는 통로·가장자리가 다시 작동하지 않음. 더미 맵 `test_travel`, 베이스캠프 도착 지점 `bc_gate`(정문). 테스트 `tests/travel_smoke`.
 - **문(exit)**: 처음엔 닫힘. 닫힌 문은 플레이어·적 모두 통과 못 하고 적의 시야도 가린다(DOOR_LAYER 8). E 로 열고 닫는다. 열린 문 칸으로 걸어 들어가면 그 맵(ref)으로 나간다.
 - **빈 공간**: 맵 칸 `' '`(공백) = 검은색, 지나갈 수 없음. 맵 바깥도 검게 그린다. 맵 에디터 '빈 공간' 도구.
 - 적 순찰 경로는 매 회차 같다 (외워서 피하기, §6). 도주하면 `field_flee_grace` 초 동안 다시 덤비지 않는다.

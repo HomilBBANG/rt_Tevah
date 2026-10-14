@@ -6,12 +6,14 @@ extends Control
 signal changed
 signal selection_changed(obj: Dictionary)
 
-const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit"]
+const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive"]
 const COLORS := {
 	"enemy": Color("d05050"), "investigate": Color("e8c35a"), "npc": Color("5a8fd0"),
 	"camp": Color("5fae6a"), "exit": Color("a07850"),
+	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("b48ce0"),
 }
-const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문"}
+const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "도"}
+const EDGE_NAME := {"up": "위", "down": "아래", "left": "왼쪽", "right": "오른쪽"}
 const DIR := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 
 var map := {}                 # { map_id, tiles: [String], start, run_start, objects: [...] }
@@ -115,7 +117,7 @@ func apply_tool(t: Vector2i, first := true) -> void:
 			if tool in OBJECT_TYPES and first and is_floor(t) and object_at(t).is_empty():
 				var o := {"object_id": id_maker.call(tool) if id_maker.is_valid() else "%s_%d" % [tool, map.objects.size() + 1],
 					"type": tool, "x": t.x, "y": t.y, "ref": "", "name": "", "text": "",
-					"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": ""}
+					"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}
 				map.objects.append(o)
 				select(o)
 				changed.emit()
@@ -180,6 +182,24 @@ func _draw() -> void:
 			var r := Rect2(pan + Vector2(x, y) * s, Vector2(s, s))
 			draw_rect(r, Color.BLACK if row[x] == " " else (Color("16171d") if row[x] == "#" else Color("3a3e4a")))
 			draw_rect(r, Color(1, 1, 1, 0.05), false, 1.0)
+	# 가장자리 이동 (edges): 맵 바깥쪽에 띠 + 이동할 맵 이름
+	var h := tiles.size()
+	var w := 0
+	for row in tiles:
+		w = maxi(w, String(row).length())
+	for d in map.get("edges", {}):
+		var e: Dictionary = map.edges[d]
+		if e.get("ref", "") == "":
+			continue
+		var band := s * 0.35
+		var r: Rect2
+		match d:
+			"up": r = Rect2(pan + Vector2(0, -band), Vector2(w * s, band))
+			"down": r = Rect2(pan + Vector2(0, h * s), Vector2(w * s, band))
+			"left": r = Rect2(pan + Vector2(-band, 0), Vector2(band, h * s))
+			_: r = Rect2(pan + Vector2(w * s, 0), Vector2(band, h * s))
+		draw_rect(r, Color(0.43, 0.66, 0.86, 0.55))
+		_label("%s → %s" % [EDGE_NAME.get(d, d), e.ref], r.get_center(), Color.WHITE, maxf(10.0, s * 0.3))
 	# 적 시야·순찰
 	for o in map.objects:
 		if o.type != "enemy":

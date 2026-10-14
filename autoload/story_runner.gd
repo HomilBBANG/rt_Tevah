@@ -28,6 +28,8 @@ signal dice_rolled(result: Dictionary)
 ## combat 선택지: 전투를 띄워 달라는 요청. 화면은 전투를 띄우고 끝나면 finish_combat("win"/"fled"/"lose")를 부른다.
 ## win → effects·next_node, fled → fail_effects·fail_next, lose → 대화가 끝남(ended) — 사망 처리는 화면 몫.
 signal combat_requested(enemy_id: String)
+## 효과 move: 맵 이동 요청 (필드 화면이 받아서 대화가 끝난 뒤 이동). arrive = 도착 지점 id, 비면 P
+signal travel_requested(map_id: String, arrive: String)
 signal _combat_done(outcome: String)
 signal _discard_chosen(slot: int)
 
@@ -389,6 +391,11 @@ func _apply_effects(effects: Array) -> String:
 				redirect = e.id
 			"save":
 				await _save_run()
+			"move":
+				if mode == "field":
+					travel_requested.emit(e.map, e.arrive)
+				else:
+					push_warning("[StoryRunner] move:%s — 맵 이동은 필드에서만" % e.map)
 			"status":
 				if GameState.set_status(e.id, e.op == "+"):
 					var nm: String = DataLoader.status_effects.get(e.id, {}).get("name", e.id)

@@ -13,7 +13,8 @@ const MAP_DIR := "res://tools/maps/"
 const PLAYTEST_FILE := "user://map_playtest.json"
 const TOOLS := [
 	["select", "선택·이동"], ["wall", "벽"], ["floor", "바닥"], ["void", "빈 공간"], ["start", "도착 P"], ["run_start", "회차 시작 S"],
-	["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["exit", "출구"], ["erase", "지우개"],
+	["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["exit", "출구(문)"], ["passage", "통로"],
+	["transit", "이용"], ["arrive", "도착 지점"], ["erase", "지우개"],
 ]
 const TOOL_TIPS := {
 	"select": "물체를 클릭하면 오른쪽 칸에 세부, 끌면 옮김. 빈 칸을 클릭하면 맵 크기 설정",
@@ -26,7 +27,10 @@ const TOOL_TIPS := {
 	"investigate": "조사 지점을 놓음 → 오른쪽 칸에서 얻는 것(Loot)·조사 문구",
 	"npc": "NPC 를 놓음 → 오른쪽 칸에서 대화(시작 노드)·나타나는 시간대",
 	"camp": "베이스캠프 거점(식사·물·씻기·잠 메뉴, 엑셀 CampActions)을 놓음",
-	"exit": "출구(문)를 놓음 → 오른쪽 칸에서 이동할 맵. 게임에서는 E 로 열고 닫음",
+	"exit": "출구(문)를 놓음 → 오른쪽 칸에서 이동할 맵·도착 지점. 게임에서는 E 로 열고, 열린 문으로 걸어가면 이동",
+	"passage": "통로를 놓음 → 밟으면 바로 이동 (열고 닫기 없음, 계단·길·동굴 입구)",
+	"transit": "이용 지점을 놓음 → E 를 눌러야 이동 (사다리·엘리베이터 등). 이름이 안내에 나옴",
+	"arrive": "도착 지점을 놓음 → 다른 맵의 문·통로·이용·가장자리에서 '도착 지점'으로 고르면 P 대신 여기 도착",
 	"erase": "클릭한 물체(또는 S)를 지움. 벽은 바닥으로 칠해서 지움",
 }
 const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]   (이 칸은 오른쪽 위 '❓ 사용법' 으로 접고 펼칩니다)
@@ -34,19 +38,23 @@ const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]   (이 칸은 오른쪽 위 '❓
 [b]1. 맵 고르기[/b] — 왼쪽 위 목록에서 맵을 고르거나 [b]새 맵[/b] (맵 ID, 너비·높이 칸 수). 맵 하나 = 파일 하나 (tools/maps/).
 [b]2. 모양 칠하기[/b] — 도구 줄에서 [b]벽[/b] / [b]바닥[/b] / [b]빈 공간[/b]을 고르고, 맵 위를 누른 채 끌면 칠해집니다.
 [b]3. 위치 찍기[/b] — [b]도착 P[/b]: 출구로 들어오거나 베이스캠프에서 깨어나는 곳 (맵마다 꼭 하나).  [b]회차 시작 S[/b]: 새 회차를 시작하는 곳 (시작 맵에만). 둘 다 바닥 칸에만.
-[b]4. 물체 놓기[/b] — [b]적[/b] · [b]조사[/b] · [b]NPC[/b] · [b]거점[/b] · [b]출구[/b] 도구로 바닥 칸을 클릭하면 놓이고, [b]오른쪽 칸[/b]에서 세부를 고릅니다.
+[b]4. 물체 놓기[/b] — [b]적[/b] · [b]조사[/b] · [b]NPC[/b] · [b]거점[/b] · [b]출구(문)[/b] · [b]통로[/b] · [b]이용[/b] · [b]도착 지점[/b] 도구로 바닥 칸을 클릭하면 놓이고, [b]오른쪽 칸[/b]에서 세부를 고릅니다.
     · 적: 적 종류, 순찰 방향과 칸 수(그 칸 수만큼 왕복). 맵에 순찰 길과 시야가 그려집니다.
     · 조사: 얻는 것(엑셀 Loot 의 spot), 조사할 때 나오는 문구.
     · NPC: 대화(시작 노드 = 대화 탭의 첫 카드), 나타나는 시간대 (예: 06:00-12:00, 20:00-23:00).
-    · 출구(문): 이동할 맵. 문으로 들어오면 그 맵의 P 에 도착합니다.
+    · 맵 이동: [b]출구(문)[/b] E 로 열고 걸어 들어감 / [b]통로[/b] 밟으면 바로 / [b]이용[/b] 사다리처럼 E 를 눌러야 / [b]가장자리[/b] 빈 칸을 클릭해 나오는 맵 설정에서 위·아래·왼쪽·오른쪽 끝으로 나가면 옆 맵.
+      모두 '이동할 맵'과 '도착 지점'을 고릅니다. 도착 지점을 비우면 그 맵의 P, [b]도착 지점[/b] 도구로 놓은 곳을 고르면 거기에 도착.
+      대화·아이템 효과의 '맵 이동'으로도 옮길 수 있습니다.
     · 나타나는 조건: [b]＋ 조건 추가[/b]로 골라 둡니다 (예: '플래그가 켜져 있다 met_cat' → 그 플래그가 켜졌을 때만 나타남).
 [b]5. 고치기[/b] — [b]선택·이동[/b] 도구: 물체를 클릭하면 세부, 끌면 옮김. 빈 칸 클릭 = 맵 크기 바꾸기.  [b]지우개[/b]: 물체를 지움.
 [b]6. 화면[/b] — 휠: 확대·축소,  휠 버튼 또는 오른쪽 버튼 누른 채 끌기: 화면 이동.
 [b]7. 반영하기[/b] — [b]저장[/b] → [b]변환·검사[/b] (오류는 맨 아래 칸) → [b]테스트 플레이[/b]로 이 맵에서 바로 실행 (진짜 저장은 건드리지 않음).
 
-[b]지도 표시[/b]  [color=#2f8f4f]P[/color] 도착 · [color=#b89a2a]S[/color] 회차 시작 · [color=#d05050]● 적[/color] · [color=#e8c35a]● 조[/color] 조사 · [color=#5a8fd0]● N[/color] NPC · [color=#5fae6a]● 거[/color] 거점 · [color=#a07850]● 문[/color] 출구 · 흐린 빨간 원 = 적 시야, 빨간 선 = 순찰 길
+[b]지도 표시[/b]  [color=#2f8f4f]P[/color] 도착 · [color=#b89a2a]S[/color] 회차 시작 · [color=#d05050]● 적[/color] · [color=#e8c35a]● 조[/color] 조사 · [color=#5a8fd0]● N[/color] NPC · [color=#5fae6a]● 거[/color] 거점 · [color=#a07850]● 문[/color] 출구 · [color=#6fa8dc]● 통[/color] 통로 · [color=#c8a060]● 이[/color] 이용 · [color=#b48ce0]● 도[/color] 도착 지점 · 맵 바깥 푸른 띠 = 가장자리 이동 · 흐린 빨간 원 = 적 시야, 빨간 선 = 순찰 길
 """
-const TYPE_NAME :={"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구"}
+const TYPE_NAME :={"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구(문)",
+	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 지점"}
+const EDGES := [["up", "위"], ["down", "아래"], ["left", "왼쪽"], ["right", "오른쪽"]]
 
 var dir := MAP_DIR                   # 테스트에서 바꿔 쓴다
 var map := {}
@@ -219,10 +227,15 @@ func save() -> void:
 		return
 	var out := {"map_id": map.map_id, "tiles": map.tiles, "start": map.get("start"), "run_start": map.get("run_start"),
 		"objects": []}
+	# 새로 생긴 항목(가장자리 edges, 도착 지점 arrive)은 쓸 때만 파일에 적는다 (예전 맵 파일이 그대로 유지되게)
+	if not map.get("edges", {}).is_empty():
+		out.edges = map.edges
 	for o in map.objects:
 		var e := {}
 		for k in ["object_id", "type", "x", "y", "ref", "name", "text", "patrol_dir", "patrol_len", "condition", "schedule"]:
 			e[k] = o.get(k, "" if k not in ["x", "y", "patrol_len"] else 0)
+		if o.get("arrive", "") != "" or o.has("arrive"):
+			e.arrive = o.get("arrive", "")
 		out.objects.append(e)
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
@@ -298,6 +311,25 @@ func _edit_map() -> void:
 	apply.pressed.connect(func(): resize_map(int(ws.value), int(hs.value)))
 	inspector.add_child(apply)
 	_hint("P = 출구로 들어오거나 베이스캠프에서 깨어나는 곳 (꼭 하나)\nS = 새 회차를 시작하는 곳 (Config start_map 의 맵에서만 쓰임, 없으면 P)\n물체를 고르면 여기에 세부가 나옵니다.")
+	_title("가장자리로 나가면")
+	_hint("그쪽 맨 끝 칸(바닥)에 닿으면 이동. 맵 끝에 바닥 칸을 터 두세요.")
+	if not map.has("edges") or not map.edges is Dictionary:
+		map.edges = {}
+	for d in EDGES:
+		var dir_id: String = d[0]
+		var e: Dictionary = map.edges.get(dir_id, {})
+		_option("%s →" % d[1], [["", "(없음)"]] + map_ids.map(func(m): return [m, m]), e.get("ref", ""), func(v):
+			if v == "":
+				map.edges.erase(dir_id)
+			else:
+				map.edges[dir_id] = {"ref": v, "arrive": ""}
+			dirty = true
+			canvas.queue_redraw()
+			_edit_map.call_deferred())
+		if e.get("ref", "") != "":
+			_option("    도착 지점", _arrive_options(e.ref), e.get("arrive", ""), func(v):
+				map.edges[dir_id].arrive = v
+				dirty = true)
 
 
 func _edit_object(o: Dictionary) -> void:
@@ -329,8 +361,15 @@ func _edit_object(o: Dictionary) -> void:
 			te.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 			te.text_changed.connect(func(): set_field(o, "text", te.text))
 			inspector.add_child(te)
-		"exit":
-			_option("이동할 맵", map_ids.map(func(m): return [m, m]), o.get("ref", ""), func(v): set_field(o, "ref", v))
+		"exit", "passage", "transit":
+			_option("이동할 맵", map_ids.map(func(m): return [m, m]), o.get("ref", ""), func(v):
+				set_field(o, "ref", v)
+				set_field(o, "arrive", "")
+				_edit_object.call_deferred(o))
+			if o.get("ref", "") != "":
+				_option("도착 지점", _arrive_options(o.ref), o.get("arrive", ""), func(v): set_field(o, "arrive", v))
+		"arrive":
+			_hint("다른 맵의 문·통로·이용·가장자리에서 이 도착 지점을 고르면 여기에 도착합니다.")
 	var cl := Label.new()
 	cl.text = "나타나는 조건 (맞을 때만 맵에 있음)"
 	inspector.add_child(cl)
@@ -344,6 +383,16 @@ func _edit_object(o: Dictionary) -> void:
 		canvas.select({})
 		dirty = true)
 	inspector.add_child(del)
+
+
+## map_id 맵의 도착 지점 목록 [["", P], [arrive id, 이름]] (그 맵 파일에서 읽음 — 지금 연 맵이면 편집 중인 내용)
+func _arrive_options(map_id: String) -> Array:
+	var objs: Array = map.objects if map_id == map.get("map_id", "") else ToolCommon.read_json(dir + map_id + ".json", {}).get("objects", [])
+	var out := [["", "P (기본 도착 위치)"]]
+	for o in objs:
+		if o.get("type", "") == "arrive":
+			out.append([o.object_id, "%s  (%s)" % [o.get("name", "") if o.get("name", "") != "" else o.object_id, o.object_id]])
+	return out
 
 
 func set_field(o: Dictionary, key: String, v: Variant) -> void:

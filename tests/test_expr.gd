@@ -121,6 +121,9 @@ func _ready() -> void:
 	eff("restore:", [], 1)
 	eff("status:+bleeding;status:-panic", [{"type": "status", "op": "+", "id": "bleeding"}, {"type": "status", "op": "-", "id": "panic"}], 0)
 	eff("status:bleeding", [], 1)
+	eff("move:basecamp;move:basecamp@bc_gate", [{"type": "move", "map": "basecamp", "arrive": ""},
+		{"type": "move", "map": "basecamp", "arrive": "bc_gate"}], 0)
+	eff("move:", [], 1)
 	eff("", [], 0)
 	eff(";;", [], 0)
 	eff("item:+", [], 1)

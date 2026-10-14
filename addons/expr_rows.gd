@@ -22,6 +22,7 @@ const EFFECTS := [
 	["status_remove", "상태이상 풀기", ["status"]],
 	["loot", "아이템 굴리기 (Loot 표)", ["loot"]],
 	["save", "저장하기 (베이스캠프에서만)", []],
+	["move", "맵 이동 (필드 대화·아이템)", ["dest"]],
 	["stat", "스탯 바꾸기 (1단계 에피소드용)", ["stat", "op_change", "num"]],
 ]
 const CONDS := [
@@ -117,6 +118,8 @@ func _row_text(r: Dictionary) -> String:
 			return "" if v == "" else "%s:%s" % [r.kind, v]
 		"save":
 			return "save"
+		"move":
+			return "" if p.dest == "" else "move:" + p.dest
 		"status_add", "status_remove":
 			return "" if p.status == "" else "status:%s%s" % ["+" if r.kind == "status_add" else "-", p.status]
 		"status", "not_status":
@@ -166,6 +169,9 @@ func _parse_effect(e: String) -> Dictionary:
 			"op_change": m.get_string(3), "num": m.get_string(4).to_int()}}
 	if e == "save":
 		return {"kind": "save", "p": {}}
+	m = _rx("move", "^move:(\\w+(?:@\\w+)?)$").search(e)
+	if m:
+		return {"kind": "move", "p": {"dest": m.get_string(1)}}
 	m = _rx("status_fx", "^status:([+-])(\\w+)$").search(e)
 	if m:
 		return {"kind": "status_add" if m.get_string(1) == "+" else "status_remove", "p": {"status": m.get_string(2)}}
@@ -230,6 +236,7 @@ func _options(param: String) -> Array:
 		"part_any": return [["any", "아무 팔다리나"]] + lookups.get("parts", [])
 		"loot": return lookups.get("loot", [])
 		"status": return lookups.get("statuses", [])
+		"dest": return lookups.get("dests", [])
 		"stat": return STATS
 		"count_kind": return COUNT_KINDS
 		"op_change": return OP_CHANGE

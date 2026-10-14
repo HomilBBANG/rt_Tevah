@@ -28,6 +28,7 @@
     "name": "베이스캠프 거점",
     "text": "",
     "condition": "",
+    "arrive": "",
     "map_id": "basecamp",
     "x": 4,
     "y": 2,
@@ -42,6 +43,7 @@
     "name": "고양이",
     "text": "",
     "condition": "",
+    "arrive": "",
     "map_id": "basecamp",
     "x": 9,
     "y": 2,
@@ -65,14 +67,31 @@
     "name": "탐험 지역으로",
     "text": "",
     "condition": "",
+    "arrive": "",
     "map_id": "basecamp",
     "x": 7,
     "y": 6,
     "patrol_dir": "",
     "patrol_len": 0,
     "schedule": []
+   },
+   {
+    "object_id": "bc_gate",
+    "type": "arrive",
+    "ref": "",
+    "name": "정문",
+    "text": "",
+    "condition": "",
+    "arrive": "",
+    "map_id": "basecamp",
+    "x": 2,
+    "y": 4,
+    "patrol_dir": "",
+    "patrol_len": 0,
+    "schedule": []
    }
-  ]
+  ],
+  "edges": {}
  },
  {
   "map_id": "test_field",
@@ -109,6 +128,7 @@
     "name": "NPC 1",
     "text": "",
     "condition": "",
+    "arrive": "",
     "map_id": "test_field",
     "x": 10,
     "y": 1,
@@ -123,6 +143,7 @@
     "name": "베이스캠프로",
     "text": "",
     "condition": "",
+    "arrive": "",
     "map_id": "test_field",
     "x": 2,
     "y": 2,
@@ -137,6 +158,7 @@
     "name": "적 A (테스트)",
     "text": "",
     "condition": "",
+    "arrive": "",
     "map_id": "test_field",
     "x": 21,
     "y": 2,
@@ -151,6 +173,7 @@
     "name": "조사 지점 1",
     "text": "조사 텍스트 1 (테스트)",
     "condition": "",
+    "arrive": "",
     "map_id": "test_field",
     "x": 8,
     "y": 6,
@@ -165,6 +188,7 @@
     "name": "보급 상자",
     "text": "조사 텍스트 4 (테스트, 음식·물)",
     "condition": "",
+    "arrive": "",
     "map_id": "test_field",
     "x": 11,
     "y": 6,
@@ -179,6 +203,7 @@
     "name": "적 A (테스트)",
     "text": "",
     "condition": "",
+    "arrive": "",
     "map_id": "test_field",
     "x": 23,
     "y": 8,
@@ -193,6 +218,7 @@
     "name": "NPC 2",
     "text": "",
     "condition": "",
+    "arrive": "",
     "map_id": "test_field",
     "x": 10,
     "y": 9,
@@ -207,6 +233,7 @@
     "name": "조사 지점 2",
     "text": "조사 텍스트 2 (테스트, 부활 아이템)",
     "condition": "",
+    "arrive": "",
     "map_id": "test_field",
     "x": 3,
     "y": 10,
@@ -221,6 +248,7 @@
     "name": "조사 지점 3",
     "text": "조사 텍스트 3 (테스트, 빈 탐색)",
     "condition": "",
+    "arrive": "",
     "map_id": "test_field",
     "x": 25,
     "y": 11,
@@ -228,6 +256,85 @@
     "patrol_len": 0,
     "schedule": []
    }
-  ]
+  ],
+  "edges": {}
+ },
+ {
+  "map_id": "test_travel",
+  "width": 9,
+  "height": 6,
+  "tiles": [
+   "#########",
+   "........#",
+   "#.......#",
+   "#.......#",
+   "#.......#",
+   "####.####"
+  ],
+  "start": [
+   4,
+   2
+  ],
+  "run_start": [
+   4,
+   2
+  ],
+  "objects": [
+   {
+    "object_id": "tt_to_camp",
+    "type": "passage",
+    "ref": "basecamp",
+    "name": "베이스캠프 통로",
+    "text": "",
+    "condition": "",
+    "arrive": "bc_gate",
+    "map_id": "test_travel",
+    "x": 6,
+    "y": 2,
+    "patrol_dir": "",
+    "patrol_len": 0,
+    "schedule": []
+   },
+   {
+    "object_id": "tt_ladder",
+    "type": "transit",
+    "ref": "test_field",
+    "name": "사다리",
+    "text": "",
+    "condition": "",
+    "arrive": "",
+    "map_id": "test_travel",
+    "x": 2,
+    "y": 3,
+    "patrol_dir": "",
+    "patrol_len": 0,
+    "schedule": []
+   },
+   {
+    "object_id": "tt_center",
+    "type": "arrive",
+    "ref": "",
+    "name": "가운데",
+    "text": "",
+    "condition": "",
+    "arrive": "",
+    "map_id": "test_travel",
+    "x": 4,
+    "y": 3,
+    "patrol_dir": "",
+    "patrol_len": 0,
+    "schedule": []
+   }
+  ],
+  "edges": {
+   "left": {
+    "ref": "test_field",
+    "arrive": ""
+   },
+   "down": {
+    "ref": "basecamp",
+    "arrive": "bc_gate"
+   }
+  }
  }
 ]

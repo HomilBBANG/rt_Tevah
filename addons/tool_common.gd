@@ -64,7 +64,7 @@ static func add_help(parent: Container, index: int, bar: HBoxContainer, key: Str
 ## 조건·효과 고르기(addons/expr_rows.gd)와 이동 대상 목록에 쓰는 이름표들 (data/*.json 에서).
 ## items·survival·abilities·parts·loot·nodes: [[id, 보이는 이름]], flags·wflags·traits: [이름] (이미 쓰이는 것)
 static func load_lookups() -> Dictionary:
-	var lk := {"items": [], "survival": [], "abilities": [], "parts": [], "loot": [], "nodes": [], "endings": [], "statuses": [],
+	var lk := {"items": [], "survival": [], "abilities": [], "parts": [], "loot": [], "nodes": [], "endings": [], "statuses": [], "dests": [],
 		"flags": [], "wflags": [], "traits": []}
 	for i in read_json("res://data/items.json", []):
 		lk.items.append([i.item_id, "%s (%s)" % [i.name, i.item_id]])
@@ -103,8 +103,11 @@ static func load_lookups() -> Dictionary:
 	for c in read_json("res://data/choices.json", []):
 		texts.append_array([c.get("condition", ""), c.get("effects", ""), c.get("fail_effects", "")])
 	for m in read_json("res://data/maps.json", []):
+		lk.dests.append([m.map_id, "%s — 기본 도착(P)" % m.map_id])
 		for o in m.get("objects", []):
 			texts.append(o.get("condition", ""))
+			if o.get("type", "") == "arrive":
+				lk.dests.append(["%s@%s" % [m.map_id, o.object_id], "%s — %s" % [m.map_id, o.get("name", "") if o.get("name", "") != "" else o.object_id]])
 	for f in ["camp_actions", "revivals"]:
 		for r in read_json("res://data/%s.json" % f, []):
 			texts.append_array([r.get("condition", ""), r.get("effects", "")])

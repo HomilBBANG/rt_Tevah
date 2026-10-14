@@ -53,6 +53,20 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": ""
+  },
+  {
+   "object_id": "bc_gate",
+   "type": "arrive",
+   "x": 2,
+   "y": 4,
+   "ref": "",
+   "name": "정문",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": ""
   }
  ]
 }

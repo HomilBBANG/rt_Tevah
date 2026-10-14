@@ -1,6 +1,7 @@
 extends Node2D
 ## 맵 바닥·벽 그리기 (아트 전 placeholder) + 상호작용 지점 표시
 ##   조사(spot): 노란 마름모 (조사하면 회색) / 거점(camp): 초록 천막 / 출구(exit): 닫힌 문은 갈색, 열린 문은 어두운 틈
+##   통로(passage): 푸른 바닥 + 화살표 / 이용(transit): 사다리
 ##   빈 공간(' ')과 맵 바깥은 검은색
 
 const FLOOR := Color("2a2d36")
@@ -45,6 +46,22 @@ func _draw() -> void:
 				else:
 					draw_rect(door, Color("8a6a44"))
 					draw_circle(c + Vector2(tile * 0.24, 0), 5.0, Color("e8d0a0"))
+			"passage":
+				var r := Rect2(c - Vector2(tile, tile) * 0.46, Vector2(tile, tile) * 0.92)
+				draw_rect(r, Color(0.35, 0.55, 0.8, 0.35))
+				draw_rect(r, Color("6fa8dc"), false, 2.0)
+				var k := tile * 0.2
+				draw_colored_polygon(PackedVector2Array([c + Vector2(k, 0), c + Vector2(-k * 0.6, -k), c + Vector2(-k * 0.6, k)]), Color("9cc4ec"))
+			"transit":
+				var hw := tile * 0.22
+				var top := c.y - tile * 0.4
+				var bot := c.y + tile * 0.4
+				var col := Color("c8a060")
+				draw_line(Vector2(c.x - hw, top), Vector2(c.x - hw, bot), col, 4.0)
+				draw_line(Vector2(c.x + hw, top), Vector2(c.x + hw, bot), col, 4.0)
+				for i in 4:
+					var y := top + (bot - top) * (i + 0.5) / 4.0
+					draw_line(Vector2(c.x - hw, y), Vector2(c.x + hw, y), col, 3.0)
 			_:
 				var k := tile * 0.18
 				var pts := PackedVector2Array([c + Vector2(0, -k), c + Vector2(k, 0), c + Vector2(0, k), c + Vector2(-k, 0)])

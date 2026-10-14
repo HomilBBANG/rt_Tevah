@@ -1,0 +1,132 @@
+extends Node
+## 맵 이동 스모크 테스트 (더미 맵 test_travel): 통로(밟으면) · 이용(사다리, E) · 가장자리(왼쪽·아래) · 효과 move: · 도착 지점.
+## 화면이 필요하므로 --headless 없이:
+##   Godot_v4.7-stable_win64_console.exe --path . res://tests/travel_smoke.tscn
+
+const FieldScript = preload("res://scenes/field/field.gd")
+
+var _fail := 0
+var f: Node
+
+
+func _ready() -> void:
+	DirAccess.make_dir_recursive_absolute("user://travel_smoke")
+	SaveManager.save_dir = "user://test_saves/"
+	SaveManager.delete_all()
+	SaveManager.begin_run()
+	GameState.wake_at_run_start = false
+	FieldScript.next_map_id = "test_travel"
+	f = load("res://scenes/field/field.tscn").instantiate()
+	add_child(f)
+	await _wait(0.3)
+	check(f.map.map_id == "test_travel" and _at(4, 2), "test_travel 의 P(4,2)에서 시작")
+	await _snap("test_travel")
+
+	# 통로: 밟으면 베이스캠프 '정문' 도착 지점(2,4)으로
+	await _walk_to(6, 2)
+	check(f.map.map_id == "basecamp" and _at(2, 4), "통로 → 베이스캠프 정문(2,4) 도착 (%s)" % _where())
+
+	# 이용(사다리): 옆에서 E → test_field 의 P
+	f.load_map("test_travel")
+	await _wait(0.2)
+	_teleport(2, 2)
+	await _wait(0.2)
+	check("이용: 사다리" in f.get_node("%Prompt").text, "사다리 근처 → '이용: 사다리' 안내 (%s)" % f.get_node("%Prompt").text)
+	_press("interact")
+	await _wait(0.2)
+	var p: Array = DataLoader.maps.test_field.start
+	check(f.map.map_id == "test_field" and _at(p[0], p[1]), "E → test_field 의 P 도착 (%s)" % _where())
+
+	# 가장자리: 왼쪽 끝(0,1) → test_field, 아래 끝(4,5) → 베이스캠프 정문
+	f.load_map("test_travel")
+	await _wait(0.2)
+	await _walk_to(0, 1)
+	check(f.map.map_id == "test_field", "왼쪽 가장자리 → test_field (%s)" % _where())
+	f.load_map("test_travel")
+	await _wait(0.2)
+	await _walk_to(4, 5)
+	check(f.map.map_id == "basecamp" and _at(2, 4), "아래 가장자리 → 베이스캠프 정문 (%s)" % _where())
+
+	# 도착 지점에 서 있어도 바로 다시 이동하지 않는다 (통로 위 도착 → 한 번 벗어나야 작동)
+	f.travel("test_travel", "tt_center")
+	await _wait(0.2)
+	check(f.map.map_id == "test_travel" and _at(4, 3), "travel(도착 지점 tt_center) → (4,3)")
+
+	# 효과 move: (대화·아이템) — 대화 밖이면 바로
+	await StoryRunner.run_effects("move:basecamp@bc_gate")
+	await _wait(0.2)
+	check(f.map.map_id == "basecamp" and _at(2, 4), "효과 move:basecamp@bc_gate → 정문 (%s)" % _where())
+	await StoryRunner.run_effects("move:test_travel")
+	await _wait(0.2)
+	check(f.map.map_id == "test_travel" and _at(4, 2), "효과 move:test_travel → P (%s)" % _where())
+	await _snap("after_move")
+	# 대화 중 move: 대화가 끝난 뒤 이동
+	f._dialogue_ui = Control.new()
+	f.add_child(f._dialogue_ui)
+	f._on_travel_requested("basecamp", "bc_gate")
+	await _wait(0.1)
+	check(f.map.map_id == "test_travel", "대화 중에는 바로 이동하지 않음")
+	f._on_dialogue_finished()
+	await _wait(0.1)
+	check(f.map.map_id == "basecamp" and _at(2, 4), "대화가 끝나면 이동 (%s)" % _where())
+
+	SaveManager.delete_all()
+	print("[travel_smoke] 실패 %d" % _fail)
+	get_tree().quit(1 if _fail > 0 else 0)
+
+
+## (x, y) 칸 바로 옆에 두고 그 칸으로 걸어 들어간다 (실제 이동·충돌로)
+func _walk_to(x: int, y: int) -> void:
+	var from := Vector2i(x, y)
+	var key := ""
+	for d in [[Vector2i(1, 0), "move_left"], [Vector2i(-1, 0), "move_right"], [Vector2i(0, -1), "move_down"], [Vector2i(0, 1), "move_up"]]:
+		var t: Vector2i = from + d[0]
+		if t.y >= 0 and t.y < f.map.tiles.size() and t.x >= 0 and t.x < String(f.map.tiles[t.y]).length() and f.map.tiles[t.y][t.x] == ".":
+			_teleport(t.x, t.y)
+			key = d[1]
+			break
+	await _wait(0.1)
+	var start_map: String = f.map.map_id
+	Input.action_press(key)
+	# 맵이 바뀌면 바로 키를 뗀다 (도착한 뒤 더 걸어가지 않게)
+	var t := 0.0
+	while f.map.map_id == start_map and t < 0.8:
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+	Input.action_release(key)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+
+
+func _at(x: int, y: int) -> bool:
+	return f.player.position.distance_to(Vector2((x + 0.5) * f.tile, (y + 0.5) * f.tile)) < 2.0
+
+
+func _where() -> String:
+	return "%s (%.1f, %.1f)" % [f.map.map_id, f.player.position.x / f.tile - 0.5, f.player.position.y / f.tile - 0.5]
+
+
+func _teleport(tx: float, ty: float) -> void:
+	f.player.position = Vector2((tx + 0.5) * f.tile, (ty + 0.5) * f.tile)
+
+
+func _press(action: String) -> void:
+	var ev := InputEventAction.new()
+	ev.action = action
+	ev.pressed = true
+	Input.parse_input_event(ev)
+
+
+func _wait(sec: float) -> void:
+	await get_tree().create_timer(sec).timeout
+
+
+func _snap(name: String) -> void:
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("user://travel_smoke/%s.png" % name)
+
+
+func check(ok: bool, label: String) -> void:
+	print(("ok   " if ok else "FAIL ") + label)
+	if not ok:
+		_fail += 1

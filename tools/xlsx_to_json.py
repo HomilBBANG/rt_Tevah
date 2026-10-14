@@ -87,7 +87,11 @@ SCHEMA = {
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
 OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "StatusEffects",
                    "Survival", "CampActions", "Revivals"}
-FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit"}
+# 맵 물체: exit 문(E 로 열고 걸어 들어가면 이동) / passage 통로(밟으면 이동) / transit 이용(사다리 등, E 로 이동) /
+#         arrive 도착 지점 (이동할 때 arrive 로 고르면 P 대신 여기 도착)
+FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive"}
+TRAVEL_TYPES = {"exit", "passage", "transit"}
+EDGE_DIRS = {"up", "down", "left", "right"}
 CAMP_KINDS = {"", "sleep"}   # sleep: 1시간 단위로 골라 자고, 자고 나면 저장 (effects 는 1시간마다)
 PATROL_DIRS = {"": (0, 0), "up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
 MAP_TILES = {"#", ".", " "}   # 벽 / 바닥 / 빈 공간(검은색, 지나갈 수 없음)
@@ -232,6 +236,7 @@ EFFECT_RES = [
     ("simple", re.compile(r"^(setflag|clearflag|setwflag|loot|goto|restore):([A-Za-z0-9_]+)$")),
     ("save", re.compile(r"^save$")),   # 회차 저장 (베이스캠프 안에서만 동작)
     ("status", re.compile(r"^status:([+-])([A-Za-z0-9_]+)$")),   # 상태이상 걸기·풀기
+    ("move", re.compile(r"^move:([A-Za-z0-9_]+)(?:@([A-Za-z0-9_]+))?$")),   # 맵 이동 (도착 지점)
 ]
 
 
@@ -259,6 +264,8 @@ def parse_effects(text):
                 pass
             elif kind == "status":
                 refs.append(("status", m.group(2)))
+            elif kind == "move":
+                refs.append(("move", (m.group(1), m.group(2) or "")))
             else:
                 refs.append((m.group(1), m.group(2)))
             break
@@ -394,6 +401,10 @@ def validate(d, rep):
                 check_limb(where, rid, "all")
             elif kind == "status" and rid not in stats_fx:
                 rep.err(where, f"없는 상태이상 '{rid}' (content.xlsx StatusEffects)")
+            elif kind == "move":
+                err = travel_error(d.get("_maps", {}), rid[0], rid[1])
+                if err:
+                    rep.err(where, err)
             elif kind == "loot" and rid not in spots:
                 rep.err(where, f"없는 spot_id '{rid}' (Loot 시트)")
             elif kind == "goto":
@@ -869,6 +880,19 @@ def field_objects(maps):
     return out
 
 
+def arrive_ids(m):
+    return {o.get("object_id", "") for o in m.get("objects", []) if o.get("type") == "arrive"}
+
+
+def travel_error(maps, ref, arrive):
+    """맵 이동 대상 검사 (문·통로·이용·가장자리·move 효과). 맞으면 ''."""
+    if ref not in maps:
+        return f"이동할 맵이 없음: '{ref}'"
+    if arrive and arrive not in arrive_ids(maps[ref]):
+        return f"도착 지점 '{arrive}' 는 맵 {ref} 의 도착 지점(arrive)이 아님"
+    return ""
+
+
 def validate_field(d, maps, rep, enemies):
     spots = {r["spot_id"] for r in d["Loot"] if r["spot_id"]}
     nodes = {n["node_id"]: n for n in d["Nodes"]}
@@ -898,6 +922,13 @@ def validate_field(d, maps, rep, enemies):
                 continue
             if not (isinstance(pos, list) and len(pos) == 2 and floor(int(pos[0]), int(pos[1]))):
                 rep.err(wm, f"{label} 위치가 바닥이 아님: {pos}")
+        for edir, e in (m.get("edges") or {}).items():
+            if edir not in EDGE_DIRS:
+                rep.err(wm, f"가장자리 방향은 up/down/left/right: '{edir}'")
+            elif e and e.get("ref"):
+                err = travel_error(maps, e["ref"], e.get("arrive", ""))
+                if err:
+                    rep.err(f"{wm} 가장자리 {edir}", err)
         occupied = {}
         for o in m["objects"]:
             oid = o.get("object_id", "")
@@ -917,7 +948,7 @@ def validate_field(d, maps, rep, enemies):
             t = o.get("type", "")
             ref = o.get("ref", "")
             if t not in FIELD_TYPES:
-                rep.err(w, f"type 은 enemy / investigate / npc / camp / exit: '{t}'")
+                rep.err(w, f"type 은 {' / '.join(sorted(FIELD_TYPES))}: '{t}'")
             elif t == "enemy" and ref not in enemies:
                 rep.err(w, f"적 종류(ref)는 싸울 수 있는 NPC(NpcParts·NpcAttacks 가 있는 npc_id): '{ref}'")
             elif t == "enemy" and not all(n["walk_speed"] > 0 and n["run_speed"] > 0
@@ -925,8 +956,8 @@ def validate_field(d, maps, rep, enemies):
                 rep.err(w, f"맵의 적 '{ref}' 는 Npcs 의 walk_speed(순찰)·run_speed(추격)가 0보다 커야 함")
             elif t == "npc" and (ref not in nodes or nodes[ref]["episode_id"] != ""):
                 rep.err(w, f"NPC 의 대화(ref)는 필드 대화 시작 노드: '{ref}'")
-            elif t == "exit" and ref not in maps:
-                rep.err(w, f"출구의 ref 는 이동할 맵 이름: '{ref}'")
+            elif t in TRAVEL_TYPES and travel_error(maps, ref, o.get("arrive", "")):
+                rep.err(w, travel_error(maps, ref, o.get("arrive", "")))
             elif t == "investigate" and ref and ref not in spots:
                 rep.err(w, f"조사의 ref 는 Loot 의 spot_id (없으면 비움): '{ref}'")
             pdir, plen = o.get("patrol_dir", ""), int(o.get("patrol_len", 0) or 0)
@@ -975,14 +1006,16 @@ def export_maps(d, maps):
         tiles = [r.ljust(width, " ") for r in m["tiles"]]   # 짧은 줄의 나머지는 빈 공간
         objects = []
         for o in m["objects"]:
-            e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition")}
+            e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition", "arrive")}
             e.update(map_id=mid, x=int(o["x"]), y=int(o["y"]), patrol_dir=o.get("patrol_dir", ""),
                      patrol_len=int(o.get("patrol_len", 0) or 0),
                      schedule=[parse_time_range(r) for r in split_list(o.get("schedule", ""))])
             objects.append(e)
         start = m.get("start") or [0, 0]
+        edges = {k: {"ref": v.get("ref", ""), "arrive": v.get("arrive", "")}
+                 for k, v in (m.get("edges") or {}).items() if v and v.get("ref")}
         out.append({"map_id": mid, "width": width, "height": len(tiles), "tiles": tiles, "start": start,
-                    "run_start": m.get("run_start") or start, "objects": objects})
+                    "run_start": m.get("run_start") or start, "objects": objects, "edges": edges})
     return out
 
 
