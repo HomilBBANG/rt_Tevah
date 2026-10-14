@@ -146,7 +146,7 @@ class Report:
 
 # ---------------------------------------------------------------- 조건·효과 문법
 # 런타임 파서(core/expr.gd)와 같은 문법. 한쪽을 바꾸면 다른 쪽도 맞춰야 한다.
-COUNTS = {"run", "death"}   # count: 조건 (월드 run_count·death_count)
+COUNTS = {"run", "death", "talk"}   # count: 조건 (월드 run_count·death_count, talk = 이 대화를 전에 한 횟수)
 ATOM_RE = re.compile(r"(has|flag|wflag|stat|trait|abil|surv|cut|count|status):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\d+(?:\.\d+)?))?")
 
 
@@ -177,7 +177,7 @@ def parse_condition(text):
                     raise ExprError(f"'{m.group(0)}': stat 조건에는 비교식이 필요 (예: stat:hp>=10)")
             elif kind == "count":
                 if ident not in COUNTS:
-                    raise ExprError(f"알 수 없는 기록 '{ident}' (가능: run, death)")
+                    raise ExprError(f"알 수 없는 기록 '{ident}' (가능: {', '.join(sorted(COUNTS))})")
                 if not op:
                     raise ExprError(f"'{m.group(0)}': count 조건에는 비교식이 필요 (예: count:death>=1)")
             elif kind == "surv" and not op:

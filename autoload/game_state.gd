@@ -35,6 +35,8 @@ var player_body := {}         # 전투 부위 상태 (부상·절단), 전투 �
 var statuses: Array = []      # 걸려 있는 상태이상 status_id (StatusEffects 시트). 효과 status:+id / status:-id
 var equipment := {}           # 장비: slot_id(EquipSlots) -> item_id. 장착한 것은 인벤토리 칸을 차지하지 않는다
 var field_state := {}         # map_id -> { "removed": [object_id], "done": [object_id] }
+var talk_counts := {}         # 대화 시작 node_id -> 그 대화를 시작한 횟수 (회차 저장에 들어감)
+var talk_now := 0             # 지금 대화를 전에 몇 번 했나 (조건 count:talk, 첫 대화 = 0)
 var arrive_at := ""           # 다음 맵 로드 때 도착할 도착 지점(arrive 물체) id (저장 안 함)
 var arrive_from := ""         # 어디로 들어왔나: 문·통로·이용 object_id 또는 "맵:방향"(가장자리). 도착 P 의 from 과 맞추어 도착
 var wake_at_run_start := false   # 다음 맵 로드 때 그 맵의 S(회차 시작 위치)에서 깨어남 (저장 안 함)
@@ -86,6 +88,8 @@ func reset_run() -> void:
 	statuses = []
 	statuses_changed.emit()
 	field_state = {}
+	talk_counts = {}
+	talk_now = 0
 	wake_at_run_start = true
 	survival_changed.emit()
 	clock_changed.emit()
@@ -455,7 +459,14 @@ func get_count(name: String) -> int:
 	match name:
 		"run": return run_count
 		"death": return death_count
+		"talk": return talk_now
 	return 0
+
+
+## 대화 시작: 이 대화(시작 노드)를 전에 몇 번 했는지를 talk_now 로 두고 횟수를 1 올린다
+func begin_talk(start_node: String) -> void:
+	talk_now = int(talk_counts.get(start_node, 0))
+	talk_counts[start_node] = talk_now + 1
 
 
 # ---------------------------------------------------------------- 사지 절단·복구 (§9, §10)
@@ -536,6 +547,7 @@ func run_to_dict() -> Dictionary:
 		"survival": survival.duplicate(),
 		"player_body": player_body.duplicate(true),
 		"field_state": field_state.duplicate(true),
+		"talk_counts": talk_counts.duplicate(),
 		"inventory": inventory.duplicate(true),
 		"equipment": equipment.duplicate(),
 		"statuses": statuses.duplicate(),
@@ -556,6 +568,9 @@ func run_from_dict(d: Dictionary) -> void:
 			player_body[k].hp = int(body[k].hp)
 			player_body[k].broken = bool(body[k].broken)
 	field_state = d.get("field_state", {}).duplicate(true)
+	talk_counts = {}
+	for k in d.get("talk_counts", {}):
+		talk_counts[str(k)] = int(d.talk_counts[k])
 	inventory = []
 	for slot in d.get("inventory", []):
 		inventory.append({"id": str(slot.id), "count": int(slot.count)})

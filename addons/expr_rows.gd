@@ -38,14 +38,14 @@ const CONDS := [
 	["not_cut", "팔다리가 잘리지 않았다", ["part_any"]],
 	["status", "상태이상에 걸려 있다", ["status"]],
 	["not_status", "상태이상에 걸려 있지 않다", ["status"]],
-	["count", "죽은 횟수 · 회차 수", ["count_kind", "op_cmp", "num"]],
+	["count", "대화 횟수 · 죽은 횟수 · 회차 수", ["count_kind", "op_cmp", "num"]],
 	["trait", "주인공 능력이 있다", ["trait"]],
 	["stat", "스탯 (1단계 에피소드용)", ["stat", "op_cmp", "num"]],
 ]
 const OP_CHANGE := [["+", "+ 늘리기"], ["-", "- 줄이기"], ["=", "= 정하기"]]
 const OP_CMP := [["<", "보다 작다 (<)"], ["<=", "이하 (<=)"], [">=", "이상 (>=)"], [">", "보다 크다 (>)"], ["==", "같다 (==)"]]
 const STATS := [["hp", "hp"], ["sanity", "sanity"], ["time", "time"]]
-const COUNT_KINDS := [["death", "죽은 횟수"], ["run", "회차 수"]]
+const COUNT_KINDS := [["talk", "이 대화를 한 횟수 (처음 = 0)"], ["death", "죽은 횟수"], ["run", "회차 수"]]
 
 var mode := "effect"
 var lookups := {}

@@ -255,6 +255,22 @@ func _run() -> void:
 	check(node_id == "fd_npc2_no", "물이 없으면 → 아니면 카드")
 	await StoryRunner.continue_story()
 
+	# ---------- 대화 횟수 count:talk (첫 대화 = 0, 같은 시작 노드마다 셈, 회차 저장에 들어감)
+	GameState.reset_run()
+	await StoryRunner.start_dialogue("fd_npc1_a")
+	check(GameState.get_count("talk") == 0 and StoryRunner.Expr.evaluate("count:talk==0", GameState), "첫 대화: count:talk == 0")
+	await StoryRunner.start_dialogue("fd_npc1_a")
+	check(GameState.get_count("talk") == 1 and StoryRunner.Expr.evaluate("count:talk==1", GameState), "두 번째: count:talk == 1 (반복 대사)")
+	await StoryRunner.start_dialogue("fd_npc2_a")
+	check(GameState.get_count("talk") == 0, "다른 대화는 따로 셈 (npc2 첫 대화 = 0)")
+	var saved := GameState.run_to_dict()
+	GameState.run_from_dict(JSON.parse_string(JSON.stringify(saved)))
+	await StoryRunner.start_dialogue("fd_npc1_a")
+	check(GameState.get_count("talk") == 2, "저장·불러오기 뒤에도 이어짐 (npc1 세 번째 = 2)")
+	GameState.reset_run()
+	await StoryRunner.start_dialogue("fd_npc1_a")
+	check(GameState.get_count("talk") == 0, "새 회차면 처음부터")
+
 
 func _fresh_to_d() -> void:
 	ending = ""

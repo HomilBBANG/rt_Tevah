@@ -2,7 +2,7 @@ extends RefCounted
 ## 조건·효과 문법 파서. tools/xlsx_to_json.py 의 검사기와 같은 문법 — 한쪽을 바꾸면 다른 쪽도 맞출 것.
 ##
 ## 조건: has:id, has:id>=2, flag:x, wflag:x, stat:hp>=30, abil:strength>=3, surv:hunger<30, trait:x,
-##       cut:left_arm / cut:any (팔다리 절단), count:death>=1 / count:run>=2 (월드 기록), status:bleeding (상태이상) / 연산자 ! & | ( )  (우선순위 ! > & > |)
+##       cut:left_arm / cut:any (팔다리 절단), count:death>=1 / count:run>=2 (월드 기록) / count:talk==0 (이 대화를 전에 한 횟수, 첫 대화 = 0), status:bleeding (상태이상) / 연산자 ! & | ( )  (우선순위 ! > & > |)
 ## 효과(; 구분): item:+id, item:-id, item:+id*2, stat:hp-10 / +10 / =10, setflag:x, clearflag:x,
 ##              setwflag:x, loot:spot, goto:node, abil:strength+1 / -1 / =3, surv:hunger+40, save,
 ##              restore:left_arm / restore:all (잘린 팔다리 복구, §10 거래), status:+bleeding / status:-bleeding (상태이상),
@@ -15,7 +15,7 @@ extends RefCounted
 ## is_severed(part_id 또는 "any")->bool, get_count(name)->int, has_status(id)->bool
 
 const STATS := ["hp", "sanity", "time"]
-const COUNTS := ["run", "death"]   # count: 조건 (월드 run_count·death_count)
+const COUNTS := ["run", "death", "talk"]   # count: 조건 (월드 run_count·death_count, 대화 횟수)
 
 ## 테스트용: 지금까지 기록된 오류 메시지
 static var errors: PackedStringArray = []
@@ -162,7 +162,7 @@ static func _tokenize(expr: String) -> Variant:
 					return null
 			elif atom.kind == "count":
 				if not atom.id in COUNTS:
-					_err("조건 '%s': 알 수 없는 기록 '%s' (가능: run, death)" % [expr, atom.id])
+					_err("조건 '%s': 알 수 없는 기록 '%s' (가능: %s)" % [expr, atom.id, ", ".join(COUNTS)])
 					return null
 				if atom.op == "":
 					_err("조건 '%s': count 조건에는 비교식이 필요" % expr)

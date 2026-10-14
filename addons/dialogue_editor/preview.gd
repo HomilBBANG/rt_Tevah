@@ -19,6 +19,8 @@ func _ready() -> void:
 		%Info.text = "미리볼 노드가 없습니다: '%s'\n대화 에디터에서 변환·검사를 먼저 하세요." % start
 		return
 	GameState.reset_run()
+	# 대화 횟수(count:talk)는 Esc 로 다시 시작해도 이어진다 → 두 번째부터 반복 대사 확인. 창을 닫으면 처음부터.
+	GameState.talk_counts = Engine.get_meta("preview_talk_counts", {}).duplicate()
 	StoryRunner.save_slot_requested.connect(func(): StoryRunner.choose_save_slot.call_deferred(-1))
 	StoryRunner.combat_requested.connect(_on_combat)
 	%Info.text = "미리보기: %s   (save 효과는 저장하지 않음 · Esc 로 다시 시작)" % start
@@ -34,6 +36,8 @@ func _start(node_id: String) -> void:
 	_ui.finished.connect(func(): %Info.text = "대화 끝 (EXIT).  Esc 로 다시 시작, 창을 닫으면 에디터로.")
 	%Stage.add_child(_ui)
 	StoryRunner.start_dialogue(node_id)
+	Engine.set_meta("preview_talk_counts", GameState.talk_counts.duplicate())
+	%Info.text += "   · 대화 횟수(count:talk) = %d" % GameState.talk_now
 
 
 ## 전투 선택지: 대화를 숨기고 전투 화면. 이기거나 도주하면 대화 계속, 지면 대화 끝 (미리보기는 사망 처리 없음)

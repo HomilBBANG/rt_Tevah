@@ -22,7 +22,7 @@ class FakeCtx:
 	func has_wflag(name: String) -> bool: return name in wflags
 	func has_trait(name: String) -> bool: return name in traits
 	func is_severed(part_id: String) -> bool: return part_id in ["left_arm", "any"]
-	func get_count(name: String) -> int: return {"run": 3, "death": 2}.get(name, 0)
+	func get_count(name: String) -> int: return {"run": 3, "death": 2, "talk": 0}.get(name, 0)
 	func has_status(id: String) -> bool: return id == "bleeding"
 
 
@@ -64,6 +64,8 @@ func _ready() -> void:
 	cond(ctx, "count:death>=2", true)
 	cond(ctx, "count:run==3", true)
 	cond(ctx, "count:death>2", false)
+	cond(ctx, "count:talk==0", true)
+	cond(ctx, "count:talk>=1", false)
 	cond_err(ctx, "count:death")
 	cond_err(ctx, "count:kills>1")
 	cond(ctx, "status:bleeding", true)

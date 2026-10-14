@@ -79,6 +79,7 @@ func start_episode(episode_id: String) -> void:
 		return
 	SaveManager.delete_episode_save(episode_id)
 	GameState.reset_for_episode(ep)
+	GameState.talk_now = 0
 	mode = "episode"
 	ended = false
 	busy = true
@@ -89,6 +90,7 @@ func start_episode(episode_id: String) -> void:
 ## 탐험 중 NPC 대화 시작. 게임 상태(인벤토리·플래그·능력치)는 그대로 쓰고, 대화가 EXIT 에 닿으면 dialogue_ended.
 ## 시그널을 받을 화면을 먼저 띄운 뒤 호출할 것.
 func start_dialogue(node_id: String) -> void:
+	GameState.begin_talk(node_id)   # 조건 count:talk = 이 대화를 전에 한 횟수
 	mode = "field"
 	ended = false
 	busy = true
