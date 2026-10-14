@@ -40,6 +40,7 @@ var selected := {}            # 마지막으로 고른 물체 (오른쪽 칸)
 var selection: Array = []     # 고른 물체들 (여러 개)
 var region := Rect2i()        # 영역 선택 (칸). size 0 = 없음
 var id_maker: Callable        # func(type) -> String
+var require_default := false  # 베이스캠프: ★ 기본 P 가 꼭 있어야 함 (첫 P 는 자동 기본, 기본 P 는 못 지움)
 ## 표시 필터 (false = 숨김, 숨긴 물체는 고를 수도 없음)
 var filters := {"tiles": true, "enemy": true, "investigate": true, "npc": true, "camp": true, "travel": true,
 	"arrive": true, "sight": true, "names": true, "links": true}
@@ -161,8 +162,8 @@ func apply_tool(t: Vector2i, first := true) -> void:
 				var o := {"object_id": id_maker.call(tool) if id_maker.is_valid() else "%s_%d" % [tool, map.objects.size() + 1],
 					"type": tool, "x": t.x, "y": t.y, "ref": "", "name": "", "text": "",
 					"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}
-				if tool == "arrive" and default_p().is_empty():
-					o.default = true   # 맵의 첫 도착 P = 기본
+				if tool == "arrive" and require_default and default_p().is_empty():
+					o.default = true   # 베이스캠프의 첫 도착 P = 기본
 				map.objects.append(o)
 				select(o)
 				changed.emit()
@@ -193,8 +194,11 @@ func default_p() -> Dictionary:
 	return {}
 
 
-## 도착 P 를 지우기 전에: 기본 P 면 다른 P 에 기본을 넘긴다. 남은 P 가 없으면 false (못 지움)
+## 도착 P 를 지우기 전에. 베이스캠프의 기본 P 면 다른 P 에 기본을 넘기고, 남은 P 가 없으면 false (못 지움).
+## 다른 맵은 기본 P 가 선택이라 그냥 지운다
 func release_p(o: Dictionary) -> bool:
+	if not require_default or not o.get("default", false):
+		return true
 	var others: Array = map.objects.filter(func(x): return x.get("type", "") == "arrive" and x != o)
 	if others.is_empty():
 		return false
@@ -409,8 +413,8 @@ func _draw() -> void:
 				draw_circle(e, s * 0.12, Color(1, 0.5, 0.5, 0.8))
 	# S (회차 시작). 도착 P 는 모두 물체(arrive) — 예전 맵처럼 기본 P 물체가 없으면 start 를 그린다
 	for key in ["start", "run_start"]:
-		if key == "start" and not default_p().is_empty():
-			continue
+		if key == "start" and map.get("objects", []).any(func(x): return x.get("type", "") == "arrive"):
+			continue   # 도착 P 물체가 있으면 start 는 따로 안 그림 (예전 맵만)
 		var p = map.get(key)
 		if p is Array and p.size() == 2:
 			var r := Rect2(pan + Vector2(p[0], p[1]) * s, Vector2(s, s)).grow(-s * 0.12)

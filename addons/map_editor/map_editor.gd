@@ -29,7 +29,7 @@ const TOOL_TIPS := {
 	"exit": "출구(문)를 놓음 → 오른쪽 칸에서 이동할 맵·도착 지점. 게임에서는 E 로 열고, 열린 문으로 걸어가면 이동",
 	"passage": "통로를 놓음 → 밟으면 바로 이동 (열고 닫기 없음, 계단·길·동굴 입구)",
 	"transit": "이용 지점을 놓음 → E 를 눌러야 이동 (사다리·엘리베이터 등). 이름이 안내에 나옴",
-	"arrive": "도착 P 를 놓음 → 오른쪽 칸 '이어지는 곳'에서 어느 맵의 어느 입구로 들어오면 여기 설지 고름. ★ = 기본 P (정하지 않은 곳·부활)",
+	"arrive": "도착 P 를 놓음 → 오른쪽 칸 '이어지는 곳'에서 어느 맵의 어느 입구로 들어오면 여기 설지 고름. ★ = 기본 P (이어지지 않은 곳 — 베이스캠프만 필수)",
 	"erase": "클릭한 물체(또는 S)를 지움. 벽은 바닥으로 칠해서 지움",
 }
 const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]   (이 칸은 오른쪽 위 '❓ 사용법' 으로 접고 펼칩니다)
@@ -37,7 +37,8 @@ const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]   (이 칸은 오른쪽 위 '❓
 [b]1. 맵 고르기[/b] — 왼쪽 위 목록에서 맵을 고르거나 [b]새 맵[/b] (맵 ID, 너비·높이 칸 수). 맵 하나 = 파일 하나 (tools/maps/).
 [b]2. 모양 칠하기[/b] — 도구 줄에서 [b]벽[/b] / [b]바닥[/b] / [b]빈 공간[/b]을 고르고, 맵 위를 누른 채 끌면 칠해집니다.
 [b]3. 위치 찍기[/b] — [b]도착 P[/b]: 다른 맵에서 들어올 때 서는 곳. 여러 개 찍고, P 를 눌러 [b]이어지는 곳[/b](어느 맵의 어느 입구로 오면 여기)을 고릅니다.
-      ★ 붙은 P 가 [b]기본 P[/b] — 아무 P 에도 이어지지 않은 곳으로 들어오거나 베이스캠프에서 깨어날 때. 맵마다 꼭 하나 (처음 찍은 P, P 설정에서 바꿈).  [b]회차 시작 S[/b]: 새 회차를 시작하는 곳 (시작 맵에만). 둘 다 바닥 칸에만.
+      ★ 붙은 P 가 [b]기본 P[/b] — 아무 P 에도 이어지지 않은 곳으로 들어올 때. [b]베이스캠프만 꼭 하나[/b] (부활·불러오기 때 깨어나는 곳),
+      다른 맵은 없어도 되지만 그러면 들어오는 곳마다 P 를 이어 둬야 합니다 (빠지면 빨간 ⚠·변환 오류). P 설정에서 켜고 끔.  [b]회차 시작 S[/b]: 새 회차를 시작하는 곳 (시작 맵에만). 둘 다 바닥 칸에만.
 [b]4. 물체 놓기[/b] — [b]적[/b] · [b]조사[/b] · [b]NPC[/b] · [b]거점[/b] · [b]출구(문)[/b] · [b]통로[/b] · [b]이용[/b] 도구로 바닥 칸을 클릭하면 놓이고, [b]오른쪽 칸[/b]에서 세부를 고릅니다.
     · 적: 적 종류, 순찰 방향과 칸 수(그 칸 수만큼 왕복). 맵에 순찰 길과 시야가 그려집니다.
     · 조사: 얻는 것(엑셀 Loot 의 spot), 조사할 때 나오는 문구.
@@ -78,6 +79,7 @@ var dialogue_starts: Array = []      # 필드 대화 노드
 var loot_spots: Array = []
 var map_ids: Array = []
 var lookups := {}                    # 조건 고르기 (ToolCommon.load_lookups)
+var basecamp_id := "basecamp"        # Config basecamp_map — ★ 기본 P 가 꼭 있어야 하는 맵
 # 실행 취소: 맵 상태 스냅샷 (tiles·objects·start·run_start·edges)
 const UNDO_MAX := 100
 var _undo: Array = []
@@ -233,16 +235,16 @@ func open_map(id: String) -> void:
 	for key in ["start", "run_start"]:   # JSON 숫자는 float → 칸 좌표는 int
 		var pos = map.get(key)
 		map[key] = [int(pos[0]), int(pos[1])] if pos is Array and pos.size() == 2 else null
-	# 예전 맵: 기본 도착 위치(start)를 기본 P 물체로
-	if not map.objects.any(func(o): return o.type == "arrive" and o.get("default", false)):
+	# 예전 맵 (도착 P 물체가 하나도 없음): 기본 도착 위치(start)를 ★ 기본 P 물체로
+	var ps: Array = map.objects.filter(func(o): return o.type == "arrive")
+	if ps.is_empty():
 		var st: Array = map.start if map.start != null else [1, 1]
-		var at: Array = map.objects.filter(func(o): return o.type == "arrive" and o.x == st[0] and o.y == st[1])
-		if not at.is_empty():
-			at[0].default = true
-		else:
-			map.objects.insert(0, {"object_id": id + "_p", "type": "arrive", "x": st[0], "y": st[1], "ref": "", "name": "기본",
-				"text": "", "patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": "", "default": true})
+		map.objects.insert(0, {"object_id": id + "_p", "type": "arrive", "x": st[0], "y": st[1], "ref": "", "name": "기본",
+			"text": "", "patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": "", "default": true})
+	elif id == basecamp_id and not ps.any(func(o): return o.get("default", false)):
+		ps[0].default = true   # 베이스캠프는 기본 P 필수
 	path = p
+	canvas.require_default = id == basecamp_id
 	canvas.set_map(map)
 	dirty = false
 	_undo.clear()
@@ -271,8 +273,11 @@ func new_map(id: String, w: int, h: int) -> bool:
 			row += "#" if x == 0 or y == 0 or x == w - 1 or y == h - 1 else "."
 		tiles.append(row)
 	map = {"map_id": id, "tiles": tiles, "start": [w / 2, h / 2], "run_start": null, "objects": [
-		{"object_id": id + "_p", "type": "arrive", "x": w / 2, "y": h / 2, "ref": "", "name": "기본", "text": "",
-		"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": "", "default": true}]}
+		{"object_id": id + "_p", "type": "arrive", "x": w / 2, "y": h / 2, "ref": "", "name": "", "text": "",
+		"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}]}
+	if id == basecamp_id:
+		map.objects[0].default = true
+	canvas.require_default = id == basecamp_id
 	path = dir + id + ".json"
 	canvas.set_map(map)
 	_undo.clear()
@@ -288,8 +293,11 @@ func save() -> void:
 	if map.is_empty():
 		return
 	var dp: Dictionary = canvas.default_p()
+	var ps: Array = map.objects.filter(func(o): return o.type == "arrive")
 	if not dp.is_empty():
 		map.start = [int(dp.x), int(dp.y)]   # 기본 P 자리 = start (게임·변환기가 읽음)
+	elif not ps.is_empty():
+		map.start = [int(ps[0].x), int(ps[0].y)]   # 기본 P 가 없으면 첫 P (테스트 플레이 시작 자리)
 	var out := {"map_id": map.map_id, "tiles": map.tiles, "start": map.get("start"), "run_start": map.get("run_start"),
 		"objects": []}
 	# 새로 생긴 항목(가장자리 edges, 도착 지점 arrive)은 쓸 때만 파일에 적는다 (예전 맵 파일이 그대로 유지되게)
@@ -387,7 +395,7 @@ func _edit_map() -> void:
 	apply.text = "크기 적용"
 	apply.pressed.connect(func(): resize_map(int(ws.value), int(hs.value)))
 	inspector.add_child(apply)
-	_hint("도착 P = 다른 맵에서 들어올 때 서는 곳 (★ 기본 P 는 꼭 하나)\nS = 새 회차를 시작하는 곳 (Config start_map 의 맵에서만 쓰임, 없으면 기본 P)\n물체를 고르면 여기에 세부가 나옵니다.")
+	_hint("도착 P = 다른 맵에서 들어올 때 서는 곳 (★ 기본 P 는 베이스캠프만 필수)\nS = 새 회차를 시작하는 곳 (Config start_map 의 맵에서만 쓰임, 없으면 기본 P·첫 P)\n물체를 고르면 여기에 세부가 나옵니다.")
 	_title("가장자리로 나가면")
 	_hint("그쪽 맨 끝 칸(바닥)에 닿으면 이동. 맵 끝에 바닥 칸을 터 두세요.")
 	if not map.has("edges") or not map.edges is Dictionary:
@@ -465,21 +473,22 @@ func _edit_object(o: Dictionary) -> void:
 				_option("도착 P (비우면 그 맵 P 쪽 설정 → 기본 P)", _arrive_options(o.ref), o.get("arrive", ""), func(v): set_field(o, "arrive", v))
 		"arrive":
 			var dcb := CheckBox.new()
-			dcb.text = "★ 기본 P (아무 데도 이어지지 않은 곳으로 들어오거나 베이스캠프에서 깨어날 때)"
+			var base: bool = map.map_id == basecamp_id
+			dcb.text = "★ 기본 P (아무 P 에도 이어지지 않은 곳으로 들어올 때%s)" % (" · 부활·불러오기 때 깨어나는 곳 — 베이스캠프는 꼭 하나" if base else " · 이 맵은 없어도 됨")
 			dcb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			dcb.button_pressed = o.get("default", false)
-			dcb.disabled = o.get("default", false)   # 기본을 바꾸려면 다른 P 에서 체크
+			dcb.disabled = base and o.get("default", false)   # 베이스캠프는 다른 P 에서 체크해야 옮겨짐
 			dcb.toggled.connect(func(on):
+				checkpoint()
+				for x in map.objects:
+					if x.type == "arrive" and (on or x == o):
+						x.erase("default")
 				if on:
-					checkpoint()
-					for x in map.objects:
-						if x.type == "arrive":
-							x.erase("default")
 					o.default = true
-					dirty = true
-					_refresh_links()
-					canvas.queue_redraw()
-					_edit_object.call_deferred(o))
+				dirty = true
+				_refresh_links()
+				canvas.queue_redraw()
+				_edit_object.call_deferred(o))
 			inspector.add_child(dcb)
 			_title("이어지는 곳")
 			_hint("체크한 곳으로 이 맵에 들어오면 이 P 에 도착합니다. 아무 P 에도 이어지지 않은 곳은 ★ 기본 P.")
@@ -925,7 +934,9 @@ func _arrival_of(src: String, ref: String, explicit: String) -> Array:
 	for a in m.get("objects", []):
 		if a.get("type", "") == "arrive" and a.get("default", false) and explicit == "":
 			return [a.object_id, "★ " + (a.get("name", "") if a.get("name", "") != "" else "기본 P")]
-	return ["", "기본 P"]
+	if explicit == "" and not m.get("objects", []).any(func(a): return a.get("type", "") == "arrive"):
+		return ["", "P"]   # 예전 맵: start 가 기본
+	return ["", ""]   # 설 P 가 없음
 
 
 ## 연결 표시 글자·검사 (문·통로·이용 → 어디, 추가 도착 P ← 어디서, 가장자리)
@@ -964,6 +975,8 @@ func _link_out(src: String, ref: String, explicit: String) -> Array:
 	var target := _arrival_of(src, ref, explicit)
 	if explicit != "" and target[0] == "":
 		return ["→ %s · ⚠ 없는 도착 P %s" % [ref, explicit], false]
+	if target[1] == "":
+		return ["→ %s · ⚠ 설 P 없음 (그 맵 P 의 이어지는 곳에 체크하거나 기본 P)" % ref, false]
 	# 문 쪽에서 고른 P 와 그 맵 P 쪽 '이어지는 곳'이 다르면 충돌
 	if explicit != "":
 		for a in _all_maps[ref].get("objects", []):
@@ -993,6 +1006,7 @@ func _load_lookups() -> void:
 			seen[l.spot_id] = true
 			loot_spots.append([l.spot_id, l.spot_id])
 	var cfg: Dictionary = ToolCommon.read_json("res://data/config.json", {})
+	basecamp_id = str(cfg.get("basecamp_map", "basecamp"))
 	canvas.sight_tiles = float(cfg.get("field_enemy_sight", 5))
 
 

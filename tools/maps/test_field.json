@@ -16,29 +16,14 @@
   "##############################"
  ],
  "start": [
-  1,
-  1
+  2,
+  3
  ],
  "run_start": [
   14,
   5
  ],
  "objects": [
-  {
-   "object_id": "test_field_p",
-   "type": "arrive",
-   "x": 1,
-   "y": 1,
-   "ref": "",
-   "name": "기본",
-   "text": "",
-   "patrol_dir": "",
-   "patrol_len": 0,
-   "condition": "",
-   "schedule": "",
-   "arrive": "",
-   "default": true
-  },
   {
    "object_id": "fo_npc1",
    "type": "npc",
@@ -155,24 +140,6 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": ""
-  },
-  {
-   "object_id": "tf_from_travel",
-   "type": "arrive",
-   "x": 5,
-   "y": 5,
-   "ref": "",
-   "name": "사다리 아래",
-   "text": "",
-   "patrol_dir": "",
-   "patrol_len": 0,
-   "condition": "",
-   "schedule": "",
-   "arrive": "",
-   "from": [
-    "tt_ladder",
-    "test_travel:left"
-   ]
   }
  ]
 }

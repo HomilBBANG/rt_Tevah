@@ -1,0 +1,65 @@
+{
+ "map_id": "test_arrive",
+ "tiles": [
+  "#######",
+  "#.....#",
+  "#.....#",
+  "#.....#",
+  "#######"
+ ],
+ "start": [
+  2,
+  2
+ ],
+ "run_start": null,
+ "objects": [
+  {
+   "object_id": "ta_from_ladder",
+   "type": "arrive",
+   "x": 2,
+   "y": 2,
+   "ref": "",
+   "name": "사다리 아래",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": "",
+   "from": [
+    "tt_ladder"
+   ]
+  },
+  {
+   "object_id": "ta_from_edge",
+   "type": "arrive",
+   "x": 4,
+   "y": 2,
+   "ref": "",
+   "name": "서쪽 길",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": "",
+   "from": [
+    "test_travel:left"
+   ]
+  },
+  {
+   "object_id": "ta_back",
+   "type": "passage",
+   "x": 5,
+   "y": 3,
+   "ref": "test_travel",
+   "name": "돌아가는 통로",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": ""
+  }
+ ]
+}

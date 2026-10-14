@@ -405,6 +405,8 @@ def validate(d, rep):
                 err = travel_error(d.get("_maps", {}), rid[0], rid[1])
                 if err:
                     rep.err(where, err)
+                elif not rid[1] and not map_has_default(d["_maps"][rid[0]]):
+                    rep.err(where, f"move:{rid[0]} — 그 맵에 ★ 기본 도착 P 가 없음 (move:{rid[0]}@도착P 로 고르거나 기본 P 를 두세요)")
             elif kind == "loot" and rid not in spots:
                 rep.err(where, f"없는 spot_id '{rid}' (Loot 시트)")
             elif kind == "goto":
@@ -902,6 +904,14 @@ def arrive_ids(m):
     return {o.get("object_id", "") for o in m.get("objects", []) if o.get("type") == "arrive"}
 
 
+def map_has_default(m):
+    """★ 기본 도착 P 가 있나 (예전 맵: 도착 P 물체가 하나도 없고 start 만 있으면 그게 기본)"""
+    objs = m.get("objects", [])
+    if any(o.get("type") == "arrive" and o.get("default") for o in objs):
+        return True
+    return not any(o.get("type") == "arrive" for o in objs) and bool(m.get("start"))
+
+
 def travel_error(maps, ref, arrive):
     """맵 이동 대상 검사 (문·통로·이용·가장자리·move 효과). 맞으면 ''."""
     if ref not in maps:
@@ -913,6 +923,7 @@ def travel_error(maps, ref, arrive):
 
 def validate_field(d, maps, rep, enemies):
     spots = {r["spot_id"] for r in d["Loot"] if r["spot_id"]}
+    basecamp = next((str(r["value"]) for r in d["Config"] if r["key"] == "basecamp_map"), "")
     nodes = {n["node_id"]: n for n in d["Nodes"]}
     seen = {}
     for mid, m in maps.items():
@@ -932,17 +943,27 @@ def validate_field(d, maps, rep, enemies):
         def floor(x, y):
             return 0 <= y < len(tiles) and 0 <= x < len(tiles[y]) and tiles[y][x] == "."
 
-        # 도착 P 는 모두 arrive 물체, 그중 하나가 기본(default) — 그 자리가 start (예전 맵의 start 도 그대로 읽음)
-        defaults = [o for o in m["objects"] if o.get("type") == "arrive" and o.get("default")]
+        # 도착 P 는 모두 arrive 물체. ★ 기본(default) P 는 베이스캠프만 필수, 다른 맵은 선택.
+        # start (게임이 '기본 자리'로 읽음) = 기본 P → 없으면 첫 도착 P → 없으면 회차 시작 S (예전 맵의 start 도 읽음)
+        arrives = [o for o in m["objects"] if o.get("type") == "arrive"]
+        defaults = [o for o in arrives if o.get("default")]
+        has_default = map_has_default(m)
         if len(defaults) > 1:
             rep.err(wm, f"기본 도착 P 가 {len(defaults)}개 — 하나만 ({', '.join(o.get('object_id', '') for o in defaults)})")
+        if mid == basecamp and not has_default:
+            rep.err(wm, "베이스캠프 맵에는 ★ 기본 도착 P 가 꼭 있어야 함 (부활·불러오기 때 깨어나는 곳)")
         if defaults:
             m["start"] = [int(defaults[0]["x"]), int(defaults[0]["y"])]
-        for key, label in (("start", "기본 도착 P"), ("run_start", "회차 시작 S")):
+        elif arrives:
+            m["start"] = [int(arrives[0]["x"]), int(arrives[0]["y"])]
+        elif not m.get("start"):
+            if m.get("run_start"):
+                m["start"] = m["run_start"]
+            else:
+                rep.err(wm, "도착 P 도 회차 시작 S 도 없음 (P 를 하나 이상 두세요)")
+        for key, label in (("start", "도착 P"), ("run_start", "회차 시작 S")):
             pos = m.get(key)
             if pos is None:
-                if key == "start":
-                    rep.err(wm, "도착 위치 P 가 없음")
                 continue
             if not (isinstance(pos, list) and len(pos) == 2 and floor(int(pos[0]), int(pos[1]))):
                 rep.err(wm, f"{label} 위치가 바닥이 아님: {pos}")
@@ -972,6 +993,12 @@ def validate_field(d, maps, rep, enemies):
                     other = ents[src].get("arrive", "")
                     if other and other != o.get("object_id", ""):
                         rep.err(w, f"'{src}' 는 출발 쪽에서 도착 지점 '{other}' 를 따로 골랐음 (한쪽에서만 정할 것)")
+        # 기본 P 가 없는 맵: 들어오는 곳마다 설 P 가 정해져 있어야 한다
+        if not has_default:
+            for src, ent in ents.items():
+                if not ent.get("arrive") and src not in claimed:
+                    rep.err(wm, f"'{src}' 로 들어오면 설 도착 P 가 없음 — 이 맵에 ★ 기본 P 가 없으니, "
+                                f"P 의 '이어지는 곳'에 체크하거나 기본 P 를 두세요")
         occupied = {}
         for o in m["objects"]:
             oid = o.get("object_id", "")

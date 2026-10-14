@@ -13,7 +13,7 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(TEST_DIR)
 	for f in DirAccess.get_files_at(TEST_DIR):
 		DirAccess.remove_absolute(TEST_DIR + f)
-	for f in ["test_field", "basecamp", "test_travel"]:
+	for f in ["test_field", "basecamp", "test_travel", "test_arrive"]:
 		var w := FileAccess.open(TEST_DIR + f + ".json", FileAccess.WRITE)
 		w.store_string(FileAccess.get_file_as_string("res://tools/maps/%s.json" % f))
 		w.close()
@@ -28,17 +28,22 @@ func _ready() -> void:
 	add_child(bg)
 	add_child(ed)
 	await _frames(2)
-	check(ed.files.item_count == 3, "맵 3개 목록")
+	check(ed.files.item_count == 4, "맵 4개 목록")
 	ed.open_map("test_field")
 	await _frames(2)
 	var cv = ed.canvas
-	check(ed.map.objects.size() == 11 and ed.map.tiles.size() == 13, "test_field: 물체 11 (도착 P 2 포함), 13줄")
+	var legacy: bool = not original.objects.any(func(o): return o.type == "arrive")
+	var n_tf: int = original.objects.size() + (1 if legacy else 0)
+	check(ed.map.objects.size() == n_tf and ed.map.tiles.size() == original.tiles.size(), "test_field: 물체 %d, %d줄" % [n_tf, original.tiles.size()])
+	check(not ed.canvas.default_p().is_empty() if legacy else true, "예전 형식 맵: 열면 P 자리가 ★ 기본 P 물체로")
 	check(ed.enemies.size() == 1 and ed.dialogue_starts.size() >= 3 and ed.loot_spots.size() >= 3, "목록: 적·대화·Loot")
 
 	# 열고 저장 → 그대로
 	ed.save()
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_field.json"))
-	check(saved.tiles == original.tiles and saved.objects == original.objects and saved.start == original.start, "열고 저장 → 내용 그대로")
+	var no_p := func(objs: Array) -> Array: return objs.filter(func(o): return o.type != "arrive")
+	check(saved.tiles == original.tiles and no_p.call(saved.objects) == no_p.call(original.objects) and saved.start == original.start,
+		"열고 저장 → 내용 그대로 (도착 P 외)")
 
 	# 칠하기: 벽 → 바닥
 	ed.set_tool("wall")
@@ -60,13 +65,13 @@ func _ready() -> void:
 	ed.set_tool("enemy")
 	cv.apply_tool(Vector2i(4, 7))
 	var e: Dictionary = cv.selected
-	check(e.type == "enemy" and e.object_id == "test_field_enemy_1" and ed.map.objects.size() == 12, "적 놓기, ID 자동")
+	check(e.type == "enemy" and e.object_id == "test_field_enemy_1" and ed.map.objects.size() == n_tf + 1, "적 놓기, ID 자동")
 	ed.set_field(e, "ref", "enemy_test")
 	ed.set_field(e, "patrol_dir", "right")
 	ed.set_field(e, "patrol_len", 3)
 	ed.set_tool("enemy")
 	cv.apply_tool(Vector2i(4, 7))
-	check(ed.map.objects.size() == 12, "같은 칸에 또 못 놓음")
+	check(ed.map.objects.size() == n_tf + 1, "같은 칸에 또 못 놓음")
 	# 선택 도구로 옮기기 (끌기 대신 직접)
 	ed.set_tool("select")
 	cv.apply_tool(Vector2i(4, 7))
@@ -74,7 +79,7 @@ func _ready() -> void:
 	# 지우개
 	ed.set_tool("erase")
 	cv.apply_tool(Vector2i(3, 10))   # 조사 지점 2 (d)
-	check(ed.map.objects.size() == 11, "지우개로 물체 삭제")
+	check(ed.map.objects.size() == n_tf, "지우개로 물체 삭제")
 	# 회차 시작 위치 옮기기
 	ed.set_tool("run_start")
 	cv.apply_tool(Vector2i(20, 5))
@@ -88,7 +93,7 @@ func _ready() -> void:
 	check(ne.size() == 1 and ne[0].patrol_dir == "right" and int(ne[0].patrol_len) == 3 and ne[0].ref == "enemy_test", "저장: 새 적의 순찰·종류")
 	ed.open_map("basecamp")
 	ed.open_map("test_field")
-	check(ed.map.objects.size() == 11 and ed.map.run_start == [20, 5], "다시 열면 그대로")
+	check(ed.map.objects.size() == n_tf and ed.map.run_start == [20, 5], "다시 열면 그대로")
 
 	# 맵 이동: 통로·이용·도착 지점·가장자리 (test_travel)
 	ed.open_map("test_travel")
@@ -97,7 +102,7 @@ func _ready() -> void:
 	await _frames(2)
 	var labels: Array = ed.inspector.find_children("*", "Label", true, false).map(func(l): return l.text)
 	check("가장자리로 나가면" in labels and "왼쪽 →" in labels, "맵 설정에 가장자리 4방향")
-	check(ed._arrive_options("test_field").any(func(a): return a[0] == "tf_from_travel"), "도착 P 목록: 테스트 필드 '사다리 아래'")
+	check(ed._arrive_options("test_arrive").any(func(a): return a[0] == "ta_from_ladder"), "도착 P 목록: test_arrive '사다리 아래'")
 	await _snap("test_travel")
 	var passage: Dictionary = ed.map.objects.filter(func(o): return o.type == "passage")[0]
 	ed.canvas.select(passage)
@@ -105,42 +110,53 @@ func _ready() -> void:
 	await _snap("passage_selected")
 	ed.save()
 	var tt: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_travel.json"))
-	check(tt.edges.left.ref == "test_field" and tt.edges.down.ref == "basecamp", "저장: 가장자리 유지")
-	# 도착 P 의 '이어지는 곳': 테스트 필드 '사다리 아래' ← test_travel 사다리·왼쪽 가장자리
-	ed.open_map("test_field")
+	check(tt.edges.left.ref == "test_arrive" and tt.edges.down.ref == "basecamp", "저장: 가장자리 유지")
+	# 도착 P 의 '이어지는 곳': test_arrive (★ 기본 P 없는 맵) '사다리 아래' ← test_travel 사다리
+	ed.open_map("test_arrive")
 	await _frames(2)
-	var gate: Dictionary = ed.map.objects.filter(func(o): return o.object_id == "tf_from_travel")[0]
+	check(ed.canvas.default_p().is_empty(), "베이스캠프가 아니면 기본 P 없어도 됨")
+	var gate: Dictionary = ed.map.objects.filter(func(o): return o.object_id == "ta_from_ladder")[0]
 	ed.canvas.select(gate)
 	await _frames(2)
 	var boxes: Array = ed.inspector.find_children("*", "CheckBox", true, false)
 	var checked: Array = boxes.filter(func(b): return b.button_pressed).map(func(b): return b.text)
-	# 체크박스: 기본 P 1 + 들어오는 곳 3 (베이스캠프 문, test_travel 사다리, test_travel 왼쪽 가장자리)
-	check(boxes.size() == 4 and checked.size() == 2 and checked.any(func(t): return "사다리" in t)
-		and checked.any(func(t): return "왼쪽 가장자리" in t), "도착 P: 이어지는 곳 목록, 사다리·왼쪽 가장자리 체크 (%s)" % [checked])
+	# 체크박스: 기본 P 1 + 들어오는 곳 2 (test_travel 사다리, test_travel 왼쪽 가장자리)
+	check(boxes.size() == 3 and checked.size() == 1 and "사다리" in checked[0], "도착 P: 이어지는 곳 목록, 사다리 체크 (%s)" % [checked])
 	await _snap("arrive_p")
 	var other: CheckBox = boxes.filter(func(b): return not b.button_pressed and not "기본 P" in b.text)[0]
 	other.button_pressed = true
-	check(gate.from.size() == 3, "체크하면 이어지는 곳 추가")
+	check(gate.from.size() == 2, "체크하면 이어지는 곳 추가")
 	other.button_pressed = false
-	check(gate.from.size() == 2, "체크 풀면 빠짐")
+	check(gate.from.size() == 1, "체크 풀면 빠짐")
 	ed.save()
-	var tf: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_field.json"))
-	check(tf.objects.filter(func(o): return o.object_id == "tf_from_travel")[0].from == ["tt_ladder", "test_travel:left"], "저장: 이어지는 곳 유지")
-	# 기본 P: 하나만, 바꾸면 이전 것은 풀림, 마지막 P 는 못 지움
-	var main_p: Dictionary = ed.canvas.default_p()
-	check(main_p.object_id == "test_field_p" and tf.objects.filter(func(o): return o.get("default", false)).size() == 1, "기본 P 하나 (★)")
+	var ta: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_arrive.json"))
+	check(ta.objects.filter(func(o): return o.object_id == "ta_from_ladder")[0].from == ["tt_ladder"], "저장: 이어지는 곳 유지")
+	# 기본 P 켜고 끄기 (베이스캠프가 아니면 자유)
 	ed.canvas.select(gate)
 	await _frames(2)
 	var dcb: CheckBox = ed.inspector.find_children("*", "CheckBox", true, false).filter(func(b): return "기본 P" in b.text)[0]
 	dcb.button_pressed = true
-	check(ed.canvas.default_p() == gate and not main_p.get("default", false), "다른 P 를 기본으로 → 이전 기본 풀림")
+	check(ed.canvas.default_p() == gate, "기본 P 켜기")
+	await _frames(1)
+	dcb = ed.inspector.find_children("*", "CheckBox", true, false).filter(func(b): return "기본 P" in b.text)[0]
+	dcb.button_pressed = false
+	check(ed.canvas.default_p().is_empty(), "기본 P 끄기 (베이스캠프 아님)")
 	ed.undo()
-	check(ed.canvas.default_p().object_id == "test_field_p", "기본 P 바꾸기 실행 취소")
+	ed.undo()
+	check(ed.canvas.default_p().is_empty() and ed.map.objects.size() == 3, "실행 취소")
+	# 베이스캠프: 기본 P 필수 — 마지막 기본 P 는 못 지움
+	ed.open_map("basecamp")
+	await _frames(1)
+	var bc_p: Dictionary = ed.canvas.default_p()
+	ed.canvas.select(bc_p)
+	ed.delete_selection()
+	check(not bc_p.is_empty() and ed.canvas.default_p() == bc_p, "베이스캠프: 마지막 기본 P 는 못 지움")
 	ed.new_map("t_p", 8, 6)
-	var only_p: Dictionary = ed.canvas.default_p()
+	var only_p: Dictionary = ed.map.objects[0]
+	check(only_p.type == "arrive" and ed.canvas.default_p().is_empty(), "새 맵: P 하나 (기본 아님)")
 	ed.canvas.select(only_p)
 	ed.delete_selection()
-	check(ed.map.objects.size() == 1 and ed.canvas.default_p() == only_p, "새 맵: 기본 P 자동, 마지막 P 는 못 지움")
+	check(ed.map.objects.is_empty(), "베이스캠프가 아니면 P 지우기 가능")
 
 	# ---------- 편집 기능: 실행 취소 · 사각형 · 영역 선택 · 복사/붙여넣기 · 묶음 편집 · 연결 · 목록 · 검색 · 필터
 	ed.open_map("test_field")
@@ -214,8 +230,17 @@ func _ready() -> void:
 	var ladder: Dictionary = ed.map.objects.filter(func(o): return o.type == "transit")[0]
 	check("사다리 아래" in cv.link_labels[ladder.object_id][0], "사다리 연결 표시: %s" % cv.link_labels[ladder.object_id][0])
 	ed.follow_link(ladder)
-	check(ed.map.map_id == "test_field" and cv.selected.get("object_id", "") == "tf_from_travel", "사다리 더블클릭 → 테스트 필드 '사다리 아래' P")
-	check(cv.link_labels.tf_from_travel[0].begins_with("← ") and cv.link_labels.tf_from_travel[1], "P 연결 표시: %s" % cv.link_labels.tf_from_travel[0])
+	check(ed.map.map_id == "test_arrive" and cv.selected.get("object_id", "") == "ta_from_ladder", "사다리 더블클릭 → test_arrive '사다리 아래' P")
+	check(cv.link_labels.ta_from_ladder[0].begins_with("← ") and cv.link_labels.ta_from_ladder[1], "P 연결 표시: %s" % cv.link_labels.ta_from_ladder[0])
+	# 기본 P 없는 맵에 이어지지 않은 입구 → 경고 (test_travel 왼쪽 가장자리의 이어짐을 잠시 뺌)
+	var edge_p: Dictionary = ed.map.objects.filter(func(o): return o.object_id == "ta_from_edge")[0]
+	ed.set_field(edge_p, "from", [])
+	ed.open_map("test_travel")
+	check(not cv.link_labels["edge:left"][1], "기본 P 없는 맵에 이어지지 않은 가장자리 → ⚠ (%s)" % cv.link_labels["edge:left"][0])
+	ed.open_map("test_arrive")
+	edge_p = ed.map.objects.filter(func(o): return o.object_id == "ta_from_edge")[0]
+	ed.set_field(edge_p, "from", ["test_travel:left"])
+	ed.save()
 	ed.open_map("basecamp")
 	# 표시 필터: NPC 끄면 안 보이고 못 고름
 	ed.filter_boxes.npc.button_pressed = false

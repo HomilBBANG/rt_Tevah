@@ -35,13 +35,13 @@ func _ready() -> void:
 	check("이용: 사다리" in f.get_node("%Prompt").text, "사다리 근처 → '이용: 사다리' 안내 (%s)" % f.get_node("%Prompt").text)
 	_press("interact")
 	await _wait(0.2)
-	check(f.map.map_id == "test_field" and _at(5, 5), "E → test_field '사다리 아래' P(5,5) — P 쪽 이어지는 곳 (%s)" % _where())
+	check(f.map.map_id == "test_arrive" and _at(2, 2), "E → test_arrive '사다리 아래' P(2,2) — P 쪽 이어지는 곳 (%s)" % _where())
 
 	# 가장자리: 왼쪽 끝(0,1) → test_field, 아래 끝(4,5) → 베이스캠프 정문
 	f.load_map("test_travel")
 	await _wait(0.2)
 	await _walk_to(0, 1)
-	check(f.map.map_id == "test_field" and _at(5, 5), "왼쪽 가장자리 → test_field '사다리 아래' P (%s)" % _where())
+	check(f.map.map_id == "test_arrive" and _at(4, 2), "왼쪽 가장자리 → test_arrive '서쪽 길' P(4,2) (%s)" % _where())
 	f.load_map("test_travel")
 	await _wait(0.2)
 	await _walk_to(4, 5)
@@ -53,9 +53,9 @@ func _ready() -> void:
 	check(f.map.map_id == "test_travel" and _at(4, 3), "travel(도착 지점 tt_center) → (4,3)")
 
 	# 효과 move: (대화·아이템) — 대화 밖이면 바로
-	await StoryRunner.run_effects("move:test_field@tf_from_travel")
+	await StoryRunner.run_effects("move:test_arrive@ta_from_ladder")
 	await _wait(0.2)
-	check(f.map.map_id == "test_field" and _at(5, 5), "효과 move:test_field@tf_from_travel → 그 P (%s)" % _where())
+	check(f.map.map_id == "test_arrive" and _at(2, 2), "효과 move:test_arrive@ta_from_ladder → 그 P (%s)" % _where())
 	await StoryRunner.run_effects("move:test_travel")
 	await _wait(0.2)
 	check(f.map.map_id == "test_travel" and _at(4, 2), "효과 move:test_travel → P (%s)" % _where())

@@ -102,6 +102,84 @@
   "edges": {}
  },
  {
+  "map_id": "test_arrive",
+  "width": 7,
+  "height": 5,
+  "tiles": [
+   "#######",
+   "#.....#",
+   "#.....#",
+   "#.....#",
+   "#######"
+  ],
+  "start": [
+   2,
+   2
+  ],
+  "run_start": [
+   2,
+   2
+  ],
+  "objects": [
+   {
+    "object_id": "ta_from_ladder",
+    "type": "arrive",
+    "ref": "",
+    "name": "사다리 아래",
+    "text": "",
+    "condition": "",
+    "arrive": "",
+    "from": [
+     "tt_ladder"
+    ],
+    "default": false,
+    "map_id": "test_arrive",
+    "x": 2,
+    "y": 2,
+    "patrol_dir": "",
+    "patrol_len": 0,
+    "schedule": []
+   },
+   {
+    "object_id": "ta_from_edge",
+    "type": "arrive",
+    "ref": "",
+    "name": "서쪽 길",
+    "text": "",
+    "condition": "",
+    "arrive": "",
+    "from": [
+     "test_travel:left"
+    ],
+    "default": false,
+    "map_id": "test_arrive",
+    "x": 4,
+    "y": 2,
+    "patrol_dir": "",
+    "patrol_len": 0,
+    "schedule": []
+   },
+   {
+    "object_id": "ta_back",
+    "type": "passage",
+    "ref": "test_travel",
+    "name": "돌아가는 통로",
+    "text": "",
+    "condition": "",
+    "arrive": "",
+    "from": [],
+    "default": false,
+    "map_id": "test_arrive",
+    "x": 5,
+    "y": 3,
+    "patrol_dir": "",
+    "patrol_len": 0,
+    "schedule": []
+   }
+  ],
+  "edges": {}
+ },
+ {
   "map_id": "test_field",
   "width": 30,
   "height": 13,
@@ -121,31 +199,14 @@
    "##############################"
   ],
   "start": [
-   1,
-   1
+   2,
+   3
   ],
   "run_start": [
    14,
    5
   ],
   "objects": [
-   {
-    "object_id": "test_field_p",
-    "type": "arrive",
-    "ref": "",
-    "name": "기본",
-    "text": "",
-    "condition": "",
-    "arrive": "",
-    "from": [],
-    "default": true,
-    "map_id": "test_field",
-    "x": 1,
-    "y": 1,
-    "patrol_dir": "",
-    "patrol_len": 0,
-    "schedule": []
-   },
    {
     "object_id": "fo_npc1",
     "type": "npc",
@@ -298,26 +359,6 @@
     "patrol_dir": "",
     "patrol_len": 0,
     "schedule": []
-   },
-   {
-    "object_id": "tf_from_travel",
-    "type": "arrive",
-    "ref": "",
-    "name": "사다리 아래",
-    "text": "",
-    "condition": "",
-    "arrive": "",
-    "from": [
-     "tt_ladder",
-     "test_travel:left"
-    ],
-    "default": false,
-    "map_id": "test_field",
-    "x": 5,
-    "y": 5,
-    "patrol_dir": "",
-    "patrol_len": 0,
-    "schedule": []
    }
   ],
   "edges": {}
@@ -380,7 +421,7 @@
    {
     "object_id": "tt_ladder",
     "type": "transit",
-    "ref": "test_field",
+    "ref": "test_arrive",
     "name": "사다리",
     "text": "",
     "condition": "",
@@ -414,7 +455,7 @@
   ],
   "edges": {
    "left": {
-    "ref": "test_field",
+    "ref": "test_arrive",
     "arrive": ""
    },
    "down": {
