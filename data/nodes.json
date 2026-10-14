@@ -199,7 +199,7 @@
   "episode_id": "",
   "speaker_id": "",
   "text": "",
-  "next_node": "fd_cat_a",
+  "next_node": "cat_1",
   "on_enter": "",
   "kind": "start",
   "condition": "",
@@ -209,6 +209,10 @@
    {
     "condition": "count:talk==0",
     "next_node": "fd_cat_a"
+   },
+   {
+    "condition": "count:talk>=1",
+    "next_node": "cat_1"
    }
   ],
   "text_speed": "",
@@ -216,6 +220,33 @@
  },
  {
   "node_id": "fd_cat_a",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "아주 귀여운 고양이가 있다.",
+  "next_node": "",
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": "",
+  "pages": [
+   {
+    "page_id": "p1",
+    "display": "narration",
+    "text": "아주 귀여운 고양이가 있다."
+   },
+   {
+    "page_id": "p2",
+    "display": "bubble",
+    "text": "먀옹",
+    "speaker_id": "char_cat"
+   }
+  ],
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_cat"
+ },
+ {
+  "node_id": "cat_1",
   "episode_id": "",
   "speaker_id": "char_cat",
   "text": "먀옹",
