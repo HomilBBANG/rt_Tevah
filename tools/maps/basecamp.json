@@ -48,7 +48,7 @@
    "type": "npc",
    "x": 9,
    "y": 2,
-   "ref": "fd_cat_a",
+   "ref": "cat_start",
    "name": "고양이",
    "text": "",
    "patrol_dir": "",

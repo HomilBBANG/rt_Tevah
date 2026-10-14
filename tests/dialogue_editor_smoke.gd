@@ -5,6 +5,7 @@ extends Node
 const Editor = preload("res://addons/dialogue_editor/dialogue_editor.gd")
 const Card = preload("res://addons/dialogue_editor/dialogue_card.gd")
 const FuncCard = preload("res://addons/dialogue_editor/func_card.gd")
+const StartCard = preload("res://addons/dialogue_editor/start_card.gd")
 const ExprRows = preload("res://addons/expr_rows.gd")
 const TEST_DIR := "user://test_dialogues/"
 
@@ -253,8 +254,42 @@ func _ready() -> void:
 
 	# 새 대화
 	check(ed.new_dialogue("t_new"), "새 대화 만들기")
-	check(FileAccess.file_exists(TEST_DIR + "t_new.json") and ed._cards().size() == 1, "새 대화 파일 + 첫 카드")
+	check(FileAccess.file_exists(TEST_DIR + "t_new.json") and ed._cards().size() == 2, "새 대화 파일 + 대화 시작 카드 + 첫 카드")
 	check(not ed.new_dialogue("bad id!"), "잘못된 ID 거부")
+
+	# ---- NPC 단위 대화 + 대화 시작 카드
+	check(ed.new_dialogue("t_cat", "", "char_cat"), "NPC(고양이) 대화 만들기")
+	var st: GraphNode = ed.graph.get_node("t_cat_start")
+	var first: GraphNode = ed.graph.get_node(st.data.next_node)
+	check(st is StartCard and first.data.pages[0].display == "bubble" and first.data.pages[0].speaker_id == "char_cat"
+		and ed.dialogue.npc_id == "char_cat", "시작 카드 → 고양이 말풍선 첫 카드, 파일에 npc_id")
+	check(ed.graph.get_connection_list().any(func(c): return c.from_node == &"t_cat_start" and c.to_node == first.name), "시작 카드 '그 외' 연결선")
+	# 길 추가: 대화 횟수 == 0 → 새 카드, 그 외 → 반복 대사 카드
+	st.data.routes.append({"condition": "count:talk==0", "next_node": ""})
+	st.rebuild()
+	check(st.out_ports.size() == 2 and st.out_ports[0][0] == "route", "길 1개 + 그 외 = 연결점 2개")
+	var again: GraphNode = ed.add_card(Vector2(560, 400))
+	ed._on_connect(st.name, 0, first.name, 0)
+	ed._on_connect(st.name, 1, again.name, 0)
+	check(st.data.routes[0].next_node == first.data.node_id and st.data.next_node == again.data.node_id, "길 1 → 첫 카드, 그 외 → 반복 카드")
+	var n_cards: int = ed._cards().size()
+	ed._add_kind("start", Vector2.ZERO)
+	check(ed._cards().size() == n_cards, "대화 시작 카드는 하나만 (두 번째는 안 만듦)")
+	ed.save()
+	var tf: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "t_cat.json"))
+	var sn: Dictionary = tf.nodes.filter(func(n): return n.node_id == "t_cat_start")[0]
+	check(tf.npc_id == "char_cat" and sn.kind == "start" and sn.routes == [{"condition": "count:talk==0", "next_node": first.data.node_id}],
+		"저장: npc_id, 시작 카드 kind=start, routes")
+	ed.open_dialogue("cat")
+	ed.open_dialogue("t_cat")
+	await _frames(2)
+	st = ed.graph.get_node("t_cat_start")
+	check(st is StartCard and st.data.routes.size() == 1 and ed.graph.get_connection_list().filter(func(c): return c.from_node == &"t_cat_start").size() == 2,
+		"다시 열어도 시작 카드·길 그대로 (연결선 2)")
+	ed._select(st)
+	await _frames(2)
+	await _snap("start_card")
+	check(ed.file_list.get_item_text(ed.files.selected).contains("고양이"), "대화 목록에 NPC 이름")
 
 	# 변환·검사 (실제 프로젝트 데이터 — 원본 tools/dialogues 는 안 건드림)
 	var conv_ok: bool = ed.run_convert()

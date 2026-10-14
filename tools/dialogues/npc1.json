@@ -1,7 +1,21 @@
 {
  "dialogue_id": "npc1",
+ "npc_id": "char_npc",
  "episode_id": "",
  "nodes": [
+  {
+   "node_id": "npc1_start",
+   "kind": "start",
+   "routes": [],
+   "speaker_id": "",
+   "text": "",
+   "next_node": "fd_npc1_a",
+   "on_enter": "",
+   "pos": [
+    -480,
+    60
+   ]
+  },
   {
    "node_id": "fd_npc1_a",
    "speaker_id": "char_npc",

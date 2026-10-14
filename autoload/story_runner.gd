@@ -294,6 +294,13 @@ func _goto(target: String) -> void:
 		elif kind == "effect":
 			# 효과 카드: on_enter 만 실행하고 화면에 보이지 않은 채 다음으로
 			target = node.next_node
+		elif kind == "start":
+			# 대화 시작 카드: 길을 위에서부터 보고 조건이 맞는 첫 길로, 없으면 '그 외' (next_node)
+			target = node.next_node
+			for r in node.get("routes", []):
+				if Expr.evaluate(r.get("condition", ""), GameState):
+					target = r.get("next_node", "")
+					break
 		elif kind == "branch":
 			# 조건 분기 카드: 맞으면 next_node, 아니면 fail_next
 			target = node.next_node if Expr.evaluate(node.get("condition", ""), GameState) else node.get("fail_next", "")

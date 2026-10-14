@@ -271,6 +271,23 @@ func _run() -> void:
 	await StoryRunner.start_dialogue("fd_npc1_a")
 	check(GameState.get_count("talk") == 0, "새 회차면 처음부터")
 
+	# ---------- 대화 시작 카드 (kind=start): 위에서부터 조건이 맞는 첫 길, 없으면 그 외
+	DataLoader.nodes["tst_start"] = {"node_id": "tst_start", "kind": "start", "speaker_id": "", "text": "", "on_enter": "",
+		"next_node": "fd_npc2_a", "pages": [], "routes": [
+			{"condition": "count:talk==0", "next_node": "fd_npc1_a"},
+			{"condition": "flag:tst_x", "next_node": "fd_npc1_b"}]}
+	GameState.reset_run()
+	await StoryRunner.start_dialogue("tst_start")
+	check(node_id == "fd_npc1_a", "시작 카드: 첫 대화 → 길 1 (%s)" % node_id)
+	await StoryRunner.start_dialogue("tst_start")
+	check(node_id == "fd_npc2_a", "두 번째 대화, 플래그 없음 → 그 외 (%s)" % node_id)
+	GameState.set_flag("tst_x", true)
+	await StoryRunner.start_dialogue("tst_start")
+	check(node_id == "fd_npc1_b", "플래그가 켜지면 → 길 2 (%s)" % node_id)
+	DataLoader.nodes.erase("tst_start")
+	await StoryRunner.start_dialogue("cat_start")
+	check(node_id == "fd_cat_a", "고양이 대화 시작 카드 → fd_cat_a")
+
 
 func _fresh_to_d() -> void:
 	ending = ""

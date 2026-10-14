@@ -33,7 +33,7 @@ func _ready() -> void:
 	var field: Node = load("res://scenes/field/field.tscn").instantiate()
 	add_child(field)
 	await _wait(0.3)
-	var cat: Dictionary = field.npcs.filter(func(n): return n.data.ref == "fd_cat_a")[0]
+	var cat: Dictionary = field.npcs.filter(func(n): return n.data.ref == "cat_start")[0]
 	field._start_dialogue(cat)
 	await _wait(0.3)
 	await _press(field._dialogue_ui, "[전투] 싸운다.")

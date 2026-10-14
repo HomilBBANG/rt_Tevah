@@ -11,18 +11,20 @@ extends VBoxContainer
 
 const Card = preload("res://addons/dialogue_editor/dialogue_card.gd")
 const FuncCard = preload("res://addons/dialogue_editor/func_card.gd")
+const StartCard = preload("res://addons/dialogue_editor/start_card.gd")
 const ScriptPanel = preload("res://addons/dialogue_editor/script_panel.gd")
 const ScriptPages = preload("res://core/script_pages.gd")
 const ExprRows = preload("res://addons/expr_rows.gd")
 const ToolCommon = preload("res://addons/tool_common.gd")
 ## 카드 만들기 메뉴 / 왼쪽 팔레트 / 그래프 오른쪽 클릭
 const ADD_MENU := [
+	["start", "▶ 대화 시작 — 말을 걸면 여기서 시작, 조건에 따라 첫 길을 고름 (대화마다 하나)"],
 	["line", "📝 대본 블록 — 대사·상황 묘사·시스템 메시지 (여러 페이지)"],
 	["branch", "◇ 조건 분기 — 조건에 따라 길이 갈림"],
 	["effect", "⚙ 효과 — 아이템·플래그·생존 수치 등을 바꿈"],
 	["ending", "■ 엔딩 — 1단계 에피소드 대화의 끝"],
 ]
-const PALETTE := [["line", "📝 대본 블록"], ["branch", "◇ 조건 분기"], ["effect", "⚙ 효과"], ["ending", "■ 엔딩"]]
+const PALETTE := [["start", "▶ 대화 시작"], ["line", "📝 대본 블록"], ["branch", "◇ 조건 분기"], ["effect", "⚙ 효과"], ["ending", "■ 엔딩"]]
 
 const DIALOGUE_DIR := "res://tools/dialogues/"
 const EXIT_NAME := "__EXIT__"
@@ -209,7 +211,7 @@ func _build_left() -> Control:
 	file_list = ItemList.new()
 	file_list.custom_minimum_size.y = 150
 	file_list.size_flags_vertical = SIZE_EXPAND_FILL
-	file_list.item_clicked.connect(func(i, _p, _b): _request_open(file_list.get_item_text(i).trim_prefix("● ").trim_prefix("▶ ")))
+	file_list.item_clicked.connect(func(i, _p, _b): _request_open(file_list.get_item_metadata(i)))
 	vb.add_child(file_list)
 	vb.add_child(_caption("찾기"))
 	search = LineEdit.new()
@@ -254,6 +256,11 @@ const HELP_TEXT := """[b]대화 탭 쓰는 법[/b] — 대본은 아래 칸에�
   왼쪽 — 대화 목록 · 찾기(모든 대화의 대사·ID·플래그·아이템) · 카드 만들기(그래프로 끌어 놓기)
   가운데 위 — 흐름 그래프.  가운데 아래 — [b]대본 칸[/b] (고른 대본 블록의 페이지들, '⤢ 크게'로 그래프 접기)
   오른쪽 — 고른 카드·선택지의 세부 (기본 / 조건 / 결과 / 고급).  아래 — 검사 결과 (누르면 그 카드·페이지로)
+
+[b]0. NPC 대화[/b] — 대화 하나 = NPC 하나. [b]새 대화[/b]에서 NPC 를 고르면 [b]▶ 대화 시작[/b] 카드와 첫 대사 카드가 생깁니다.
+  · [b]▶ 대화 시작[/b]: 말을 걸면 여기서 시작 (화면에 안 보임). [b]＋ 조건 길 추가[/b]로 길을 만들고, 위에서부터 조건이 맞는 첫 길로 갑니다. 하나도 안 맞으면 [b]그 외 →[/b].
+    예) 길 1: 대화 횟수 == 0 → 첫 만남 · 길 2: 플래그 met_boss → 보스 이야기 · 그 외 → 반복 대사.  ↑ ↓ 로 길 순서(먼저 볼 것)를 바꿉니다.
+  · 맵 탭에서 NPC 의 '대화'에 [b]▶ NPC 대화[/b]를 고르면 연결됩니다. 대화 시작 카드는 대화마다 하나.
 
 [b]1. 대본 쓰기[/b] — 📝 대본 블록 카드를 고르면 아래 대본 칸에 페이지가 나옵니다.
   · 한 블록에 페이지를 여러 개: [b]＋ 페이지[/b] (본문에서 Ctrl+Enter = 그 아래에 새 페이지)
@@ -321,7 +328,9 @@ func _refresh_file_list_marks() -> void:
 	var current: String = dialogue.get("dialogue_id", "")
 	for i in files.item_count:
 		var n := files.get_item_text(i)
-		file_list.add_item(("● " if n == current and dirty else ("▶ " if n == current else "")) + n)
+		var who := _npc_of_file(n)
+		var row := file_list.add_item(("● " if n == current and dirty else ("▶ " if n == current else "")) + n + ("   — " + who if who != "" else ""))
+		file_list.set_item_metadata(row, n)
 	_save_btn.text = "저장 ●" if dirty else "저장"
 
 
@@ -377,7 +386,8 @@ func open_dialogue(id: String) -> void:
 	_select_file_item(id)
 	dirty = false
 	_refresh_file_list_marks()
-	_status("열림: %s  (%s)" % [id, "필드 대화" if dialogue.get("episode_id", "") == "" else "에피소드 " + dialogue.episode_id])
+	var who := _npc_of_file(id)
+	_status("열림: %s  (%s)" % [id, ("NPC 대화: " + who if who != "" else "필드 대화") if dialogue.get("episode_id", "") == "" else "에피소드 " + dialogue.episode_id])
 	_show_first_card.call_deferred()
 
 
@@ -392,7 +402,9 @@ func _show_first_card() -> void:
 	graph.scroll_offset = (top_left - Vector2(40, 90)) * graph.zoom   # 90: 그래프 도구줄 아래
 
 
-func new_dialogue(id: String, episode_id := "") -> bool:
+## 새 대화 (NPC 하나 = 대화 하나): ▶ 대화 시작 카드 + 그 NPC 의 첫 대사 카드를 만들어 잇는다.
+## episode_id 는 1단계 에피소드 대화용 (비우면 필드·NPC 대화).
+func new_dialogue(id: String, episode_id := "", npc_id := "") -> bool:
 	id = id.strip_edges()
 	if not RegEx.create_from_string("^[A-Za-z0-9_]+$").search(id):
 		_status("대화 ID 는 영문·숫자·_ 만")
@@ -404,9 +416,21 @@ func new_dialogue(id: String, episode_id := "") -> bool:
 	if dirty and not dialogue.is_empty():
 		save()
 	dialogue = {"dialogue_id": id, "episode_id": episode_id, "nodes": [], "choices": []}
+	if npc_id != "":
+		dialogue.npc_id = npc_id
 	path = dir + id + ".json"
 	_build_graph()
-	add_card(Vector2(40, 60))
+	_quiet = true
+	if episode_id == "":
+		var st := _make_card({"node_id": id + "_start", "kind": "start", "routes": [], "speaker_id": "", "text": "", "next_node": "", "on_enter": ""},
+			[], Vector2(40, 60))
+		var first := _make_card({"node_id": _new_node_id(), "speaker_id": npc_id, "text": "", "next_node": "", "on_enter": ""}, [], Vector2(560, 60))
+		st.data.next_node = first.data.node_id
+		st.rebuild()
+	else:
+		_make_card({"node_id": _new_node_id(), "speaker_id": "", "text": "", "next_node": "", "on_enter": ""}, [], Vector2(40, 60))
+	_quiet = false
+	_sync_connections()
 	save()
 	_reset_history()
 	refresh_file_list()
@@ -545,6 +569,7 @@ func _build_graph() -> void:
 	_clear_inspector()
 	_empty_hint()
 	script_panel.speakers = speakers.slice(1)
+	script_panel.default_speaker = dialogue.get("npc_id", "")
 	script_panel.edit(null)
 	var by_node := {}
 	for c in dialogue.get("choices", []):
@@ -562,13 +587,16 @@ func _build_graph() -> void:
 	for t in _all_targets():
 		if t.begins_with("END:") and graph.get_node_or_null(END_PREFIX + t.substr(4)) == null:
 			_make_terminal(END_PREFIX + t.substr(4), "엔딩: " + t.substr(4), _right_of_cards() + Vector2(0, 140))
+	for c in _cards():
+		c.rebuild()   # 모든 카드가 생긴 뒤에 다시 그려야 '없는 곳' ⚠ 표시가 맞다
 	_sync_connections()
 	_quiet = false
 
 
 func _make_card(data: Dictionary, node_choices: Array, pos: Vector2) -> GraphNode:
-	var card: GraphNode = FuncCard.new() if data.get("kind", "") in ["effect", "branch"] else Card.new()
-	if card is FuncCard:
+	var kind: String = data.get("kind", "")
+	var card: GraphNode = StartCard.new() if kind == "start" else (FuncCard.new() if kind in ["effect", "branch"] else Card.new())
+	if card is FuncCard or card is StartCard:
 		card.lookups = lookups
 	card.choice_id_maker = _new_choice_id
 	card.target_exists = _target_exists
@@ -598,7 +626,8 @@ func _make_terminal(node_name: String, label: String, pos: Vector2) -> GraphNode
 
 func add_card(pos: Vector2) -> GraphNode:
 	var id := _new_node_id()
-	var card := _make_card({"node_id": id, "speaker_id": "", "text": "", "next_node": "", "on_enter": ""}, [], pos)
+	# NPC 대화면 새 블록은 그 NPC 의 말풍선으로 시작
+	var card := _make_card({"node_id": id, "speaker_id": dialogue.get("npc_id", ""), "text": "", "next_node": "", "on_enter": ""}, [], pos)
 	_sync_connections()
 	_touch()
 	return card
@@ -673,6 +702,20 @@ func _add_kind(kind: String, pos: Vector2) -> void:
 		_status("먼저 대화를 열거나 새로 만드세요")
 		return
 	match kind:
+		"start":
+			var have := _start_card()
+			if have:
+				_select(have)
+				center_on(have)
+				_status("대화 시작 카드는 대화마다 하나입니다 — 이미 있는 카드로 갔습니다")
+				return
+			var data := {"node_id": dialogue.get("dialogue_id", "dlg") + "_start", "kind": "start", "routes": [], "speaker_id": "", "text": "", "next_node": "", "on_enter": ""}
+			while graph.get_node_or_null(NodePath(data.node_id)) != null:
+				data.node_id += "_"
+			var sc := _make_card(data, [], pos)
+			_sync_connections()
+			_touch()
+			_select(sc)
 		"line": _select(add_card(pos), 0)
 		"ending": _add_end_card()
 		_: _select(add_func_card(kind, pos))
@@ -799,7 +842,7 @@ func _select(card: GraphNode, page := -1) -> void:
 	if not is_instance_valid(card):
 		return
 	_edit_node(card)
-	if card is FuncCard:
+	if not card.uses_pages():
 		script_panel.edit(null)
 	elif script_panel.card != card or page >= 0:
 		script_panel.edit(card, page)
@@ -853,7 +896,7 @@ func _graph_keys(e: InputEvent) -> void:
 
 # ---------------------------------------------------------------- 복사·붙여넣기·복제
 func copy_selected() -> void:
-	var sel := _selected_cards()
+	var sel := _selected_cards().filter(func(c): return not c is StartCard)   # 대화 시작 카드는 대화마다 하나
 	if sel.is_empty():
 		return
 	_clipboard = []
@@ -944,6 +987,25 @@ func _edit_node(card: GraphNode) -> void:
 	_box_mode = "node"
 	_clear_inspector()
 	var d: Dictionary = card.data
+	if card is StartCard:
+		_title("▶ 대화 시작")
+		_section("기본")
+		_hint("NPC 에게 말을 걸면 여기서 시작합니다 (화면에 안 보임).\n카드 안의 길을 위에서부터 보고 조건이 맞는 첫 길로, 하나도 안 맞으면 '그 외 →'.\n예) 길 1: 대화 횟수 == 0 → 첫 만남 / 그 외 → 반복 대사")
+		var npcs := [["", "(정하지 않음)"]] + _npc_list()
+		_option("이 대화의 NPC", npcs.map(func(x): return x[0]), npcs.map(func(x): return x[1]), dialogue.get("npc_id", ""), func(v):
+			if v == "":
+				dialogue.erase("npc_id")
+			else:
+				dialogue.npc_id = v
+			script_panel.default_speaker = v
+			_touch()
+			_refresh_file_list_marks())
+		_hint("맵 탭에서 NPC 를 놓고 '대화'에 이 카드(%s)를 고르면 연결됩니다." % d.node_id)
+		_section("결과")
+		_target("그 외 갈 곳", d, "next_node", card)
+		_section("고급", false)
+		_line("카드 ID", d.node_id, func(v): _rename_node(card, v))
+		return
 	if card is FuncCard:
 		var branch: bool = d.kind == "branch"
 		_title("◇ 조건 분기" if branch else "⚙ 효과")
@@ -1165,7 +1227,7 @@ func _run_search() -> void:
 					_result(f, nid, i, "%s · %s · %d쪽: %s" % [f, nid, i + 1, ScriptPages.parse_text(pages[i].text).text.left(30)])
 					hit = true
 			if not hit:
-				for k in ["node_id", "on_enter", "condition", "next_node", "fail_next", "speaker_id"]:
+				for k in ["node_id", "on_enter", "condition", "next_node", "fail_next", "speaker_id", "routes"]:
 					if q in str(nd.get(k, "")).to_lower():
 						_result(f, nid, -1, "%s · %s  (%s: %s)" % [f, nid, k, str(nd.get(k, "")).left(30)])
 						break
@@ -1269,21 +1331,58 @@ func _status(t: String) -> void:
 
 func _ask_new() -> void:
 	var dlg := ConfirmationDialog.new()
-	dlg.title = "새 대화"
+	dlg.title = "새 NPC 대화"
 	var box := VBoxContainer.new()
+	var l := Label.new()
+	l.text = "누구의 대화인가요? (NPC 하나 = 대화 하나, npc.xlsx Npcs)"
+	box.add_child(l)
+	var npc := OptionButton.new()
+	var npcs := _npc_list()
+	for x in npcs:
+		npc.add_item(x[1])
+	box.add_child(npc)
 	var id := LineEdit.new()
-	id.placeholder_text = "대화 ID (영문·숫자·_, 예: hana_first_meet)"
-	var ep := LineEdit.new()
-	ep.placeholder_text = "에피소드 ID (비우면 필드 대화)"
+	id.placeholder_text = "대화 ID (영문·숫자·_)"
 	box.add_child(id)
-	box.add_child(ep)
+	var suggest := func(i: int):
+		if i >= 0 and i < npcs.size():
+			id.text = String(npcs[i][0]).trim_prefix("char_").trim_prefix("npc_")
+	npc.item_selected.connect(suggest)
+	suggest.call(0)
 	dlg.add_child(box)
 	dlg.confirmed.connect(func():
-		new_dialogue(id.text, ep.text.strip_edges())
+		new_dialogue(id.text, "", npcs[npc.selected][0] if npc.selected >= 0 and npc.selected < npcs.size() else "")
 		dlg.queue_free())
 	dlg.canceled.connect(dlg.queue_free)
 	add_child(dlg)
-	dlg.popup_centered(Vector2i(480, 160))
+	dlg.popup_centered(Vector2i(520, 200))
+
+
+## NPC 목록 [[char_id, "이름  (id)"]] — 플레이어 빼고
+func _npc_list() -> Array:
+	var out := []
+	for ch in _read_json("res://data/characters.json", []):
+		if not ch.get("is_player", false):
+			out.append([ch.char_id, "%s  (%s)" % [ch.name, ch.char_id]])
+	return out
+
+
+## 대화 파일의 NPC 이름 (목록 표시용)
+func _npc_of_file(id: String) -> String:
+	var npc: String = dialogue.get("npc_id", "") if id == dialogue.get("dialogue_id", "") else str(_read_json(dir + id + ".json", {}).get("npc_id", ""))
+	if npc == "":
+		return ""
+	for s in speakers:
+		if s[0] == npc:
+			return String(s[1]).get_slice("  (", 0)
+	return npc
+
+
+func _start_card() -> GraphNode:
+	for c in _cards():
+		if c is StartCard:
+			return c
+	return null
 
 
 func _clear_inspector() -> void:
@@ -1337,6 +1436,8 @@ func _target(label: String, d: Dictionary, key: String, card: GraphNode) -> void
 	for c in _cards():
 		var id: String = c.data.node_id
 		here[id] = true
+		if c is StartCard:
+			continue   # 대화 시작 카드로는 이을 수 없음 (들어오는 점 없음)
 		var what: String = ("(조건 분기)" if c.data.kind == "branch" else "(효과 카드)") if c is FuncCard else c.summary().left(18)
 		opts.append([id, "이 대화: %s — %s" % [id, what]])
 	for n in lookups.get("nodes", []):

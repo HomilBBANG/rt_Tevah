@@ -34,7 +34,8 @@ OUT_DIR = ROOT / "data"
 
 STATS = {"hp", "sanity", "time"}
 SHOW_MODES = {"", "hide", "gray"}
-NODE_KINDS = {"", "line", "effect", "branch"}
+NODE_KINDS = {"", "line", "effect", "branch", "start"}
+# start = 대화 시작 카드 (NPC 대화 파일마다 하나). routes 를 위에서부터 보고 조건이 맞는 첫 길로, 없으면 next_node(그 외).
 # 대본 페이지 (core/script_pages.gd 와 같은 규칙). 노드의 pages 가 없으면 speaker_id·text 로 페이지 1개.
 PAGE_DISPLAYS = {"narration", "bubble", "system"}
 PAGE_SPEEDS = {"", "instant", "slow", "normal", "fast"}
@@ -620,14 +621,37 @@ def validate(d, rep):
             check_target(w + " next_node", n["next_node"], ep)
             if not n["next_node"].startswith("END:"):
                 out.add(n["next_node"])
-        elif nid not in choices_by_node and not out:
+        elif nid not in choices_by_node and not out and n["kind"] != "start":   # 시작 카드는 아래에서 '그 외' 로 검사
             rep.err(w, "출구 없음 (선택지·next_node·END/EXIT 모두 없음)")
         check_pages(w, n, chars, rep)
         kind = n["kind"]
         if kind not in NODE_KINDS:
-            rep.err(w, f"kind 는 line / effect / branch: '{kind}'")
-        if kind in ("effect", "branch") and nid in choices_by_node:
-            rep.err(w, "효과·조건 분기 카드에는 선택지를 달 수 없음")
+            rep.err(w, f"kind 는 line / effect / branch / start: '{kind}'")
+        if kind in ("effect", "branch", "start") and nid in choices_by_node:
+            rep.err(w, "효과·조건 분기·대화 시작 카드에는 선택지를 달 수 없음")
+        routes = n.get("routes") or []
+        if kind == "start":
+            if ep != "":
+                rep.err(w, "대화 시작 카드는 NPC(필드) 대화에서만")
+            if not n["next_node"]:
+                rep.err(w, "대화 시작 카드에 '그 외 →' 출구가 없음")
+            for i, r in enumerate(routes):
+                rw = f"{w} 길 {i + 1}"
+                if not isinstance(r, dict):
+                    rep.err(rw, "길 형식이 아님")
+                    continue
+                cond = _dlg_str(r.get("condition", ""))
+                target = _dlg_str(r.get("next_node", ""))
+                if not cond:
+                    rep.err(rw, "조건이 없음 (조건 없는 길은 '그 외 →' 로)")
+                check_cond(rw, cond)
+                if not target:
+                    rep.err(rw, "갈 곳이 없음")
+                else:
+                    check_target(rw, target, ep)
+                    out.add(target)
+        elif routes:
+            rep.err(w, "routes 는 대화 시작(kind=start) 카드에서만")
         if kind == "branch":
             if not n["condition"]:
                 rep.err(w, "조건 분기 카드에 조건이 없음")
@@ -710,7 +734,13 @@ def validate(d, rep):
     roots = [[ep["start_node"], ep["timeout_node"]] +
              [g for g in item_gotos if g in nodes and nodes[g]["episode_id"] == ep["episode_id"]]
              for ep in d["Episodes"]]
-    roots.append([o["ref"] for o in d["FieldObjects"] if o.get("type") == "npc"])
+    npc_refs = {o["ref"] for o in d["FieldObjects"] if o.get("type") == "npc"}
+    roots.append(list(npc_refs))
+    # 대화 시작 카드는 맵에 아직 안 놓은 NPC 의 대화여도 검사가 통과하도록 뿌리로 (안 쓰이면 경고)
+    roots.append([n["node_id"] for n in d["Nodes"] if n["kind"] == "start"])
+    for n in d["Nodes"]:
+        if n["kind"] == "start" and n["node_id"] not in npc_refs:
+            rep.warn(f"{loc('Nodes', n)} ({n['node_id']})", "어느 맵의 NPC 에도 연결되지 않은 대화 시작 카드")
     for root in roots:
         q = deque(x for x in root if x in nodes)
         while q:
@@ -819,9 +849,9 @@ def validate_combat(d, rep, pparts, enemies, eparts):
 def check_pages(w, n, chars, rep):
     """대본 페이지 검사. 오류: 표시 종류·화자·속도·넘김·{ } 표시. 경고: 빈 본문."""
     pages = n.get("pages") or []
-    if n.get("kind") in ("effect", "branch"):
+    if n.get("kind") in ("effect", "branch", "start"):
         if pages:
-            rep.err(w, "효과·조건 분기 카드에는 대본 페이지를 둘 수 없음")
+            rep.err(w, "효과·조건 분기·대화 시작 카드에는 대본 페이지를 둘 수 없음")
         return
     if n.get("text_speed", "") not in PAGE_SPEEDS and not _is_pos_number(n.get("text_speed", "")):
         rep.err(w, f"대화 파일의 text_speed 가 이상함: '{n['text_speed']}'")
@@ -884,6 +914,7 @@ def read_dialogues(d, rep):
     """tools/dialogues/*.json (대화 에디터 파일) 의 노드·선택지를 엑셀 Nodes·Choices 뒤에 붙인다."""
     if not DIALOGUES_DIR.exists():
         return
+    npc_ids = {r["npc_id"] for r in d.get("Npcs", [])}
     node_cols = SCHEMA["Nodes"][1] + OPTIONAL.get("Nodes", [])
     choice_cols = SCHEMA["Choices"][1] + OPTIONAL.get("Choices", [])
     for f in sorted(DIALOGUES_DIR.glob("*.json")):
@@ -894,11 +925,22 @@ def read_dialogues(d, rep):
             continue
         episode = str(dlg.get("episode_id", "") or "")
         speed = _dlg_str(dlg.get("text_speed", ""))
+        # NPC 단위 대화: 파일마다 npc_id (Npcs) 하나, 대화 시작 카드는 하나만
+        npc = _dlg_str(dlg.get("npc_id", ""))
+        if npc and npc not in npc_ids:
+            rep.err(f"대화 {f.name}", f"없는 npc_id '{npc}' (npc.xlsx Npcs)")
+        starts = [n.get("node_id") for n in dlg.get("nodes", []) if n.get("kind") == "start"]
+        if len(starts) > 1:
+            rep.err(f"대화 {f.name}", f"대화 시작 카드가 {len(starts)}개 (하나만): {', '.join(map(str, starts))}")
+        if npc and not starts:
+            rep.warn(f"대화 {f.name}", "NPC 대화에 대화 시작 카드가 없음")
         for n in dlg.get("nodes", []):
             rec = {c: _dlg_str(n.get(c, "")) for c in node_cols}
             rec["episode_id"] = episode
             rec["pages"] = n.get("pages") if isinstance(n.get("pages"), list) else []
+            rec["routes"] = n.get("routes") if isinstance(n.get("routes"), list) else []
             rec["text_speed"] = speed
+            rec["npc_id"] = npc
             rec["_row"] = f"{f.name}"
             d["Nodes"].append(rec)
         for c in dlg.get("choices", []):
@@ -1182,7 +1224,9 @@ def export(d, maps):
 
     out = {
         "episodes": clean(d["Episodes"]),
-        "nodes": [dict(n, pages=n.get("pages") or [], text_speed=n.get("text_speed", "")) for n in clean(d["Nodes"])],
+        "nodes": [dict(n, pages=n.get("pages") or [], routes=[{"condition": _dlg_str(r.get("condition", "")), "next_node": _dlg_str(r.get("next_node", ""))}
+                                                         for r in (n.get("routes") or []) if isinstance(r, dict)],
+                       text_speed=n.get("text_speed", ""), npc_id=n.get("npc_id", "")) for n in clean(d["Nodes"])],
         "choices": [choice(r) for r in clean(d["Choices"])],
         "items": [dict(r, dice_bonus=bonuses(r["dice_bonus"])) for r in clean(d["Items"])],
         "loot": clean(d["Loot"]),

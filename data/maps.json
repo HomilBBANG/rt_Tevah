@@ -58,7 +58,7 @@
    {
     "object_id": "fo_cat",
     "type": "npc",
-    "ref": "fd_cat_a",
+    "ref": "cat_start",
     "name": "고양이",
     "text": "",
     "condition": "",
@@ -206,7 +206,7 @@
    {
     "object_id": "fo_npc1",
     "type": "npc",
-    "ref": "fd_npc1_a",
+    "ref": "npc1_start",
     "name": "NPC 1",
     "text": "",
     "condition": "",
@@ -308,7 +308,7 @@
    {
     "object_id": "fo_npc2",
     "type": "npc",
-    "ref": "fd_npc2_a",
+    "ref": "npc2_start",
     "name": "NPC 2",
     "text": "",
     "condition": "",

@@ -10,7 +10,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "t1_a",
@@ -23,7 +25,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "t1_b",
@@ -36,7 +40,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "t1_c",
@@ -49,7 +55,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "t1_d",
@@ -62,7 +70,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "t1_timeout",
@@ -75,7 +85,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "t2_a",
@@ -88,7 +100,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "t2_timeout",
@@ -101,7 +115,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "t2_npc1",
@@ -114,7 +130,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "t2_npc2",
@@ -127,7 +145,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "t1_e",
@@ -140,7 +160,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "t1_dice_ok",
@@ -153,7 +175,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "t1_dice_fail",
@@ -166,7 +190,29 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": ""
+ },
+ {
+  "node_id": "cat_start",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "fd_cat_a",
+  "on_enter": "",
+  "kind": "start",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [
+   {
+    "condition": "count:talk==0",
+    "next_node": "fd_cat_a"
+   }
+  ],
+  "text_speed": "",
+  "npc_id": "char_cat"
  },
  {
   "node_id": "fd_cat_a",
@@ -179,7 +225,24 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_cat"
+ },
+ {
+  "node_id": "npc1_start",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "fd_npc1_a",
+  "on_enter": "",
+  "kind": "start",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc"
  },
  {
   "node_id": "fd_npc1_a",
@@ -192,7 +255,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc"
  },
  {
   "node_id": "fd_npc1_b",
@@ -205,7 +270,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc"
  },
  {
   "node_id": "fd_npc1_fail",
@@ -218,7 +285,24 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc"
+ },
+ {
+  "node_id": "npc2_start",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "fd_npc2_a",
+  "on_enter": "",
+  "kind": "start",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc2"
  },
  {
   "node_id": "fd_npc2_a",
@@ -231,7 +315,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc2"
  },
  {
   "node_id": "fd_npc2_b",
@@ -244,7 +330,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc2"
  },
  {
   "node_id": "fd_npc2_win",
@@ -257,7 +345,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc2"
  },
  {
   "node_id": "fd_npc2_fled",
@@ -270,7 +360,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc2"
  },
  {
   "node_id": "fd_npc2_fx",
@@ -283,7 +375,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc2"
  },
  {
   "node_id": "fd_npc2_br",
@@ -296,7 +390,9 @@
   "condition": "has:water & flag:fx_done",
   "fail_next": "fd_npc2_no",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc2"
  },
  {
   "node_id": "fd_npc2_yes",
@@ -309,7 +405,9 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc2"
  },
  {
   "node_id": "fd_npc2_no",
@@ -322,6 +420,8 @@
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "text_speed": ""
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "char_npc2"
  }
 ]

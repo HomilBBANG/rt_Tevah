@@ -1092,10 +1092,18 @@ func _load_lookups() -> void:
 	var names := {}
 	for c in ToolCommon.read_json("res://data/characters.json", []):
 		names[c.char_id] = c.name
+	# NPC 대화의 ▶ 대화 시작 카드를 먼저, 그 밑에 중간 카드(대화 중간부터 시작)
+	var mids := []
 	for n in ToolCommon.read_json("res://data/nodes.json", []):
-		if n.get("episode_id", "") == "":
+		if n.get("episode_id", "") != "":
+			continue
+		if n.get("kind", "") == "start":
+			var npc: String = n.get("npc_id", "")
+			dialogue_starts.append([n.node_id, "▶ %s 대화  (%s)" % [names.get(npc, npc) if npc != "" else "NPC 미정", n.node_id]])
+		elif not n.get("kind", "") in ["effect", "branch"]:
 			var who: String = names.get(n.speaker_id, "내레이션") if n.speaker_id != "" else "내레이션"
-			dialogue_starts.append([n.node_id, "%s  — %s: %s" % [n.node_id, who, String(n.text).left(14)]])
+			mids.append([n.node_id, "   %s  — %s: %s" % [n.node_id, who, String(n.text).left(14)]])
+	dialogue_starts.append_array(mids)
 	loot_spots = []
 	var seen := {}
 	for l in ToolCommon.read_json("res://data/loot.json", []):

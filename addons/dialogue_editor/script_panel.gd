@@ -15,6 +15,7 @@ const SPEED_ITEMS := [["", "속도: 기본"], ["instant", "즉시"], ["slow", "�
 
 var card: GraphNode
 var speakers: Array = []           # [[char_id, name]] — (내레이션) 빼고
+var default_speaker := ""          # 이 대화의 NPC (첫 페이지를 새로 쓸 때 말풍선 화자)
 var page_boxes: Array = []         # 페이지 편집 칸 (테스트에서 씀)
 var _head: Label
 var _list: VBoxContainer
@@ -75,6 +76,8 @@ func add_page(at: int, from := {}) -> void:
 	if from.is_empty():
 		# 바로 위 페이지의 화자·표시를 이어받는다 (대본을 이어 쓰기 쉽게)
 		var prev: Dictionary = pages()[at - 1] if at > 0 and at - 1 < pages().size() else {}
+		if prev.is_empty() and default_speaker != "":
+			prev = {"display": "bubble", "speaker_id": default_speaker}
 		p = ScriptPages.normalize({"display": prev.get("display", "narration"), "speaker_id": prev.get("speaker_id", ""), "text": ""})
 	else:
 		p = from.duplicate(true)

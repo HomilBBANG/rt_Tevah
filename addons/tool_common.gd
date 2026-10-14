@@ -117,8 +117,8 @@ static func load_lookups() -> Dictionary:
 	var texts := PackedStringArray()
 	for n in read_json("res://data/nodes.json", []):
 		var kind: String = n.get("kind", "")
-		var label := "(효과 카드)" if kind == "effect" else ("(조건 분기)" if kind == "branch" else
-			"%s: %s" % [names.get(n.speaker_id, "내레이션") if n.speaker_id != "" else "내레이션", String(n.text).left(16)])
+		var label := "(효과 카드)" if kind == "effect" else ("(조건 분기)" if kind == "branch" else ("▶ 대화 시작" if kind == "start" else
+			"%s: %s" % [names.get(n.speaker_id, "내레이션") if n.speaker_id != "" else "내레이션", String(n.text).left(16)]))
 		lk.nodes.append([n.node_id, n.get("episode_id", ""), label])
 		texts.append(n.get("on_enter", ""))
 		texts.append(n.get("condition", ""))
