@@ -2,7 +2,7 @@ extends Node
 ## ep_test1 / ep_test2 더미 데이터로 StoryRunner 를 처음부터 엔딩까지 돌려보는 통합 테스트. 실행:
 ##   Godot_v4.7-stable_win64_console.exe --headless --path . res://tests/test_story.tscn
 ## 저장은 user://test_saves/ 에 하므로 실제 세이브는 건드리지 않는다.
-## 더미 데이터(tools/sheets/content.xlsx)의 ID에 의존한다.
+## 더미 데이터(tools/sheets/*.xlsx, tools/dialogues/)의 ID에 의존한다.
 
 var node_id := ""
 var entries: Array = []

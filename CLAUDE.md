@@ -31,7 +31,10 @@ res://
   ui/            # 재사용 컴포넌트
 tools/
   xlsx_to_json.py
-  sheets/content.xlsx
+  sheets/content.xlsx  # 에피소드 대화·능력치 이름·Config·생존·거점·부활
+  sheets/player.xlsx   # Player, PlayerParts
+  sheets/npc.xlsx      # Npcs, NpcParts, NpcAttacks
+  sheets/item.xlsx     # Items, Loot
 ```
 
 ## 아키텍처
@@ -41,7 +44,7 @@ tools/
 - **SaveManager** (autoload): `user://`에 월드 상태 파일 1개 + 에피소드 진행 파일 분리 저장.
 - UI 씬은 로직을 갖지 않는다. StoryRunner·GameState 시그널을 받아 그리고, 선택 입력만 돌려준다.
 
-## 엑셀 시트 (content.xlsx)
+## 엑셀 시트 (tools/sheets/*.xlsx — 파일별 시트는 변환기 SHEET_FILES)
 | 시트 | 열 |
 | --- | --- |
 | Episodes | episode_id, title, protagonist_id, start_node, unlock_condition |

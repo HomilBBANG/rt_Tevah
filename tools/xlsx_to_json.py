@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""tools/sheets/content.xlsx (+ tools/maps/*.txt, tools/dialogues/*.json) → res://data/*.json 변환 + 데이터 검사. Python 3.9+.
+"""tools/sheets/*.xlsx (+ tools/maps/*.json, tools/dialogues/*.json) → res://data/*.json 변환 + 데이터 검사. Python 3.9+.
+
+엑셀은 여러 파일로 나뉜다 (SHEET_FILES): player.xlsx (플레이어), npc.xlsx (NPC·적), item.xlsx (아이템·Loot),
+content.xlsx (나머지: 에피소드 대화, 능력치 이름, Config, 생존, 거점, 부활 …).
 
 대화(노드·선택지)는 Godot 의 '대화' 탭(addons/dialogue_editor)이 만드는 tools/dialogues/*.json 이 원본이고,
 엑셀 Nodes·Choices 시트와 합쳐서 검사·출력한다.
 
-사용법:  python tools/xlsx_to_json.py [xlsx 경로]
+사용법:  python tools/xlsx_to_json.py [엑셀 폴더 또는 content.xlsx 경로]
 오류가 하나라도 있으면 JSON을 쓰지 않고 종료 코드 1로 끝난다.
 이름이 '_'로 시작하는 시트와, 스키마에 없는 열(메모 등)은 무시한다.
 """
@@ -17,7 +20,14 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_XLSX = ROOT / "tools" / "sheets" / "content.xlsx"
+SHEETS_DIR = ROOT / "tools" / "sheets"
+# 시트 → 엑셀 파일 (여기 없는 시트는 content.xlsx)
+SHEET_FILES = {
+    "Player": "player.xlsx", "PlayerParts": "player.xlsx",
+    "Npcs": "npc.xlsx", "NpcParts": "npc.xlsx", "NpcAttacks": "npc.xlsx",
+    "Items": "item.xlsx", "Loot": "item.xlsx",
+}
+CONTENT_FILE = "content.xlsx"
 MAPS_DIR = ROOT / "tools" / "maps"
 DIALOGUES_DIR = ROOT / "tools" / "dialogues"
 OUT_DIR = ROOT / "data"
@@ -259,13 +269,24 @@ def cell_str(v):
     return str(v).strip()
 
 
-def read_sheets(path, rep):
-    wb = load_workbook(path, data_only=True, read_only=True)
+def read_sheets(folder, rep):
+    """SHEET_FILES 에 따라 시트마다 그 엑셀 파일에서 읽는다. 잠긴 파일은 PermissionError."""
+    books = {}
     data = {}
     for sheet, (id_col, cols, numeric) in SCHEMA.items():
+        fname = SHEET_FILES.get(sheet, CONTENT_FILE)
+        if fname not in books:
+            fpath = folder / fname
+            books[fname] = load_workbook(fpath, data_only=True, read_only=True) if fpath.exists() else None
+            if books[fname] is None:
+                rep.err(fname, f"엑셀 파일이 없음: {fpath}")
+        wb = books[fname]
+        if wb is None:
+            data[sheet] = []
+            continue
         if sheet not in wb.sheetnames:
             if sheet not in OPTIONAL_SHEETS:
-                rep.err(sheet, "시트가 없음")
+                rep.err(sheet, f"시트가 없음 ({fname})")
             data[sheet] = []
             continue
         rows = list(wb[sheet].iter_rows(values_only=True))
@@ -1010,7 +1031,8 @@ def main():
         lines.append(text)
 
     try:
-        return _run(Path(args[0]) if args else DEFAULT_XLSX, say)
+        target = Path(args[0]) if args else SHEETS_DIR
+        return _run(target.parent if target.suffix == ".xlsx" else target, say)
     finally:
         if log_path:
             with open(log_path, "w", encoding="utf-8", newline="\n") as fp:
@@ -1024,8 +1046,8 @@ def _run(path, say):
     rep = Report()
     try:
         data = read_sheets(path, rep)
-    except PermissionError:
-        say(f"파일을 열 수 없음(다른 프로그램이 잠금?): {path}")
+    except PermissionError as e:
+        say(f"파일을 열 수 없음(엑셀에서 열려 있나요?): {e.filename or path}")
         return 1
     read_dialogues(data, rep)
     maps = read_maps(rep)
