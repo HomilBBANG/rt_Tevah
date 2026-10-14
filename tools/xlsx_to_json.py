@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SHEETS_DIR = ROOT / "tools" / "sheets"
 # 시트 → 엑셀 파일 (여기 없는 시트는 content.xlsx)
 SHEET_FILES = {
-    "Player": "player.xlsx", "PlayerParts": "player.xlsx",
+    "Player": "player.xlsx", "PlayerParts": "player.xlsx", "EquipSlots": "player.xlsx",
     "Npcs": "npc.xlsx", "NpcParts": "npc.xlsx", "NpcAttacks": "npc.xlsx",
     "Items": "item.xlsx", "Loot": "item.xlsx",
 }
@@ -49,7 +49,9 @@ SCHEMA = {
     "Choices": ("choice_id", ["choice_id", "node_id", "text", "condition", "show_mode", "cost", "effects",
                               "next_node"], {}),
     "Items": ("item_id", ["item_id", "name", "type", "description", "use_effects", "stack_max"],
-              {"stack_max": (int, 1)}),
+              {"stack_max": (int, 1), "weight": (float, 0.0), "bag_slots": (int, 0)}),
+    # 장비 칸 (장비창). Items.equip_slot 이 이 slot_id 면 그 칸에 장착
+    "EquipSlots": ("slot_id", ["slot_id", "name"], {}),
     "Loot": ("loot_id", ["loot_id", "spot_id", "item_id", "amount", "chance", "time_cost"],
              {"amount": (int, 1), "chance": (float, 100.0), "time_cost": (int, 0)}),
     # ---- 등장인물: 플레이어(주인공)와 NPC(적 포함 — NPC 와도 싸울 수 있다). 능력치 6개는 주사위 판정에도 쓴다
@@ -80,7 +82,7 @@ SCHEMA = {
 }
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
-OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks",
+OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots",
                    "Survival", "CampActions", "Revivals"}
 FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit"}
 CAMP_KINDS = {"", "sleep"}   # sleep: 1시간 단위로 골라 자고, 자고 나면 저장 (effects 는 1시간마다)
@@ -98,7 +100,10 @@ OPTIONAL = {
                "traits"],           # 능력(trait:) 쉼표로 여러 개
     # walk_speed·run_speed: 필드 이동 속도(칸/초) — 순찰은 걷기, 추격은 달리기. 부위·공격(NpcParts·NpcAttacks)이 있으면 전투 가능
     "Npcs": ["name_color", "traits", "image", "flee_chance", "walk_speed", "run_speed"] + ABILITY_COLS,
-    "Items": ["dice_bonus"],        # 소지 시 판정 보정 "strength+2, all+1"
+    "Items": ["dice_bonus",         # 소지 시 판정 보정 "strength+2, all+1"
+              "weight",             # 무게 (개당). 들고 있는 무게가 Config carry_* 를 넘으면 느려지고, 최대면 못 움직임
+              "equip_slot",         # 장착 칸 (EquipSlots 의 slot_id). 비우면 장착 못 함
+              "bag_slots"],         # 장착하면 늘어나는 인벤토리 칸 수 (가방)
     # 선택지 종류: normal(기본) / item / dice
     # dice: check=능력치, dc=목표값, mod=상황 보정, 실패 시 fail_effects·fail_next
     # combat: check=npc_id(싸울 수 있는 NPC), 이기면 effects·next_node, 도주하면 fail_effects·fail_next (필드 대화 전용)
@@ -472,10 +477,19 @@ def validate(d, rep):
             rep.err(loc("Player", c), "walk_speed(걷기 속도)는 0보다 커야 함")
 
     # Items
+    equip_slots = index("EquipSlots")
     for it in d["Items"]:
         w = f"Items {it['_row']}행 ({it['item_id']})"
         if it["stack_max"] is not None and it["stack_max"] < 1:
             rep.err(w, "stack_max 는 1 이상")
+        if (it["weight"] or 0) < 0:
+            rep.err(w, "weight 는 0 이상")
+        if it["equip_slot"] and it["equip_slot"] not in equip_slots:
+            rep.err(w, f"equip_slot 은 EquipSlots 의 slot_id (player.xlsx): '{it['equip_slot']}'")
+        if (it["bag_slots"] or 0) < 0:
+            rep.err(w, "bag_slots 는 0 이상")
+        if it["bag_slots"] and not it["equip_slot"]:
+            rep.err(w, "bag_slots(늘어나는 칸)는 장착하는 아이템(equip_slot)에만")
         check_effects(w, it["use_effects"], None)
         for b in split_list(it["dice_bonus"]):
             m = BONUS_RE.match(b)
@@ -985,6 +999,7 @@ def export(d, maps):
         "characters": [character(r, "player_id", True) for r in clean(d["Player"])]
                       + [character(r, "npc_id", False) for r in clean(d["Npcs"])],
         "abilities": clean(d["Abilities"]),
+        "equip_slots": clean(d["EquipSlots"]),
         "player_parts": [dict(r, key=r["key"].upper(), vital=is_true(r["vital"])) for r in clean(d["PlayerParts"])],
         # 싸울 수 있는 NPC (부위·공격이 있는 것). enemy_id = npc_id
         "enemies": [{"enemy_id": e["npc_id"], "name": e["name"], "image": e["image"],

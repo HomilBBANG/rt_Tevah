@@ -57,6 +57,7 @@ func _ready() -> void:
 	%ItemButton.pressed.connect(_on_item)
 	%FleeButton.pressed.connect(_on_flee)
 	%Inventory.use_handler = _on_item_used
+	%Inventory.allow_equip = false   # TODO(기획): 전투 중 장비 바꾸기 — 지금은 소모품 사용만
 	%Inventory.visibility_changed.connect(func():
 		if not %Inventory.visible and _state == "item":
 			_player_turn())

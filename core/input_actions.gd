@@ -3,6 +3,7 @@ extends RefCounted
 ##   move_*  : 탐험 이동 (WASD, 방향키, 패드 십자키·왼스틱)
 ##   interact: 조사·대화 (E, Space, Enter, 패드 A)
 ##   inventory: 소지품 (I, Tab, 패드 Y)
+##   equipment: 장비창 (Q, 패드 X)
 ##   run     : 누르는 동안 달리기 (Shift, 패드 L1)
 ##   dodge_* : 전투 회피 (WASD, 방향키, 패드 십자키) — 기획서 §8.1
 
@@ -13,6 +14,7 @@ const KEYS := {
 	"dodge_down": [KEY_S, KEY_DOWN], "dodge_right": [KEY_D, KEY_RIGHT],
 	"interact": [KEY_E, KEY_SPACE, KEY_ENTER],
 	"inventory": [KEY_I, KEY_TAB],
+	"equipment": [KEY_Q],
 	"run": [KEY_SHIFT],
 }
 const PAD_BUTTONS := {
@@ -22,6 +24,7 @@ const PAD_BUTTONS := {
 	"dodge_down": JOY_BUTTON_DPAD_DOWN, "dodge_right": JOY_BUTTON_DPAD_RIGHT,
 	"interact": JOY_BUTTON_A,
 	"inventory": JOY_BUTTON_Y,
+	"equipment": JOY_BUTTON_X,
 	"run": JOY_BUTTON_LEFT_SHOULDER,
 }
 const PAD_AXES := {

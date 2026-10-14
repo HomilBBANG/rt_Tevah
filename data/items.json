@@ -6,7 +6,10 @@
   "description": "아이템 설명 1",
   "use_effects": "item:-bandage;stat:hp+20",
   "stack_max": 5,
-  "dice_bonus": []
+  "dice_bonus": [],
+  "weight": 0.2,
+  "equip_slot": "",
+  "bag_slots": 0
  },
  {
   "item_id": "knife",
@@ -20,7 +23,10 @@
     "ability": "strength",
     "value": 1
    }
-  ]
+  ],
+  "weight": 1.0,
+  "equip_slot": "weapon",
+  "bag_slots": 0
  },
  {
   "item_id": "junk",
@@ -29,7 +35,10 @@
   "description": "아이템 설명 3",
   "use_effects": "",
   "stack_max": 1,
-  "dice_bonus": []
+  "dice_bonus": [],
+  "weight": 2.0,
+  "equip_slot": "",
+  "bag_slots": 0
  },
  {
   "item_id": "pill",
@@ -38,7 +47,10 @@
   "description": "아이템 설명 4",
   "use_effects": "item:-pill;stat:sanity+10",
   "stack_max": 3,
-  "dice_bonus": []
+  "dice_bonus": [],
+  "weight": 0.1,
+  "equip_slot": "",
+  "bag_slots": 0
  },
  {
   "item_id": "food",
@@ -47,7 +59,10 @@
   "description": "아이템 설명 5",
   "use_effects": "item:-food;surv:hunger+40",
   "stack_max": 5,
-  "dice_bonus": []
+  "dice_bonus": [],
+  "weight": 0.5,
+  "equip_slot": "",
+  "bag_slots": 0
  },
  {
   "item_id": "water",
@@ -56,7 +71,10 @@
   "description": "아이템 설명 6",
   "use_effects": "item:-water;surv:thirst+50",
   "stack_max": 5,
-  "dice_bonus": []
+  "dice_bonus": [],
+  "weight": 1.0,
+  "equip_slot": "",
+  "bag_slots": 0
  },
  {
   "item_id": "charm",
@@ -65,6 +83,21 @@
   "description": "아이템 설명 7",
   "use_effects": "",
   "stack_max": 1,
-  "dice_bonus": []
+  "dice_bonus": [],
+  "weight": 0.1,
+  "equip_slot": "",
+  "bag_slots": 0
+ },
+ {
+  "item_id": "small_bag",
+  "name": "작은 가방(테스트)",
+  "type": "equip",
+  "description": "장착하면 소지품 칸 +4",
+  "use_effects": "",
+  "stack_max": 1,
+  "dice_bonus": [],
+  "weight": 1.0,
+  "equip_slot": "bag",
+  "bag_slots": 4
  }
 ]

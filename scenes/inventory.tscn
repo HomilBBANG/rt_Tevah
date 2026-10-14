@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scenes/inventory.gd" id="1"]
 
 [sub_resource type="StyleBoxFlat" id="panel"]
-bg_color = Color(0.03, 0.03, 0.04, 1)
+bg_color = Color(0.03, 0.03, 0.04, 0.97)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
@@ -42,40 +42,67 @@ theme_override_styles/panel = SubResource("panel")
 
 [node name="Margin" type="MarginContainer" parent="Center/Panel"]
 layout_mode = 2
-theme_override_constants/margin_left = 33
-theme_override_constants/margin_top = 27
-theme_override_constants/margin_right = 33
-theme_override_constants/margin_bottom = 27
+theme_override_constants/margin_left = 30
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 30
+theme_override_constants/margin_bottom = 24
 
 [node name="VBox" type="VBoxContainer" parent="Center/Panel/Margin"]
-custom_minimum_size = Vector2(767, 0)
+custom_minimum_size = Vector2(740, 0)
 layout_mode = 2
-theme_override_constants/separation = 17
+theme_override_constants/separation = 14
 
 [node name="Title" type="Label" parent="Center/Panel/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 33
 
+[node name="Weight" type="Label" parent="Center/Panel/Margin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+
 [node name="Slots" type="GridContainer" parent="Center/Panel/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-columns = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 6
 
 [node name="Desc" type="Label" parent="Center/Panel/Margin/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(700, 80)
+custom_minimum_size = Vector2(700, 70)
 layout_mode = 2
+autowrap_mode = 3
+
+[node name="Status" type="Label" parent="Center/Panel/Margin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.75, 0.45, 1)
+theme_override_font_sizes/font_size = 22
 autowrap_mode = 3
 
 [node name="Buttons" type="HBoxContainer" parent="Center/Panel/Margin/VBox"]
 layout_mode = 2
 alignment = 2
 
+[node name="Hint" type="Label" parent="Center/Panel/Margin/VBox/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 20
+text = "우클릭: 장착 · 끌어서 장비창(Q)에 놓기"
+
 [node name="UseButton" type="Button" parent="Center/Panel/Margin/VBox/Buttons"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "사용"
+
+[node name="EquipButton" type="Button" parent="Center/Panel/Margin/VBox/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "장착"
 
 [node name="GiveUpButton" type="Button" parent="Center/Panel/Margin/VBox/Buttons"]
 unique_name_in_owner = true

@@ -141,7 +141,7 @@ func _ready() -> void:
 	_press("inventory")
 	await _wait(0.2)
 	check(f.get_node("%Inventory").visible and f.frozen, "소지품 열림, 시간 멈춤")
-	await _press_button("통조림(테스트) x2")
+	await _press_button("통조림(테스트)\nx2")   # 격자 칸: 이름 + 줄바꿈 + 개수
 	await _snap("inventory")
 	await _press_button("사용")
 	check(GameState.item_count("food") == 1 and GameState.get_survival("hunger") > h2, "통조림 사용 → 포만감 회복")

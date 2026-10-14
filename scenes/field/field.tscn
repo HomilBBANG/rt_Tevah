@@ -1,9 +1,10 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scenes/field/field.gd" id="1"]
 [ext_resource type="Script" path="res://scenes/field/map_view.gd" id="2"]
 [ext_resource type="PackedScene" path="res://ui/letterbox.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://scenes/inventory.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/equipment.tscn" id="5"]
 
 [sub_resource type="StyleBoxFlat" id="message_box"]
 content_margin_left = 43.0
@@ -94,7 +95,7 @@ anchor_right = 0.98
 anchor_bottom = 1.0
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 theme_override_font_sizes/font_size = 25
-text = "이동: WASD / 방향키      조사·대화: E / Space      소지품: I / Tab      붉은 원 = 적의 시야"
+text = "이동: WASD / 방향키   달리기: Shift   조사·대화: E / Space   소지품: I   장비: Q   붉은 원 = 적의 시야"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -213,6 +214,10 @@ layout_mode = 2
 text = "처음부터"
 
 [node name="Inventory" parent="HUD" instance=ExtResource("4")]
+unique_name_in_owner = true
+visible = false
+
+[node name="Equipment" parent="HUD" instance=ExtResource("5")]
 unique_name_in_owner = true
 visible = false
 

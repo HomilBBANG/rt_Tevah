@@ -155,13 +155,14 @@ func dice_preview(c: Dictionary) -> Dictionary:
 	var parts := []
 	parts.append({"label": DataLoader.ability_name(ability), "value": GameState.get_ability(ability)})
 	var seen := {}
-	for slot in GameState.inventory:
-		if seen.has(slot.id):
+	# 소지품 + 장착한 장비
+	for id in GameState.inventory.map(func(s): return s.id) + GameState.equipment.values():
+		if seen.has(id):
 			continue
-		seen[slot.id] = true
-		for b in DataLoader.items.get(slot.id, {}).get("dice_bonus", []):
+		seen[id] = true
+		for b in DataLoader.items.get(id, {}).get("dice_bonus", []):
 			if b.ability == ability or b.ability == "all":
-				parts.append({"label": DataLoader.item_name(slot.id), "value": int(b.value)})
+				parts.append({"label": DataLoader.item_name(id), "value": int(b.value)})
 	if int(c.get("mod", 0)) != 0:
 		parts.append({"label": "상황", "value": int(c.mod)})
 	var mod := 0

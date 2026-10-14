@@ -6,6 +6,7 @@ extends Node
 signal stats_changed
 signal body_changed
 signal inventory_changed
+signal equipment_changed
 signal flags_changed
 signal survival_changed
 signal clock_changed
@@ -30,6 +31,7 @@ var current_map := ""
 var clock := 0.0              # 회차 시작부터 흐른 게임 시간 (분). 1일차 0:00 = 0
 var survival := {}            # param_id -> float (0 ~ max, 높을수록 좋음)
 var player_body := {}         # 전투 부위 상태 (부상·절단), 전투 사이에 이어짐
+var equipment := {}           # 장비: slot_id(EquipSlots) -> item_id. 장착한 것은 인벤토리 칸을 차지하지 않는다
 var field_state := {}         # map_id -> { "removed": [object_id], "done": [object_id] }
 var wake_at_run_start := false   # 다음 맵 로드 때 그 맵의 S(회차 시작 위치)에서 깨어남 (저장 안 함)
 
@@ -47,6 +49,7 @@ func reset_for_episode(ep: Dictionary) -> void:
 	for s in STATS:
 		stats[s] = DataLoader.get_config_int(s + "_start", 100)
 	inventory = []
+	equipment = {}
 	ep_flags = {}
 	timed_out = false
 	# TODO(기획 확인): 능력치 성장은 에피소드 안에서만 유지. 영구 성장(로그라이크)은 다음 단계.
@@ -74,6 +77,8 @@ func reset_run() -> void:
 	for p in DataLoader.survival:
 		survival[p.param_id] = float(p.start)
 	player_body = Combat.fresh_player_parts()
+	equipment = {}
+	equipment_changed.emit()
 	field_state = {}
 	wake_at_run_start = true
 	survival_changed.emit()
@@ -220,16 +225,94 @@ func change_ability(id: String, op: String, value: int) -> void:
 
 
 # ---------------------------------------------------------------- 인벤토리
+## 인벤토리 칸 수 = Config inventory_slots + 장착한 장비(가방)의 bag_slots
 func slot_count() -> int:
-	return DataLoader.get_config_int("inventory_slots", 8)
+	var n := DataLoader.get_config_int("inventory_slots", 8)
+	for id in equipment.values():
+		n += int(DataLoader.items.get(id, {}).get("bag_slots", 0))
+	return n
 
 
+## 소지 개수 (장착한 것 포함 — has: 조건)
 func item_count(item_id: String) -> int:
 	var n := 0
 	for slot in inventory:
 		if slot.id == item_id:
 			n += slot.count
+	for id in equipment.values():
+		if id == item_id:
+			n += 1
 	return n
+
+
+# ---------------------------------------------------------------- 장비·무게
+## 들고 있는 무게 (인벤토리 + 장착한 장비)
+func carry_weight() -> float:
+	var w := 0.0
+	for slot in inventory:
+		w += float(DataLoader.items.get(slot.id, {}).get("weight", 0.0)) * slot.count
+	for id in equipment.values():
+		w += float(DataLoader.items.get(id, {}).get("weight", 0.0))
+	return w
+
+
+func carry_max() -> float:
+	return float(DataLoader.config.get("carry_max_weight", 30))
+
+
+## 무게에 따른 이동 속도 배율: carry_heavy_weight 미만 1, 그 이상 carry_heavy_speed_mult, 최대 무게 이상 0 (못 움직임)
+## TODO(기획): 기준 무게·배율은 임시 Config 값. 근력 등 능력치와의 관계 미정
+func carry_speed_mult() -> float:
+	var w := carry_weight()
+	if w >= carry_max():
+		return 0.0
+	if w >= float(DataLoader.config.get("carry_heavy_weight", 20)):
+		return float(DataLoader.config.get("carry_heavy_speed_mult", 0.5))
+	return 1.0
+
+
+## 인벤토리 index 칸의 아이템을 장착. 같은 칸에 이미 장비가 있으면 그것은 인벤토리로 돌아온다.
+## 실패하면 이유(문자열), 성공하면 "".
+func equip(index: int) -> String:
+	if index < 0 or index >= inventory.size():
+		return "없는 칸"
+	var id: String = inventory[index].id
+	var slot_id: String = DataLoader.items.get(id, {}).get("equip_slot", "")
+	if slot_id == "":
+		return "%s 은(는) 장착할 수 없다." % DataLoader.item_name(id)
+	var old: String = equipment.get(slot_id, "")
+	if old != "" and not _can_hold_after(slot_id, id, 0):
+		return "바꿔 낀 %s 을(를) 넣을 칸이 없다." % DataLoader.item_name(old)
+	inventory[index].count -= 1
+	if inventory[index].count <= 0:
+		inventory.remove_at(index)
+	equipment[slot_id] = id
+	if old != "":
+		inventory.insert(mini(index, inventory.size()), {"id": old, "count": 1})
+	inventory_changed.emit()
+	equipment_changed.emit()
+	return ""
+
+
+## 장비를 벗어 인벤토리로. 가방을 벗어서 칸이 모자라면 못 벗는다. 실패하면 이유, 성공하면 "".
+func unequip(slot_id: String) -> String:
+	var id: String = equipment.get(slot_id, "")
+	if id == "":
+		return ""
+	if not _can_hold_after(slot_id, "", 1):
+		return "%s 을(를) 벗으면 소지품이 칸에 다 들어가지 않는다." % DataLoader.item_name(id)
+	equipment.erase(slot_id)
+	inventory.append({"id": id, "count": 1})
+	inventory_changed.emit()
+	equipment_changed.emit()
+	return ""
+
+
+## slot_id 칸 장비를 new_id 로 바꾸고(빈 문자열이면 벗음) 인벤토리에 extra 칸이 더 필요할 때 다 들어가는지
+func _can_hold_after(slot_id: String, new_id: String, extra: int) -> bool:
+	var old: String = equipment.get(slot_id, "")
+	var bonus := int(DataLoader.items.get(new_id, {}).get("bag_slots", 0)) - int(DataLoader.items.get(old, {}).get("bag_slots", 0))
+	return inventory.size() + extra <= slot_count() + bonus
 
 
 ## 가능한 만큼 넣고, 칸이 모자라 못 넣은 개수를 돌려준다.
@@ -266,6 +349,12 @@ func remove_item(item_id: String, amount: int) -> int:
 		left -= take
 		if slot.count <= 0:
 			inventory.remove_at(i)
+	# 인벤토리에 모자라면 장착한 것에서 (예: 효과 item:-knife 인데 칼을 손에 들고 있을 때)
+	for slot_id in equipment.keys():
+		if left > 0 and equipment[slot_id] == item_id:
+			equipment.erase(slot_id)
+			left -= 1
+			equipment_changed.emit()
 	if left != amount:
 		inventory_changed.emit()
 	return amount - left
@@ -393,6 +482,7 @@ func run_to_dict() -> Dictionary:
 		"player_body": player_body.duplicate(true),
 		"field_state": field_state.duplicate(true),
 		"inventory": inventory.duplicate(true),
+		"equipment": equipment.duplicate(),
 		"flags": ep_flags.keys(),
 		"abilities": abilities.duplicate(),
 	}
@@ -413,6 +503,9 @@ func run_from_dict(d: Dictionary) -> void:
 	inventory = []
 	for slot in d.get("inventory", []):
 		inventory.append({"id": str(slot.id), "count": int(slot.count)})
+	equipment = {}
+	for k in d.get("equipment", {}):
+		equipment[str(k)] = str(d.equipment[k])
 	ep_flags = {}
 	for f in d.get("flags", []):
 		ep_flags[f] = true
@@ -421,4 +514,5 @@ func run_from_dict(d: Dictionary) -> void:
 	survival_changed.emit()
 	clock_changed.emit()
 	inventory_changed.emit()
+	equipment_changed.emit()
 	flags_changed.emit()

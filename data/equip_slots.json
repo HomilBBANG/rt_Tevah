@@ -1,0 +1,18 @@
+[
+ {
+  "slot_id": "bag",
+  "name": "가방"
+ },
+ {
+  "slot_id": "weapon",
+  "name": "무기"
+ },
+ {
+  "slot_id": "head",
+  "name": "머리"
+ },
+ {
+  "slot_id": "body",
+  "name": "몸"
+ }
+]

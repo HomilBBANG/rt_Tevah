@@ -77,7 +77,10 @@ func _ready() -> void:
 	%InventoryButton.pressed.connect(_open_inventory)
 	%NewRunButton.pressed.connect(_new_run)
 	%CampClose.pressed.connect(_close_camp)
+	%Inventory.dock = "right"   # 장비창(왼쪽)과 같이 열어 끌어다 놓기
 	%Inventory.visibility_changed.connect(func(): _set_frozen_by_overlay())
+	%Equipment.visibility_changed.connect(func(): _set_frozen_by_overlay())
+	GameState.equipment_changed.connect(_update_hud)
 	load_map(GameState.current_map)
 
 
@@ -312,8 +315,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not _sleep_pick.is_empty():
 		_sleep_picker_input(event)
 		return
-	if event.is_action_pressed("inventory") and not frozen:
-		_open_inventory()
+	if event.is_action_pressed("inventory") and (not frozen or _bag_open()):
+		_toggle_inventory()
+	elif event.is_action_pressed("equipment") and (not frozen or _bag_open()):
+		if %Equipment.visible:
+			%Equipment.hide()
+		else:
+			%Equipment.open()
 	elif not event.is_action_pressed("interact"):
 		return
 	elif %MessagePanel.visible and not %DeathPanel.visible:
@@ -396,12 +404,25 @@ func _on_inventory_full(item_id: String, amount: int) -> void:
 
 
 func _open_inventory() -> void:
-	if not frozen:
+	if not frozen or _bag_open():
 		%Inventory.open_browse()
 
 
-func _set_frozen_by_overlay() -> void:
+## I: 소지품 열기/닫기
+func _toggle_inventory() -> void:
 	if %Inventory.visible:
+		%Inventory.hide()
+	else:
+		_open_inventory()
+
+
+## 소지품·장비창 중 하나라도 열려 있음 (둘은 같이 열 수 있다)
+func _bag_open() -> bool:
+	return %Inventory.visible or %Equipment.visible
+
+
+func _set_frozen_by_overlay() -> void:
+	if _bag_open():
 		frozen = true
 	elif not _collecting and not %MessagePanel.visible and not %CampPanel.visible and _combat_ui == null and _dialogue_ui == null:
 		frozen = false
@@ -716,4 +737,7 @@ func _update_hud() -> void:
 		elif p.hp < p.max_hp:
 			hurt.append("%s %d/%d" % [p.name, p.hp, p.max_hp])
 	%Body.text = "부상: " + ("없음" if hurt.is_empty() else "  ·  ".join(hurt))
-	%InventoryButton.text = "소지품 %d/%d" % [GameState.inventory.size(), GameState.slot_count()]
+	var heavy := GameState.carry_speed_mult()
+	%InventoryButton.text = "소지품 %d/%d · 무게 %s/%s%s" % [GameState.inventory.size(), GameState.slot_count(),
+		String.num(GameState.carry_weight(), 1), String.num(GameState.carry_max(), 1),
+		" (못 움직임)" if heavy <= 0.0 else (" (느림)" if heavy < 1.0 else "")]

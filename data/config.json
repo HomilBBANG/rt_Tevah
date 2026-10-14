@@ -24,5 +24,9 @@
  "sleep_max_hours": 12,
  "sleep_default_hours": 8,
  "save_slots": 5,
- "combat_item_uses_turn": 1
+ "combat_item_uses_turn": 1,
+ "carry_max_weight": 30,
+ "carry_heavy_weight": 20,
+ "carry_heavy_speed_mult": 0.5,
+ "ability_chart_max": 10
 }

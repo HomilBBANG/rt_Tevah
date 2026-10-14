@@ -13,7 +13,8 @@ func _physics_process(_delta: float) -> void:
 		velocity = Vector2.ZERO
 		return
 	var dir := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	velocity = dir * (run_speed if Input.is_action_pressed("run") else speed)
+	# 무게: 무거우면 느려지고 최대 무게면 못 움직인다 (GameState.carry_speed_mult)
+	velocity = dir * (run_speed if Input.is_action_pressed("run") else speed) * GameState.carry_speed_mult()
 	if dir != Vector2.ZERO:
 		facing = dir.normalized()
 		queue_redraw()
