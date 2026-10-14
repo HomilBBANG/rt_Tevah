@@ -206,6 +206,37 @@ func _run() -> void:
 	await StoryRunner.choose("fdc6")
 	check(dialogue_done == 4 and not SaveManager.has_episode_save(""), "필드 대화는 에피소드 저장 안 함")
 
+	# ---------- 전투 선택지 (type=combat, check=enemy_id): 이기면 next_node, 도주하면 fail_next, 지면 대화 끝
+	var fights := []
+	StoryRunner.combat_requested.connect(func(id): fights.append(id))
+	await StoryRunner.start_dialogue("fd_npc2_a")
+	var fight_entry: Array = entries.filter(func(e): return e.choice.choice_id == "fdc7")
+	check(fight_entry.size() == 1 and fight_entry[0].combat.enemy_name == "적 A (테스트)", "전투 선택지: 적 이름 표시")
+	StoryRunner.combat_override = "win"
+	await StoryRunner.choose("fdc7")
+	check(node_id == "fd_npc2_win" and GameState.has_flag("beat_npc2") and not GameState.has_flag("fled_npc2"), "전투 승리 → effects·next_node")
+	await StoryRunner.continue_story()
+	await StoryRunner.start_dialogue("fd_npc2_a")
+	StoryRunner.combat_override = "fled"
+	await StoryRunner.choose("fdc7")
+	check(node_id == "fd_npc2_fled" and GameState.has_flag("fled_npc2"), "전투 도주 → fail_effects·fail_next")
+	await StoryRunner.continue_story()
+	var done_before := dialogue_done
+	await StoryRunner.start_dialogue("fd_npc2_a")
+	StoryRunner.combat_override = "lose"
+	await StoryRunner.choose("fdc7")
+	check(StoryRunner.ended and not StoryRunner.busy and dialogue_done == done_before and node_id == "fd_npc2_a",
+		"전투 패배 → 대화 끝 (dialogue_ended 없음, 사망 처리는 화면 몫)")
+	StoryRunner.combat_override = ""
+	# 화면이 전투를 띄우는 경우: combat_requested → finish_combat
+	await StoryRunner.start_dialogue("fd_npc2_a")
+	StoryRunner.choose("fdc7")
+	check(fights == ["enemy_test"] and StoryRunner.busy, "combat_requested(enemy_test) 후 결과 대기")
+	StoryRunner.finish_combat("win")
+	await get_tree().process_frame
+	check(node_id == "fd_npc2_win" and not StoryRunner.busy, "finish_combat(win) → 대화 계속")
+	await StoryRunner.continue_story()
+
 
 func _fresh_to_d() -> void:
 	ending = ""

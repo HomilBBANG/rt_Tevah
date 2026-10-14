@@ -30,6 +30,8 @@ func setup(entry: Dictionary) -> void:
 			var d: Dictionary = entry.dice
 			label = "[판정 %d%%] %s   (%s %s%d · 목표 %d)" % [roundi(d.chance * 100), label,
 				d.ability_name, "+" if d.mod >= 0 else "", d.mod, d.dc]
+		"combat":
+			label = "[전투] %s   (%s)" % [label, entry.combat.enemy_name]
 	text = label if c.cost == "" else "%s  [%s]" % [label, c.cost]
 	disabled = not entry.enabled
 

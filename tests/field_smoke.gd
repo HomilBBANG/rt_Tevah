@@ -76,6 +76,24 @@ func _ready() -> void:
 	await _press_button(dlg, "대화 끝내기")
 	await _wait(0.2)
 	check(f._dialogue_ui == null and not f.frozen, "대화 끝내기 → 복귀")
+	# 대화 전투 선택지: 대화를 숨기고 전투 → 도주하면 대화 계속 (도주 노드)
+	var body_before: Dictionary = GameState.player_body.duplicate(true)
+	await _talk_and_fight()
+	check(f._combat_ui != null and not f._dialogue_ui.visible and f.frozen, "대화 전투 선택지 → 전투, 대화 숨김")
+	await _snap("dialogue_combat")
+	await _end_combat("fled", func(_c): pass)
+	check(f._dialogue_ui != null and f._dialogue_ui.visible and GameState.has_flag("fled_npc2"), "도주 → 대화로 돌아옴")
+	await _snap("dialogue_after_flee")
+	f._dialogue_ui.advance()
+	await _wait(0.2)
+	check(f._dialogue_ui == null and not f.frozen, "도주 노드 → EXIT → 필드")
+	await _talk_and_fight()
+	await _end_combat("win", func(_c): pass)
+	check(f._dialogue_ui != null and GameState.has_flag("beat_npc2"), "승리 → 대화 계속 (승리 노드)")
+	f._dialogue_ui.advance()
+	await _wait(0.2)
+	check(f._dialogue_ui == null and not f.frozen and f.enemies.size() == 2, "승리 후 필드, 맵의 적은 그대로")
+	GameState.player_body = body_before
 
 	# 닫힌 문은 시야를 가린다: 문 (2,2) 를 사이에 두고 적 (2,4) ↔ 플레이어 (2,1)
 	var e0: Node = f.enemies[0]
@@ -156,9 +174,28 @@ func _ready() -> void:
 	check(GameState.run_count == 2 and f.map.map_id == "test_field" and not GameState.player_body.left_arm.broken
 		and GameState.inventory.is_empty(), "처음부터 → 2회차, 소지품·몸 새로")
 	check(f.player.position.distance_to(Vector2((rs[0] + 0.5) * f.tile, (rs[1] + 0.5) * f.tile)) < 1.0, "맵 한복판(S)에서 깨어남")
+
+	# 대화 전투에서 지면 → 대화가 닫히고 사망 처리
+	await _talk_and_fight()
+	await _end_combat("lose", func(_c): pass)
+	await _wait(0.2)
+	check(f._dialogue_ui == null and f.get_node("%DeathPanel").visible and StoryRunner.ended and not StoryRunner.busy,
+		"대화 전투 패배 → 대화 닫힘, 사망 패널")
+	f.get_node("%NewRunButton").pressed.emit()
+	await _wait(0.2)
 	SaveManager.delete_all()
 	print("[field_smoke] 스크린샷 %d장, 실패 %d → %s" % [_shot, _fail, ProjectSettings.globalize_path("user://field_smoke")])
 	get_tree().quit(1 if _fail > 0 else 0)
+
+
+## NPC 2 (10,9) 에게 말을 걸어 전투 선택지를 고른다
+func _talk_and_fight() -> void:
+	_teleport(11, 9)
+	await _wait(0.15)
+	_press("interact")
+	await _wait(0.3)
+	await _press_button(f._dialogue_ui, "[전투] 싸운다 (테스트)   (적 A (테스트))")
+	await _wait(0.1)
 
 
 func _end_combat(outcome: String, tweak: Callable) -> void:

@@ -24,7 +24,7 @@ OUT_DIR = ROOT / "data"
 
 STATS = {"hp", "sanity", "time"}
 SHOW_MODES = {"", "hide", "gray"}
-CHOICE_TYPES = {"", "normal", "item", "dice"}
+CHOICE_TYPES = {"", "normal", "item", "dice", "combat"}
 REQUIRED_CONFIG = ["inventory_slots", "hp_start", "hp_max", "sanity_start", "sanity_max", "time_start", "time_max"]
 
 # 시트 → (ID 열, 열 목록, 숫자 열 {이름: (타입, 기본값)})
@@ -80,6 +80,7 @@ OPTIONAL = {
     "Items": ["dice_bonus"],        # 소지 시 판정 보정 "stat_a+2, all+1"
     # 선택지 종류: normal(기본) / item / dice
     # dice: check=능력치, dc=목표값, mod=상황 보정, 실패 시 fail_effects·fail_next
+    # combat: check=enemy_id, 이기면 effects·next_node, 도주하면 fail_effects·fail_next (필드 대화 전용)
     "Choices": ["type", "check", "dc", "mod", "fail_effects", "fail_next"],
 }
 
@@ -540,7 +541,7 @@ def validate(d, rep):
         gotos = check_effects(w, c["effects"], ep)
         ctype = c["type"]
         if ctype not in CHOICE_TYPES:
-            rep.err(w, f"type 은 normal / item / dice: '{ctype}'")
+            rep.err(w, f"type 은 normal / item / dice / combat: '{ctype}'")
         if ctype == "item" and "has:" not in c["condition"]:
             rep.err(w, "item 선택지는 condition 에 has:아이템 이 필요")
         if c["mod"] and not INT_RE.match(c["mod"]):
@@ -550,18 +551,28 @@ def validate(d, rep):
                 rep.err(w, f"dice 선택지의 check 는 Abilities 의 ability_id: '{c['check']}'")
             if not INT_RE.match(c["dc"]):
                 rep.err(w, f"dice 선택지의 dc(목표값)는 정수: '{c['dc']}'")
+        elif ctype == "combat":
+            if ep != "":
+                rep.err(w, "combat 선택지는 필드 대화(episode_id 가 빈 노드)에서만")
+            if c["check"] not in enemies:
+                rep.err(w, f"combat 선택지의 check 는 Enemies 의 enemy_id: '{c['check']}'")
+            for col in ("dc", "mod"):
+                if c[col]:
+                    rep.err(w, f"{col} 은 dice 선택지에서만 쓸 수 있음 (type='combat')")
+        else:
+            for col in ("check", "dc", "mod", "fail_effects", "fail_next"):
+                if c[col]:
+                    rep.err(w, f"{col} 은 dice·combat 선택지에서만 쓸 수 있음 (type='{ctype or 'normal'}')")
+        if ctype in ("dice", "combat"):
+            label = "실패" if ctype == "dice" else "도주"
             fail_gotos = check_effects(w + " fail_effects", c["fail_effects"], ep)
             if c["fail_next"]:
                 check_target(w + " fail_next", c["fail_next"], ep)
                 if not c["fail_next"].startswith("END:"):
                     edges[c["node_id"]].add(c["fail_next"])
             elif not fail_gotos:
-                rep.err(w, "실패 출구 없음 (fail_next 도 fail_effects 의 goto 도 없음)")
+                rep.err(w, f"{label} 출구 없음 (fail_next 도 fail_effects 의 goto 도 없음)")
             edges[c["node_id"]].update(fail_gotos)
-        else:
-            for col in ("check", "dc", "mod", "fail_effects", "fail_next"):
-                if c[col]:
-                    rep.err(w, f"{col} 은 dice 선택지에서만 쓸 수 있음 (type='{ctype or 'normal'}')")
         if c["next_node"]:
             check_target(w + " next_node", c["next_node"], ep)
             if not c["next_node"].startswith("END:"):

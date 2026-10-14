@@ -23,6 +23,28 @@
     560,
     140
    ]
+  },
+  {
+   "node_id": "fd_npc2_win",
+   "speaker_id": "char_npc2",
+   "text": "필드 대화 노드 6 (전투 승리)",
+   "next_node": "EXIT",
+   "on_enter": "",
+   "pos": [
+    560,
+    340
+   ]
+  },
+  {
+   "node_id": "fd_npc2_fled",
+   "speaker_id": "char_npc2",
+   "text": "필드 대화 노드 7 (전투 도주)",
+   "next_node": "EXIT",
+   "on_enter": "",
+   "pos": [
+    560,
+    500
+   ]
   }
  ],
  "choices": [
@@ -57,6 +79,22 @@
    "mod": 0,
    "fail_effects": "",
    "fail_next": ""
+  },
+  {
+   "choice_id": "fdc7",
+   "node_id": "fd_npc2_a",
+   "text": "싸운다 (테스트)",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "setflag:beat_npc2",
+   "next_node": "fd_npc2_win",
+   "type": "combat",
+   "check": "enemy_test",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "setflag:fled_npc2",
+   "fail_next": "fd_npc2_fled"
   }
  ]
 }

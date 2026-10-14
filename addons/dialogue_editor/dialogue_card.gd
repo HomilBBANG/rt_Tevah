@@ -4,7 +4,7 @@ extends GraphNode
 ##   0: 화자          ← 들어오는 연결점
 ##   1: 대사
 ##   2: 다음 →        → next_node (선택지가 없을 때 진행)
-##   3~: 선택지 줄    → next_node, 판정(dice) 선택지는 '실패 →' 줄이 하나 더 (fail_next)
+##   3~: 선택지 줄    → next_node, 판정(dice)·전투(combat) 선택지는 '실패/도주 →' 줄이 하나 더 (fail_next)
 ##   끝: + 선택지
 ## 연결점 번호(port)는 out_ports 순서와 같다: ["next"], ["choice", i], ["fail", i]
 
@@ -12,7 +12,7 @@ signal changed
 signal choice_selected(card: GraphNode, index: int)
 signal node_selected_for_edit(card: GraphNode)
 
-const TYPE_LABEL := {"normal": "일반", "item": "아이템", "dice": "판정"}
+const TYPE_LABEL := {"normal": "일반", "item": "아이템", "dice": "판정", "combat": "전투"}
 const PORT_COLOR := Color("8fb8ff")
 const FAIL_COLOR := Color("e46a6a")
 
@@ -107,9 +107,9 @@ func rebuild() -> void:
 		cr.add_child(del)
 		_add_row(cr, false, true, PORT_COLOR)
 		out_ports.append(["choice", i])
-		if c.get("type", "normal") == "dice":
+		if c.get("type", "normal") in ["dice", "combat"]:
 			var fl := Label.new()
-			fl.text = "판정 실패 →  " + _target_hint(c.get("fail_next", ""))
+			fl.text = ("판정 실패 →  " if c.type == "dice" else "도주 →  ") + _target_hint(c.get("fail_next", ""))
 			fl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			fl.add_theme_color_override("font_color", FAIL_COLOR)
 			_add_row(fl, false, true, FAIL_COLOR)

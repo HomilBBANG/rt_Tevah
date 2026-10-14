@@ -28,6 +28,7 @@ var inspector: VBoxContainer
 var log_view: TextEdit
 var speakers: Array = []             # [[char_id, name]]
 var abilities: Array = []            # [[ability_id, name]]
+var enemies: Array = []              # [[enemy_id, name]] (전투 선택지)
 var _selected_card: GraphNode
 var _counter := 0
 
@@ -351,8 +352,17 @@ func _edit_choice(card: GraphNode, index: int) -> void:
 		c.text = v
 		card.rebuild()
 		dirty = true)
-	_option("종류", ["normal", "item", "dice"], ["일반", "아이템 (조건에 has: 필요)", "판정 (주사위)"], c.get("type", "normal"), func(v):
+	_option("종류", ["normal", "item", "dice", "combat"], ["일반", "아이템 (조건에 has: 필요)", "판정 (주사위)", "전투 (이기면 이동, 도주하면 도주 이동)"],
+			c.get("type", "normal"), func(v):
 		c.type = v
+		if v == "combat" and not c.get("check", "") in enemies.map(func(e): return e[0]):
+			c.check = enemies[0][0] if not enemies.is_empty() else ""
+		elif v == "dice" and not c.get("check", "") in abilities.map(func(a): return a[0]):
+			c.check = abilities[0][0] if not abilities.is_empty() else ""
+		elif not v in ["dice", "combat"]:
+			# 판정·전투 전용 칸을 비워 둬야 변환기 검사를 통과한다
+			for k in ["check", "fail_effects", "fail_next"]:
+				c[k] = ""
 		card.rebuild()
 		_after_target_change(card)
 		_edit_choice(card, index))
@@ -374,6 +384,18 @@ func _edit_choice(card: GraphNode, index: int) -> void:
 		_line("실패 이동 (직접 입력)", c.get("fail_next", ""), func(v):
 			c.fail_next = v
 			_after_target_change(card))
+	elif c.get("type", "normal") == "combat":
+		_title("전투")
+		_option("적 (check)", enemies.map(func(e): return e[0]), enemies.map(func(e): return e[1]), c.get("check", ""),
+			_setter(c, "check"))
+		_line("도주 효과 (fail_effects)", c.get("fail_effects", ""), _setter(c, "fail_effects"))
+		_line("도주 이동 (직접 입력)", c.get("fail_next", ""), func(v):
+			c.fail_next = v
+			_after_target_change(card))
+		var note := Label.new()
+		note.text = "이기면 효과·이동, 도주하면 도주 효과·이동.\n지면 대화가 끝나고 사망 처리 (부활 규칙)."
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		inspector.add_child(note)
 
 
 func _rename_node(card: GraphNode, new_id: String) -> void:
@@ -470,6 +492,9 @@ func _load_lookups() -> void:
 	abilities = []
 	for a in _read_json("res://data/abilities.json", []):
 		abilities.append([a.ability_id, "%s  (%s)" % [a.name, a.ability_id]])
+	enemies = []
+	for e in _read_json("res://data/enemies.json", []):
+		enemies.append([e.enemy_id, "%s  (%s)" % [e.name, e.enemy_id]])
 
 
 func _read_json(p: String, default: Variant) -> Variant:

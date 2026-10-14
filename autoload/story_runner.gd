@@ -7,8 +7,8 @@ const WorldContext = preload("res://core/world_context.gd")
 
 ## 노드 표시: node(Dictionary), 화자 이름
 signal node_shown(node: Dictionary, speaker_name: String)
-## 선택지 목록: [{ "choice": Dictionary, "enabled": bool, "dice": Dictionary }] — hide 조건 미충족은 빠져 있음.
-## dice 는 type=dice 선택지에만 있음 (dice_preview() 결과).
+## 선택지 목록: [{ "choice": Dictionary, "enabled": bool, "dice": Dictionary, "combat": Dictionary }] — hide 조건 미충족은 빠져 있음.
+## dice 는 type=dice 선택지에만 있음 (dice_preview() 결과). combat 은 type=combat 에만 ({enemy_id, enemy_name}).
 ## 선택지가 없는 노드면 빈 배열 (UI는 '계속' 버튼을 띄운다)
 signal choices_shown(entries: Array)
 ## 시스템 메시지 (획득·버림 등)
@@ -25,6 +25,10 @@ signal _save_slot_chosen(slot: int)
 ## 주사위 판정 결과 (dice_preview() 내용 + roll, total, success, critical). 효과 적용 전에 발신.
 ## critical: "success"(20, 대성공) / "fail"(1, 대실패) / "" — 1·20 은 합계와 무관하게 결과가 정해진다.
 signal dice_rolled(result: Dictionary)
+## combat 선택지: 전투를 띄워 달라는 요청. 화면은 전투를 띄우고 끝나면 finish_combat("win"/"fled"/"lose")를 부른다.
+## win → effects·next_node, fled → fail_effects·fail_next, lose → 대화가 끝남(ended) — 사망 처리는 화면 몫.
+signal combat_requested(enemy_id: String)
+signal _combat_done(outcome: String)
 signal _discard_chosen(slot: int)
 
 const DICE_SIDES := 20
@@ -34,6 +38,8 @@ var busy := false    # 효과 처리 중 (입력 무시)
 var forced_rolls: Array[int] = []
 ## 테스트용: 0 보다 크면 슬롯을 묻지 않고 이 슬롯에 저장
 var save_slot_override := 0
+## 테스트용: 비어 있지 않으면 전투를 띄우지 않고 이 결과("win"/"fled"/"lose")로 처리
+var combat_override := ""
 var ended := false
 ## "episode" = 에피소드 진행 (엔딩·스탯 규칙·자동 저장) / "field" = 탐험 중 NPC 대화 (EXIT 로 끝)
 var mode := "episode"
@@ -110,11 +116,36 @@ func choose(choice_id: String) -> void:
 		if not result.success:
 			effects = c.fail_effects
 			next = c.fail_next
+	elif c.get("type", "normal") == "combat":
+		var outcome := await _fight(c.check)
+		if outcome == "lose":
+			ended = true
+			busy = false
+			return
+		if outcome != "win":
+			effects = c.fail_effects
+			next = c.fail_next
 	var redirect := await _apply_effects(Expr.parse_effects(effects))
 	if not ended:
 		var forced := _check_stats()
 		await _goto(forced if forced != "" else (redirect if redirect != "" else next))
 	busy = false
+
+
+## combat 선택지: 전투 결과 "win" / "fled" / "lose"
+func _fight(enemy_id: String) -> String:
+	if combat_override != "":
+		return combat_override
+	if mode != "field":
+		push_error("[StoryRunner] combat 선택지는 필드 대화에서만: %s" % enemy_id)
+		return "fled"
+	combat_requested.emit(enemy_id)
+	return await _combat_done
+
+
+## 화면이 combat_requested 로 띄운 전투가 끝남
+func finish_combat(outcome: String) -> void:
+	_combat_done.emit(outcome)
 
 
 ## dice 선택지의 판정 정보: 능력치, 목표값, 보정치 내역, 성공 확률.
@@ -289,6 +320,8 @@ func _show_current() -> void:
 		var entry := {"choice": c, "enabled": ok}
 		if c.get("type", "normal") == "dice":
 			entry.dice = dice_preview(c)
+		elif c.get("type", "normal") == "combat":
+			entry.combat = {"enemy_id": c.check, "enemy_name": DataLoader.enemies.get(c.check, {}).get("name", c.check)}
 		entries.append(entry)
 	choices_shown.emit(entries)
 

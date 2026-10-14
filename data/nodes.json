@@ -150,5 +150,21 @@
   "text": "필드 대화 노드 5 (flag:showed_knife 일 때만)",
   "next_node": "EXIT",
   "on_enter": ""
+ },
+ {
+  "node_id": "fd_npc2_win",
+  "episode_id": "",
+  "speaker_id": "char_npc2",
+  "text": "필드 대화 노드 6 (전투 승리)",
+  "next_node": "EXIT",
+  "on_enter": ""
+ },
+ {
+  "node_id": "fd_npc2_fled",
+  "episode_id": "",
+  "speaker_id": "char_npc2",
+  "text": "필드 대화 노드 7 (전투 도주)",
+  "next_node": "EXIT",
+  "on_enter": ""
  }
 ]

@@ -45,6 +45,7 @@ var npcs: Array = []             # NPC [{ kind: "npc", data, pos, node, active }
 var _combat_ui: Node
 var _dialogue_ui: Node
 var _combat_enemy: Node
+var _combat_from_dialogue := false   # 대화 선택지(type=combat)로 시작한 전투
 var _near_spot := {}
 var _collecting := false         # StoryRunner 메시지를 모으는 중 (조사·거점 행동)
 var _collected: PackedStringArray = []
@@ -66,6 +67,7 @@ func _ready() -> void:
 	StoryRunner.message.connect(_on_story_message)
 	StoryRunner.inventory_full.connect(_on_inventory_full)
 	StoryRunner.save_slot_requested.connect(_on_save_slot_requested)
+	StoryRunner.combat_requested.connect(_on_dialogue_combat)
 	GameState.survival_changed.connect(_update_hud)
 	GameState.clock_changed.connect(_update_hud)
 	GameState.clock_changed.connect(_refresh_presence)
@@ -81,7 +83,7 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	for pair in [[StoryRunner.message, _on_story_message], [StoryRunner.inventory_full, _on_inventory_full],
-			[StoryRunner.save_slot_requested, _on_save_slot_requested]]:
+			[StoryRunner.save_slot_requested, _on_save_slot_requested], [StoryRunner.combat_requested, _on_dialogue_combat]]:
 		if pair[0].is_connected(pair[1]):
 			pair[0].disconnect(pair[1])
 
@@ -612,10 +614,23 @@ func _on_dialogue_finished() -> void:
 func _start_combat(enemy: Node) -> void:
 	frozen = true
 	_combat_enemy = enemy
+	_open_combat(enemy.data.ref)
+
+
+## 대화 선택지 type=combat: 대화를 숨기고 전투, 끝나면 결과를 StoryRunner 에 돌려준다 (이기거나 도주하면 대화 계속)
+func _on_dialogue_combat(enemy_id: String) -> void:
+	frozen = true
+	_combat_from_dialogue = true
+	if _dialogue_ui != null:
+		_dialogue_ui.visible = false
+	_open_combat(enemy_id)
+
+
+func _open_combat(enemy_id: String) -> void:
 	%Prompt.visible = false
 	_combat_ui = CombatScene.instantiate()
 	_combat_ui.embedded = true
-	_combat_ui.enemy_id_override = enemy.data.ref
+	_combat_ui.enemy_id_override = enemy_id
 	_combat_ui.player_state = GameState.player_body
 	_combat_ui.finished.connect(_on_combat_finished)
 	%Overlay.add_child(_combat_ui)
@@ -626,6 +641,17 @@ func _on_combat_finished(outcome: String) -> void:
 	_combat_ui.queue_free()
 	_combat_ui = null
 	_update_hud()
+	if _combat_from_dialogue:
+		_combat_from_dialogue = false
+		if outcome == "win" or outcome == "fled":
+			_dialogue_ui.visible = true
+			StoryRunner.finish_combat(outcome)
+		else:
+			StoryRunner.finish_combat("lose")
+			_dialogue_ui.queue_free()
+			_dialogue_ui = null
+			_on_death()
+		return
 	match outcome:
 		"win":
 			GameState.field_mark(map.map_id, "removed", _combat_enemy.data.object_id)
