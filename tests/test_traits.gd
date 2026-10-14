@@ -55,7 +55,12 @@ func _ready() -> void:
 	# ---- 사건으로 얻기·잃기 (효과 trait:+id / trait:-id)
 	await StoryRunner.run_effects("trait:+brave;trait:+brave")
 	check(GameState.owned_trait_ids().count("brave") == 1 and GameState.owned_traits[2].from == "event", "사건으로 용감함 (두 번 얻어도 하나)")
-	check(_msgs.any(func(m): return "특성을 얻었다: 용감함" in m), "알림: 특성을 얻었다: 용감함")
+	var who := DataLoader.character_name(GameState.protagonist_id)
+	check(_msgs.has(StoryRunner.with_subject(who) + " 영향 받았습니다.") and not _msgs.any(func(m): return "용감함" in m),
+		"알림: '%s 영향 받았습니다.' 만 (특성 이름은 안 나옴)" % StoryRunner.with_subject(who))
+	check(StoryRunner.with_subject("고양이") == "고양이가" and StoryRunner.with_subject("하나") == "하나가"
+		and StoryRunner.with_subject("주인공") == "주인공이" and StoryRunner.with_subject("주인공 1") == "주인공 1이"
+		and StoryRunner.with_subject("NPC 2") == "NPC 2가" and StoryRunner.with_subject("Ann") == "Ann(이)가", "이/가 조사")
 	# ---- 저장 슬롯 (안 B): 슬롯에 그때의 특성
 	GameState.current_map = DataLoader.get_config_str("basecamp_map")
 	SaveManager.save_run(1)          # 고지능자·골초·용감함

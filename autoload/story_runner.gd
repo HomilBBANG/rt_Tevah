@@ -358,6 +358,19 @@ func _show_current() -> void:
 	choices_shown.emit(entries)
 
 
+## 이름 + 주격 조사: 받침이 있으면 '이', 없으면 '가' (숫자도 읽는 소리로). 알 수 없으면 '(이)가'
+static func with_subject(name: String) -> String:
+	if name == "":
+		return name
+	var c := name.unicode_at(name.length() - 1)
+	var batchim := -1
+	if c >= 0xAC00 and c <= 0xD7A3:
+		batchim = 1 if (c - 0xAC00) % 28 != 0 else 0
+	elif c >= 0x30 and c <= 0x39:   # 영 일 이 삼 사 오 육 칠 팔 구
+		batchim = [1, 1, 0, 1, 0, 0, 1, 1, 1, 0][c - 0x30]
+	return name + ("이" if batchim == 1 else ("가" if batchim == 0 else "(이)가"))
+
+
 func _find_choice(choice_id: String) -> Dictionary:
 	for c in DataLoader.choices_by_node.get(GameState.node_id, []):
 		if c.choice_id == choice_id:
@@ -411,8 +424,9 @@ func _apply_effects(effects: Array) -> String:
 					message.emit(("%s 상태가 되었다." if e.op == "+" else "%s 이(가) 나았다.") % nm)
 			"trait":
 				if GameState.set_trait(e.id, e.op == "+"):
-					var tn: String = DataLoader.traits.get(e.id, {}).get("name", e.id)
-					message.emit(("특성을 얻었다: %s" if e.op == "+" else "특성을 잃었다: %s") % tn)
+					# 얻든 잃든 어떤 특성인지는 말하지 않는다 (장비창 특성 탭에서 확인)
+					var who := DataLoader.character_name(GameState.protagonist_id)
+					message.emit("%s 영향 받았습니다." % with_subject(who if who != "" else "주인공"))
 					SaveManager.save_world()   # 사건으로 얻은 특성은 다음 회차에도 (기획 §5.2)
 			"restore":
 				var restored := GameState.restore_limb(e.id)
