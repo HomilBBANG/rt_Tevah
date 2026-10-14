@@ -39,7 +39,7 @@ const CONDS := [
 	["status", "상태이상에 걸려 있다", ["status"]],
 	["not_status", "상태이상에 걸려 있지 않다", ["status"]],
 	["count", "대화 횟수 · 죽은 횟수 · 회차 수", ["count_kind", "op_cmp", "num"]],
-	["trait", "주인공 능력이 있다", ["trait"]],
+	["trait", "특성이 있다 (player.xlsx Traits)", ["trait"]],
 	["stat", "스탯 (1단계 에피소드용)", ["stat", "op_cmp", "num"]],
 ]
 const OP_CHANGE := [["+", "+ 늘리기"], ["-", "- 줄이기"], ["=", "= 정하기"]]
@@ -369,7 +369,7 @@ func _param_widget(r: Dictionary, param: String) -> Control:
 			le.custom_minimum_size.x = 220
 			le.size_flags_horizontal = SIZE_EXPAND_FILL
 			le.text = p.get(param, "")
-			le.placeholder_text = {"flag": "플래그 이름 (영문)", "wflag": "월드 플래그 이름 (영문)", "trait": "능력 이름"}[param]
+			le.placeholder_text = {"flag": "플래그 이름 (영문)", "wflag": "월드 플래그 이름 (영문)", "trait": "특성 ID (▾ 로 고르기)"}[param]
 			le.text_changed.connect(func(t):
 				p[param] = t.strip_edges()
 				_emit())

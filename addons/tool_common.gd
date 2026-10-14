@@ -112,7 +112,11 @@ static func load_lookups() -> Dictionary:
 		names[c.char_id] = c.name
 		for t in c.get("traits", []):
 			traits[t] = true
+	# 특성: player.xlsx Traits (+ 예전 데이터의 능력 이름)
+	for t in read_json("res://data/traits.json", []):
+		traits[t.trait_id] = true
 	lk.traits = traits.keys()
+	lk.traits.sort()
 	# 이미 쓰이는 플래그 이름 모으기
 	var texts := PackedStringArray()
 	for n in read_json("res://data/nodes.json", []):

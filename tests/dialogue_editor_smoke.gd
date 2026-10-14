@@ -99,11 +99,11 @@ func _ready() -> void:
 	ee._emit()
 	check(ee.get_text().begins_with("item:+food;"), "수량 1 이면 *1 생략")
 	check(ExprRows.new().setup("cond", "(has:a | has:b) & flag:x", lk)._raw, "괄호 식 → 직접 입력만")
-	var se: Node = ExprRows.new().setup("effect", "status:+bleeding;status:-panic", lk)
-	var sc: Node = ExprRows.new().setup("cond", "status:bleeding & !status:panic", lk)
-	check(se._rows.size() == 2 and se._rows[0].kind == "status_add" and se._to_text() == "status:+bleeding;status:-panic"
-		and sc._rows[1].kind == "not_status" and sc._to_text() == "status:bleeding & !status:panic"
-		and lk.statuses.size() == 3, "상태이상 걸기·풀기·조건 줄 그대로")
+	var se: Node = ExprRows.new().setup("effect", "status:+bleeding;status:-panic_disorder", lk)
+	var sc: Node = ExprRows.new().setup("cond", "status:bleeding & !status:panic_disorder", lk)
+	check(se._rows.size() == 2 and se._rows[0].kind == "status_add" and se._to_text() == "status:+bleeding;status:-panic_disorder"
+		and sc._rows[1].kind == "not_status" and sc._to_text() == "status:bleeding & !status:panic_disorder"
+		and lk.statuses.size() == 12 and "high_intellect" in lk.traits, "상태이상 걸기·풀기·조건 줄 그대로 (상태이상 12, 특성 목록)")
 	se.free()
 	sc.free()
 	check(ExprRows.new().setup("effect", "goto:somewhere", lk)._raw, "goto 효과 → 직접 입력만")

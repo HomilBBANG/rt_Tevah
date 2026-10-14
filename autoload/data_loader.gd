@@ -13,7 +13,8 @@ var characters := {}       # char_id -> Dictionary
 var endings := {}          # ending_id -> Dictionary
 var abilities := {}        # ability_id -> Dictionary
 var player_parts: Array = []  # 전투: 플레이어 부위 (엑셀 행 순서)
-var status_effects := {}     # 상태이상 status_id -> { name, description } (content.xlsx StatusEffects)
+var status_effects := {}     # 상태이상 status_id -> { name, description, scope, … } (status.xlsx StatusEffects)
+var traits := {}             # 특성 trait_id -> { name, polarity, points, category, description, conflicts, selectable } (player.xlsx Traits)
 var equip_slots: Array = []   # 장비창 칸 [{ slot_id, name }] (player.xlsx EquipSlots, 행 순서)
 var enemies := {}          # 전투: enemy_id -> { name, parts: [...], attacks: [{..., strikes}] }
 var maps := {}             # 탐험: map_id -> { width, height, tiles: [String], start: [x, y], objects: [...] }
@@ -41,6 +42,7 @@ func load_all() -> void:
 	player_parts = []
 	equip_slots = []
 	status_effects.clear()
+	traits.clear()
 	enemies.clear()
 	maps.clear()
 	map_order.clear()
@@ -76,6 +78,9 @@ func load_all() -> void:
 	if FileAccess.file_exists(DATA_DIR + "status_effects.json"):
 		for st in _read_list("status_effects"):
 			status_effects[st.status_id] = st
+	if FileAccess.file_exists(DATA_DIR + "traits.json"):
+		for t in _read_list("traits"):
+			traits[t.trait_id] = t
 	if FileAccess.file_exists(DATA_DIR + "equip_slots.json"):
 		equip_slots = _read_list("equip_slots")
 	if FileAccess.file_exists(DATA_DIR + "player_parts.json"):

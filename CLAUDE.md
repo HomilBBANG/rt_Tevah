@@ -32,7 +32,8 @@ res://
 tools/
   xlsx_to_json.py
   sheets/content.xlsx  # 에피소드 대화·능력치 이름·Config·생존·거점·부활
-  sheets/player.xlsx   # Player, PlayerParts
+  sheets/player.xlsx   # Player, PlayerParts, EquipSlots, Traits(특성)
+  sheets/status.xlsx   # StatusEffects (상태이상)
   sheets/npc.xlsx      # Npcs, NpcParts, NpcAttacks
   sheets/item.xlsx     # Items, Loot
 ```
@@ -179,7 +180,8 @@ tools/
   - 무게 = 소지품 + 장비. Config `carry_heavy_weight` 이상이면 이동 속도 x`carry_heavy_speed_mult`, `carry_max_weight` 이상이면 못 움직임. TODO(기획): 기준값·근력과의 관계 미정 (지금 임시값).
   - 장착한 아이템도 `has:` 조건·판정 보정(dice_bonus)에 들어가고, `item:-x` 효과는 소지품에 없으면 장비에서 뺀다. GameState `equipment` 는 회차 저장에 들어감. 전투 중에는 장착 불가(소모품만).
   - 머리·몸·다리 칸에 들어갈 장비 아이템은 아직 없음 — TODO(기획).
-- **상태이상** (2026-10-14): content.xlsx `StatusEffects`(status_id, name, description). 효과 `status:+id` 걸기 / `status:-id` 풀기, 조건 `status:id`. GameState `statuses`(회차 저장에 들어감, 새 회차에 비움). 장비창 능력치 탭 오른쪽 위에 빨간 이름, 마우스를 올리면 description. 더미: 출혈·매스꺼움·공황. TODO(기획): 실제 효과·지속 시간·부활 때 처리.
+- **상태이상** (2026-10-14): **status.xlsx** `StatusEffects` (status_id, name, description + scope part/whole, tick_mode, tick_amount, stack_rule, dispel, death_cause, state, note — 기획 `tevah_character_creation_status_effects_spec_v0.1` §6–8 의 확정 4종 bleeding·panic_disorder·fear·withdrawal + 후보 8종, 미정 수치는 빈칸). 실제 효과(틱 피해·사망 원인 등)는 아직 없음 TODO. 효과 `status:+id` 걸기 / `status:-id` 풀기, 조건 `status:id`. GameState `statuses`(회차 저장에 들어감, 새 회차에 비움). 장비창 능력치 탭 오른쪽 위에 빨간 이름, 마우스를 올리면 description. 더미: 출혈·매스꺼움·공황. TODO(기획): 실제 효과·지속 시간·부활 때 처리.
+  - **특성** (2026-10-14, 같은 기획 §2–5): **player.xlsx `Traits`** (trait_id, name, polarity positive/negative, points 긍정=소비 음수·부정=획득 양수, category, description, conflicts, selectable 1/0, state 확정/일부 확정/후보, note). 40종 후보 (확정: 고지능자 -6, 골초 +2 / 이름·방향 확정: 반사신경, 용감함). 변환기가 부호·polarity·conflicts·selectable 검사, Player·Npcs traits 와 조건 trait: 에 없는 특성은 경고. `data/traits.json`, `DataLoader.traits`. 미구현(TODO 기획): 캐릭터 생성 화면, 특성 효과, 사건·거래로 얻기/바꾸기 효과, 회차 간 유지와 저장 슬롯 정책(§5.4), 시작 포인트.
   - 능력치 탭 배치(사용자 시안): 왼쪽 몸 상태 / 오른쪽 위 상태이상 / 오른쪽 아래 능력치 육각형.
 - 필드 소지품: I / Tab. 필드 조사·거점 행동·아이템 사용은 `StoryRunner.run_effects()` / `use_item()` (대화 밖, mode="field") 으로 같은 효과 엔진을 쓴다.
 - 임시·미구현(TODO, 기획 미확정): 파라미터가 낮거나 0일 때의 효과·사망 여부(§5), 시간 배율·행동 시간(§4), 탐험 중 종료 처리(§13.2), 사망·부활 연출(§11).

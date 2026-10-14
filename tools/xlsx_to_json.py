@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SHEETS_DIR = ROOT / "tools" / "sheets"
 # 시트 → 엑셀 파일 (여기 없는 시트는 content.xlsx)
 SHEET_FILES = {
-    "Player": "player.xlsx", "PlayerParts": "player.xlsx", "EquipSlots": "player.xlsx",
+    "Player": "player.xlsx", "PlayerParts": "player.xlsx", "EquipSlots": "player.xlsx", "Traits": "player.xlsx",
+    "StatusEffects": "status.xlsx",
     "Npcs": "npc.xlsx", "NpcParts": "npc.xlsx", "NpcAttacks": "npc.xlsx",
     "Items": "item.xlsx", "Loot": "item.xlsx",
 }
@@ -70,6 +71,8 @@ SCHEMA = {
     "Abilities": ("ability_id", ["ability_id", "name"], {}),
     # 상태이상: 효과 status:+id / status:-id, 조건 status:id. description = 장비창 능력치 탭에서 마우스를 올리면 뜨는 설명
     "StatusEffects": ("status_id", ["status_id", "name", "description"], {}),
+    # 특성 (캐릭터 생성·사건·거래). points: 긍정은 소비(음수), 부정은 획득(양수)
+    "Traits": ("trait_id", ["trait_id", "name", "polarity", "points"], {"points": (int, 0)}),
     # ---- 전투 (기획서 §7–9)
     # attack = 부위별 공격력 (TODO 기획: 전투 피해 공식에 아직 안 쓰임 — 플레이어 피해는 Config combat_player_damage,
     #          NPC 피해는 NpcAttacks.damage)
@@ -90,7 +93,7 @@ SCHEMA = {
 }
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
-OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "StatusEffects",
+OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "StatusEffects", "Traits",
                    "Survival", "CampActions", "Revivals"}
 # 맵 물체: exit 문(E 로 열고 걸어 들어가면 이동) / passage 통로(밟으면 이동) / transit 이용(사다리 등, E 로 이동) /
 #         arrive 도착 지점 (이동할 때 arrive 로 고르면 P 대신 여기 도착)
@@ -123,7 +126,14 @@ OPTIONAL = {
     # 노드 종류(대화 에디터의 기능 카드): line(기본, 대사) / effect(on_enter 효과만 실행하고 next_node 로) /
     # branch(condition 이 맞으면 next_node, 아니면 fail_next). effect·branch 는 화면에 보이지 않는다
     "Nodes": ["kind", "condition", "fail_next"],
+    # 특성: category 화면 분류, conflicts 같이 못 고르는 trait_id(쉼표), selectable 1 = 생성 화면에서 고름, state 기획 상태
+    "Traits": ["category", "description", "conflicts", "selectable", "state", "note"],
+    # 상태이상: scope part(부위)/whole(전체), tick_mode·tick_amount 시간마다 효과(미정이면 빈칸), death_cause 사망 원인
+    "StatusEffects": ["scope", "tick_mode", "tick_amount", "stack_rule", "dispel", "death_cause", "state", "note"],
 }
+TRAIT_POLARITY = {"positive", "negative"}
+STATUS_SCOPES = {"", "part", "whole"}
+TICK_MODES = {"", "game_hour", "game_minute", "real_second", "combat_turn"}
 
 ID_RE = re.compile(r"^[A-Za-z0-9_]+$")
 EXIT = "EXIT"   # 필드 대화 끝 → 필드로 복귀
@@ -386,6 +396,35 @@ def validate(d, rep):
     config, abils = index("Config"), index("Abilities")
     survs = index("Survival")
     stats_fx = index("StatusEffects")
+    traits = index("Traits")
+    for t in d["Traits"]:
+        w = loc("Traits", t)
+        if t["polarity"] not in TRAIT_POLARITY:
+            rep.err(w, f"polarity 는 positive / negative: '{t['polarity']}'")
+        elif t["polarity"] == "positive" and t["points"] > 0:
+            rep.err(w, f"긍정 특성은 포인트를 소비 (음수): {t['points']}")
+        elif t["polarity"] == "negative" and t["points"] < 0:
+            rep.err(w, f"부정 특성은 포인트를 획득 (양수): {t['points']}")
+        for other in split_list(t["conflicts"]):
+            if other not in traits:
+                rep.err(w, f"conflicts 에 없는 trait_id '{other}'")
+            elif other == t["trait_id"]:
+                rep.err(w, "conflicts 에 자기 자신")
+        if t["selectable"] and t["selectable"].lower() not in TRUE_WORDS | {"0", "n", "no", "false", "x"}:
+            rep.err(w, f"selectable 은 1 / 0: '{t['selectable']}'")
+    for st in d["StatusEffects"]:
+        w = loc("StatusEffects", st)
+        if st["scope"] not in STATUS_SCOPES:
+            rep.err(w, f"scope 는 part / whole: '{st['scope']}'")
+        if st["tick_mode"] not in TICK_MODES:
+            rep.err(w, f"tick_mode 는 {' / '.join(sorted(m for m in TICK_MODES if m))}: '{st['tick_mode']}'")
+        if st["tick_amount"] and not _is_number(st["tick_amount"]):
+            rep.err(w, f"tick_amount 는 숫자: '{st['tick_amount']}'")
+
+    def check_trait(where, tid):
+        # 예전 테스트 데이터의 이름(tester 등)이 있어 오류가 아니라 경고
+        if traits and tid not in traits:
+            rep.warn(where, f"Traits 시트(player.xlsx)에 없는 특성 '{tid}'")
     pparts, eparts, eattacks = index("PlayerParts"), index("NpcParts"), index("NpcAttacks")
     # 부위나 공격이 있는 NPC = 싸울 수 있는 NPC (맵의 적·대화 전투 선택지 대상)
     fighters = {r["npc_id"] for r in d["NpcParts"]} | {r["npc_id"] for r in d["NpcAttacks"]}
@@ -409,7 +448,7 @@ def validate(d, rep):
             elif kind == "restore":
                 check_limb(where, rid, "all")
             elif kind == "status" and rid not in stats_fx:
-                rep.err(where, f"없는 상태이상 '{rid}' (content.xlsx StatusEffects)")
+                rep.err(where, f"없는 상태이상 '{rid}' (status.xlsx StatusEffects)")
             elif kind == "move":
                 err = travel_error(d.get("_maps", {}), rid[0], rid[1])
                 if err:
@@ -462,7 +501,9 @@ def validate(d, rep):
                 elif kind == "cut":
                     check_limb(where, rid, "any")
                 elif kind == "status" and rid not in stats_fx:
-                    rep.err(where, f"조건의 없는 상태이상 '{rid}' (content.xlsx StatusEffects)")
+                    rep.err(where, f"조건의 없는 상태이상 '{rid}' (status.xlsx StatusEffects)")
+                elif kind == "trait":
+                    check_trait(where, rid)
                 elif kind == "surv" and rid not in survs:
                     rep.err(where, f"조건의 없는 생존 파라미터 '{rid}'")
         except ExprError as e:
@@ -503,6 +544,8 @@ def validate(d, rep):
             for t in split_list(c["traits"]):
                 if not ID_RE.match(t):
                     rep.err(w, f"능력 이름 '{t}' 에는 영문·숫자·_ 만")
+                else:
+                    check_trait(w, t)
             if (c["walk_speed"] or 0) < 0 or (c["run_speed"] or 0) < 0:
                 rep.err(w, "walk_speed·run_speed 는 0 이상 (칸/초)")
     for c in d["Player"]:
@@ -1235,7 +1278,10 @@ def export(d, maps):
                       + [character(r, "npc_id", False) for r in clean(d["Npcs"])],
         "abilities": clean(d["Abilities"]),
         "equip_slots": clean(d["EquipSlots"]),
-        "status_effects": clean(d["StatusEffects"]),
+        "status_effects": [dict(r, scope=r["scope"] or "whole", tick_amount=float(r["tick_amount"]) if r["tick_amount"] else None)
+                           for r in clean(d["StatusEffects"])],
+        "traits": [dict(r, conflicts=split_list(r["conflicts"]), selectable=is_true(r["selectable"]) if r["selectable"] else True)
+                   for r in clean(d["Traits"])],
         "player_parts": [dict(r, key=r["key"].upper(), vital=is_true(r["vital"])) for r in clean(d["PlayerParts"])],
         # 싸울 수 있는 NPC (부위·공격이 있는 것). enemy_id = npc_id
         "enemies": [{"enemy_id": e["npc_id"], "name": e["name"], "image": e["image"],

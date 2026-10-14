@@ -64,10 +64,10 @@ func _ready() -> void:
 	check(GameState.remove_item("knife", 1) == 1 and GameState.equipment.is_empty(), "item:-knife → 손에 든 칼이 빠짐")
 
 	# 상태이상: 효과 status:+id / status:-id, 조건 status:id
-	await StoryRunner.run_effects("status:+bleeding;status:+panic;status:+bleeding")
-	check(GameState.statuses == ["bleeding", "panic"], "상태이상 걸기 (같은 것 두 번은 한 번만)")
+	await StoryRunner.run_effects("status:+bleeding;status:+panic_disorder;status:+bleeding")
+	check(GameState.statuses == ["bleeding", "panic_disorder"], "상태이상 걸기 (같은 것 두 번은 한 번만)")
 	check(Expr.evaluate("status:bleeding & !status:nausea", GameState), "조건 status:")
-	await StoryRunner.run_effects("status:-panic")
+	await StoryRunner.run_effects("status:-panic_disorder")
 	check(GameState.statuses == ["bleeding"], "상태이상 풀기")
 
 	# 저장·불러오기
