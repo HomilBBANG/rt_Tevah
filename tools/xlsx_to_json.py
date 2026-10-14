@@ -863,7 +863,7 @@ def read_maps(rep):
             continue
         m["file"] = f.name
         m["tiles"] = [str(r) for r in m.get("tiles", [])]
-        m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len", "from") else v for k, v in o.items()}
+        m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len", "from", "default") else v for k, v in o.items()}
                         for o in m.get("objects", [])]
         maps[f.stem] = m
     for f in sorted(MAPS_DIR.glob("*.txt")):
@@ -932,7 +932,13 @@ def validate_field(d, maps, rep, enemies):
         def floor(x, y):
             return 0 <= y < len(tiles) and 0 <= x < len(tiles[y]) and tiles[y][x] == "."
 
-        for key, label in (("start", "도착 위치 P"), ("run_start", "회차 시작 S")):
+        # 도착 P 는 모두 arrive 물체, 그중 하나가 기본(default) — 그 자리가 start (예전 맵의 start 도 그대로 읽음)
+        defaults = [o for o in m["objects"] if o.get("type") == "arrive" and o.get("default")]
+        if len(defaults) > 1:
+            rep.err(wm, f"기본 도착 P 가 {len(defaults)}개 — 하나만 ({', '.join(o.get('object_id', '') for o in defaults)})")
+        if defaults:
+            m["start"] = [int(defaults[0]["x"]), int(defaults[0]["y"])]
+        for key, label in (("start", "기본 도착 P"), ("run_start", "회차 시작 S")):
             pos = m.get(key)
             if pos is None:
                 if key == "start":
@@ -1045,6 +1051,7 @@ def export_maps(d, maps):
         for o in m["objects"]:
             e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition", "arrive")}
             e["from"] = arrive_from(o)   # 도착 P: 이어지는 곳 (object_id / "맵:방향")
+            e["default"] = bool(o.get("default"))   # 기본 도착 P
             e.update(map_id=mid, x=int(o["x"]), y=int(o["y"]), patrol_dir=o.get("patrol_dir", ""),
                      patrol_len=int(o.get("patrol_len", 0) or 0),
                      schedule=[parse_time_range(r) for r in split_list(o.get("schedule", ""))])

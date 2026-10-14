@@ -11,10 +11,25 @@
  ],
  "start": [
   7,
-  4
+  5
  ],
  "run_start": null,
  "objects": [
+  {
+   "object_id": "basecamp_p",
+   "type": "arrive",
+   "x": 7,
+   "y": 5,
+   "ref": "",
+   "name": "기본",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": "",
+   "default": true
+  },
   {
    "object_id": "fo_camp",
    "type": "camp",
@@ -53,24 +68,6 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": ""
-  },
-  {
-   "object_id": "bc_gate",
-   "type": "arrive",
-   "x": 2,
-   "y": 4,
-   "ref": "",
-   "name": "정문",
-   "text": "",
-   "patrol_dir": "",
-   "patrol_len": 0,
-   "condition": "",
-   "schedule": "",
-   "arrive": "",
-   "from": [
-    "tt_to_camp",
-    "test_travel:down"
-   ]
   }
  ]
 }

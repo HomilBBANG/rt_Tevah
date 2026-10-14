@@ -19,7 +19,7 @@ const TRAVEL_TYPES := ["exit", "passage", "transit"]
 const COLORS := {
 	"enemy": Color("d05050"), "investigate": Color("e8c35a"), "npc": Color("5a8fd0"),
 	"camp": Color("5fae6a"), "exit": Color("a07850"),
-	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("b48ce0"),
+	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"),
 }
 const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P"}
 const EDGE_NAME := {"up": "위", "down": "아래", "left": "왼쪽", "right": "오른쪽"}
@@ -145,6 +145,8 @@ func apply_tool(t: Vector2i, first := true) -> void:
 			if not first:
 				return
 			var o := visible_object_at(t)
+			if not o.is_empty() and o.type == "arrive" and not release_p(o):
+				return   # 마지막 도착 P 는 못 지움
 			if not o.is_empty():
 				map.objects.erase(o)
 				selection.erase(o)
@@ -159,6 +161,8 @@ func apply_tool(t: Vector2i, first := true) -> void:
 				var o := {"object_id": id_maker.call(tool) if id_maker.is_valid() else "%s_%d" % [tool, map.objects.size() + 1],
 					"type": tool, "x": t.x, "y": t.y, "ref": "", "name": "", "text": "",
 					"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}
+				if tool == "arrive" and default_p().is_empty():
+					o.default = true   # 맵의 첫 도착 P = 기본
 				map.objects.append(o)
 				select(o)
 				changed.emit()
@@ -179,6 +183,25 @@ func fill_rect(r: Rect2i) -> void:
 		for x in range(r.position.x, r.end.x):
 			_paint(Vector2i(x, y), ch)
 	queue_redraw()
+
+
+## 기본 도착 P (default) 물체. 없으면 {}
+func default_p() -> Dictionary:
+	for o in map.get("objects", []):
+		if o.get("type", "") == "arrive" and o.get("default", false):
+			return o
+	return {}
+
+
+## 도착 P 를 지우기 전에: 기본 P 면 다른 P 에 기본을 넘긴다. 남은 P 가 없으면 false (못 지움)
+func release_p(o: Dictionary) -> bool:
+	var others: Array = map.objects.filter(func(x): return x.get("type", "") == "arrive" and x != o)
+	if others.is_empty():
+		return false
+	if o.get("default", false):
+		o.erase("default")
+		others[0].default = true
+	return true
 
 
 func select(o: Dictionary) -> void:
@@ -384,8 +407,10 @@ func _draw() -> void:
 				var e := _center(int(o.x) + d.x * int(o.patrol_len), int(o.y) + d.y * int(o.patrol_len))
 				draw_line(c, e, Color(1, 0.5, 0.5, 0.8), 2.0)
 				draw_circle(e, s * 0.12, Color(1, 0.5, 0.5, 0.8))
-	# P / S
+	# S (회차 시작). 도착 P 는 모두 물체(arrive) — 예전 맵처럼 기본 P 물체가 없으면 start 를 그린다
 	for key in ["start", "run_start"]:
+		if key == "start" and not default_p().is_empty():
+			continue
 		var p = map.get(key)
 		if p is Array and p.size() == 2:
 			var r := Rect2(pan + Vector2(p[0], p[1]) * s, Vector2(s, s)).grow(-s * 0.12)
@@ -404,6 +429,8 @@ func _draw() -> void:
 		if o in selection:
 			draw_arc(c, s * 0.52, 0, TAU, 32, Color.WHITE, 2.0, true)
 		_label(LETTER.get(o.type, "?"), c, Color.BLACK, s * 0.42)
+		if o.get("default", false):
+			_label("★", c + Vector2(s * 0.36, -s * 0.3), Color("ffd84a"), maxf(10.0, s * 0.36))
 		if filters.names:
 			var nm: String = o.name if o.get("name", "") != "" else o.object_id
 			_label(nm, c + Vector2(0, -s * 0.62), Color(1, 1, 1, 0.85), maxf(10.0, s * 0.32))

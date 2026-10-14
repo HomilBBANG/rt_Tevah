@@ -98,7 +98,9 @@ func _exit_tree() -> void:
 # ---------------------------------------------------------------- 맵 만들기
 ## 맵을 (다시) 만든다. 처치한 적·조사한 곳은 GameState.field_state 에서 빠진다.
 func load_map(map_id: String) -> void:
+	# 바로 빼낸다: queue_free 만 하면 이전 맵의 벽이 한 프레임 남아, 그 자리에 도착한 플레이어를 밀어낸다
 	for c in %World.get_children():
+		%World.remove_child(c)
 		c.queue_free()
 	enemies.clear()
 	spots.clear()

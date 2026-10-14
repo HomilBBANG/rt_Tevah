@@ -15,6 +15,21 @@
  "run_start": null,
  "objects": [
   {
+   "object_id": "test_travel_p",
+   "type": "arrive",
+   "x": 4,
+   "y": 2,
+   "ref": "",
+   "name": "기본",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": "",
+   "default": true
+  },
+  {
    "object_id": "tt_to_camp",
    "type": "passage",
    "x": 6,

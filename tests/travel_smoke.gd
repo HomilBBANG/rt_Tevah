@@ -22,9 +22,10 @@ func _ready() -> void:
 	check(f.map.map_id == "test_travel" and _at(4, 2), "test_travel 의 P(4,2)에서 시작")
 	await _snap("test_travel")
 
-	# 통로: 밟으면 베이스캠프 '정문' 도착 지점(2,4)으로
+	# 통로: 밟으면 베이스캠프 — 이어진 P 가 없으니 기본 P(★)
+	var bc_p: Array = DataLoader.maps.basecamp.start
 	await _walk_to(6, 2)
-	check(f.map.map_id == "basecamp" and _at(2, 4), "통로 → 베이스캠프 정문(2,4) 도착 (%s)" % _where())
+	check(f.map.map_id == "basecamp" and _at(bc_p[0], bc_p[1]), "통로 → 베이스캠프 기본 P 도착 (%s)" % _where())
 
 	# 이용(사다리): 옆에서 E → test_field 의 P
 	f.load_map("test_travel")
@@ -34,18 +35,17 @@ func _ready() -> void:
 	check("이용: 사다리" in f.get_node("%Prompt").text, "사다리 근처 → '이용: 사다리' 안내 (%s)" % f.get_node("%Prompt").text)
 	_press("interact")
 	await _wait(0.2)
-	var p: Array = DataLoader.maps.test_field.start
-	check(f.map.map_id == "test_field" and _at(p[0], p[1]), "E → test_field 의 P 도착 (%s)" % _where())
+	check(f.map.map_id == "test_field" and _at(5, 5), "E → test_field '사다리 아래' P(5,5) — P 쪽 이어지는 곳 (%s)" % _where())
 
 	# 가장자리: 왼쪽 끝(0,1) → test_field, 아래 끝(4,5) → 베이스캠프 정문
 	f.load_map("test_travel")
 	await _wait(0.2)
 	await _walk_to(0, 1)
-	check(f.map.map_id == "test_field", "왼쪽 가장자리 → test_field (%s)" % _where())
+	check(f.map.map_id == "test_field" and _at(5, 5), "왼쪽 가장자리 → test_field '사다리 아래' P (%s)" % _where())
 	f.load_map("test_travel")
 	await _wait(0.2)
 	await _walk_to(4, 5)
-	check(f.map.map_id == "basecamp" and _at(2, 4), "아래 가장자리 → 베이스캠프 정문 (%s)" % _where())
+	check(f.map.map_id == "basecamp" and _at(bc_p[0], bc_p[1]), "아래 가장자리 → 베이스캠프 기본 P (%s)" % _where())
 
 	# 도착 지점에 서 있어도 바로 다시 이동하지 않는다 (통로 위 도착 → 한 번 벗어나야 작동)
 	f.travel("test_travel", "tt_center")
@@ -53,9 +53,9 @@ func _ready() -> void:
 	check(f.map.map_id == "test_travel" and _at(4, 3), "travel(도착 지점 tt_center) → (4,3)")
 
 	# 효과 move: (대화·아이템) — 대화 밖이면 바로
-	await StoryRunner.run_effects("move:basecamp@bc_gate")
+	await StoryRunner.run_effects("move:test_field@tf_from_travel")
 	await _wait(0.2)
-	check(f.map.map_id == "basecamp" and _at(2, 4), "효과 move:basecamp@bc_gate → 정문 (%s)" % _where())
+	check(f.map.map_id == "test_field" and _at(5, 5), "효과 move:test_field@tf_from_travel → 그 P (%s)" % _where())
 	await StoryRunner.run_effects("move:test_travel")
 	await _wait(0.2)
 	check(f.map.map_id == "test_travel" and _at(4, 2), "효과 move:test_travel → P (%s)" % _where())
@@ -63,12 +63,12 @@ func _ready() -> void:
 	# 대화 중 move: 대화가 끝난 뒤 이동
 	f._dialogue_ui = Control.new()
 	f.add_child(f._dialogue_ui)
-	f._on_travel_requested("basecamp", "bc_gate")
+	f._on_travel_requested("basecamp", "")
 	await _wait(0.1)
 	check(f.map.map_id == "test_travel", "대화 중에는 바로 이동하지 않음")
 	f._on_dialogue_finished()
 	await _wait(0.1)
-	check(f.map.map_id == "basecamp" and _at(2, 4), "대화가 끝나면 이동 (%s)" % _where())
+	check(f.map.map_id == "basecamp" and _at(bc_p[0], bc_p[1]), "대화가 끝나면 이동 (%s)" % _where())
 
 	SaveManager.delete_all()
 	print("[travel_smoke] 실패 %d" % _fail)
