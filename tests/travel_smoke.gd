@@ -4,6 +4,8 @@ extends Node
 ##   Godot_v4.7-stable_win64_console.exe --path . res://tests/travel_smoke.tscn
 
 const FieldScript = preload("res://scenes/field/field.gd")
+## 테스트 전용 맵 복사본 — tools/maps 의 test_ 맵을 고쳐도 이 테스트는 안 깨진다
+const FIX := "res://tests/fixtures/maps/"
 
 var _fail := 0
 var f: Node
@@ -11,6 +13,7 @@ var f: Node
 
 func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute("user://travel_smoke")
+	_load_fixture_maps()
 	SaveManager.save_dir = "user://test_saves/"
 	SaveManager.delete_all()
 	SaveManager.begin_run()
@@ -71,8 +74,57 @@ func _ready() -> void:
 	check(f.map.map_id == "basecamp" and _at(bc_p[0], bc_p[1]), "대화가 끝나면 이동 (%s)" % _where())
 
 	SaveManager.delete_all()
+	DataLoader.load_all()   # 진짜 데이터로 되돌림
 	print("[travel_smoke] 실패 %d" % _fail)
 	get_tree().quit(1 if _fail > 0 else 0)
+
+
+## 복사본 맵을 변환기 결과와 같은 모양으로 DataLoader 에 넣는다 (start = 기본 P → 첫 P → start)
+func _load_fixture_maps() -> void:
+	for f in DirAccess.get_files_at(FIX):
+		if not f.ends_with(".json"):
+			continue
+		var m: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(FIX + f))
+		var objs := []
+		var start = m.get("start")
+		var first_p = null
+		for o in m.objects:
+			var c: Dictionary = o.duplicate(true)
+			c.x = int(o.x)
+			c.y = int(o.y)
+			c.patrol_len = int(o.get("patrol_len", 0))
+			c.schedule = _schedule(str(o.get("schedule", "")))
+			c.from = o.get("from", [])
+			c.default = o.get("default", false)
+			for k in ["condition", "arrive", "ref", "name", "text", "patrol_dir"]:
+				c[k] = str(o.get(k, ""))
+			if c.type == "arrive":
+				if c.default:
+					start = [c.x, c.y]
+				elif first_p == null:
+					first_p = [c.x, c.y]
+			objs.append(c)
+		if not m.objects.any(func(o): return o.type == "arrive" and o.get("default", false)) and first_p != null:
+			start = first_p
+		start = [int(start[0]), int(start[1])]
+		var w := 0
+		for row in m.tiles:
+			w = maxi(w, String(row).length())
+		DataLoader.maps[m.map_id] = {"map_id": m.map_id, "width": w, "height": m.tiles.size(), "tiles": m.tiles,
+			"start": start, "run_start": m.run_start if m.get("run_start") != null else start, "objects": objs,
+			"edges": m.get("edges", {})}
+
+
+## "06:00-12:00, 20:00-23:00" → [[360, 720], [1200, 1380]]
+func _schedule(t: String) -> Array:
+	var out := []
+	for part in t.split(",", false):
+		var ab := part.strip_edges().split("-")
+		if ab.size() == 2:
+			var a := ab[0].split(":")
+			var b := ab[1].split(":")
+			out.append([int(a[0]) * 60 + int(a[1]), int(b[0]) * 60 + int(b[1])])
+	return out
 
 
 ## (x, y) 칸 바로 옆에 두고 그 칸으로 걸어 들어간다 (실제 이동·충돌로)

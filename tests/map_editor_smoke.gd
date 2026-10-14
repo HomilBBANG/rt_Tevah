@@ -15,7 +15,8 @@ func _ready() -> void:
 		DirAccess.remove_absolute(TEST_DIR + f)
 	for f in ["test_field", "basecamp", "test_travel", "test_arrive"]:
 		var w := FileAccess.open(TEST_DIR + f + ".json", FileAccess.WRITE)
-		w.store_string(FileAccess.get_file_as_string("res://tools/maps/%s.json" % f))
+		# 테스트 전용 맵 복사본 (tools/maps 의 test_ 맵을 고쳐도 테스트가 안 깨지게)
+		w.store_string(FileAccess.get_file_as_string("res://tests/fixtures/maps/%s.json" % f))
 		w.close()
 	var original: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_field.json"))
 
@@ -213,7 +214,7 @@ func _ready() -> void:
 	ed.undo()
 	check(cv.link_labels.fo_to_camp[1], "실행 취소로 연결 복구")
 	# 맵 목록 · 검색
-	check(ed.map_list.item_count >= 3 and "→ basecamp" in ed.map_list.get_item_text(ed.map_ids.find("test_field")), "맵 목록에 이어지는 맵")
+	check(ed.map_list.item_count >= 3 and "→ 나가는 곳: basecamp" in ed.map_list.get_item_tooltip(ed.map_ids.find("test_field")), "맵 목록: 이어지는 맵은 마우스 설명에")
 	ed.search.text = "고양이"
 	ed._run_search()
 	check(ed.results.item_count == 1 and ed.results.get_item_metadata(0) == ["basecamp", "fo_cat"], "검색: 고양이 → basecamp")

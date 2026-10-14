@@ -48,7 +48,7 @@
    "type": "transit",
    "x": 2,
    "y": 3,
-   "ref": "test_arrive",
+   "ref": "test_field",
    "name": "사다리",
    "text": "",
    "patrol_dir": "",
@@ -74,7 +74,7 @@
  ],
  "edges": {
   "left": {
-   "ref": "test_arrive",
+   "ref": "test_field",
    "arrive": ""
   },
   "down": {

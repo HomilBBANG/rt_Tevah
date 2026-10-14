@@ -61,6 +61,28 @@ static func add_help(parent: Container, index: int, bar: HBoxContainer, key: Str
 	return panel
 
 
+## 사용법 창: bar 에 '❓ 사용법' 버튼, 누르면 설명 창이 뜬다 (화면 자리를 차지하지 않음). 만든 창을 돌려준다.
+static func add_help_window(owner: Control, bar: HBoxContainer, title: String, bbcode: String) -> AcceptDialog:
+	var dlg := AcceptDialog.new()
+	dlg.title = title
+	dlg.ok_button_text = "닫기"
+	dlg.exclusive = false
+	var text := RichTextLabel.new()
+	text.bbcode_enabled = true
+	text.text = bbcode
+	text.selection_enabled = true
+	text.custom_minimum_size = Vector2(900, 560)
+	dlg.add_child(text)
+	owner.add_child(dlg)
+	var btn := Button.new()
+	btn.text = "❓ 사용법"
+	btn.flat = true
+	btn.tooltip_text = "이 에디터 쓰는 법"
+	btn.pressed.connect(func(): dlg.popup_centered())
+	bar.add_child(btn)
+	return dlg
+
+
 ## 조건·효과 고르기(addons/expr_rows.gd)와 이동 대상 목록에 쓰는 이름표들 (data/*.json 에서).
 ## items·survival·abilities·parts·loot·nodes: [[id, 보이는 이름]], flags·wflags·traits: [이름] (이미 쓰이는 것)
 static func load_lookups() -> Dictionary:

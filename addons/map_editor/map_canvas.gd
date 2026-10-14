@@ -399,13 +399,15 @@ func _draw() -> void:
 			var info: Array = link_labels.get("edge:" + d, ["%s → %s" % [EDGE_NAME.get(d, d), e.ref], true])
 			draw_rect(r, Color(0.43, 0.66, 0.86, 0.55) if info[1] else Color(0.85, 0.25, 0.25, 0.6))
 			_label(info[0], r.get_center(), Color.WHITE, maxf(10.0, s * 0.3))
-	# 적 시야·순찰
+	# 적 순찰 길 (시야 원은 고르거나 마우스를 올린 적만 — 겹쳐서 지저분해지지 않게)
+	var focus := _focus_objects()
 	if filters.sight and filters.enemy:
 		for o in map.objects:
 			if o.type != "enemy":
 				continue
 			var c := _center(int(o.x), int(o.y))
-			draw_arc(c, sight_tiles * s, 0, TAU, 48, Color(1, 0.3, 0.3, 0.25), 1.0, true)
+			if o in focus:
+				draw_arc(c, sight_tiles * s, 0, TAU, 48, Color(1, 0.3, 0.3, 0.35), 1.5, true)
 			if o.get("patrol_dir", "") in DIR and int(o.get("patrol_len", 0)) > 0:
 				var d: Vector2i = DIR[o.patrol_dir]
 				var e := _center(int(o.x) + d.x * int(o.patrol_len), int(o.y) + d.y * int(o.patrol_len))
@@ -435,11 +437,16 @@ func _draw() -> void:
 		_label(LETTER.get(o.type, "?"), c, Color.BLACK, s * 0.42)
 		if o.get("default", false):
 			_label("★", c + Vector2(s * 0.36, -s * 0.3), Color("ffd84a"), maxf(10.0, s * 0.36))
-		if filters.names:
+		# 이름표: 충분히 확대했을 때만 (고르거나 마우스를 올리면 늘)
+		if filters.names and (s >= 26.0 or o in focus):
 			var nm: String = o.name if o.get("name", "") != "" else o.object_id
-			_label(nm, c + Vector2(0, -s * 0.62), Color(1, 1, 1, 0.85), maxf(10.0, s * 0.32))
+			_label(nm, c + Vector2(0, -s * 0.62), Color(1, 1, 1, 0.8), maxf(10.0, s * 0.32))
+		# 연결 글자: 고르거나 마우스를 올린 것만. 잘못된 연결은 ⚠ 만 늘
 		if filters.links and not info.is_empty():
-			_label(info[0], c + Vector2(0, s * 0.72), Color("9cc4ec") if info[1] else Color("ff6060"), maxf(9.0, s * 0.28))
+			if o in focus:
+				_label(info[0], c + Vector2(0, s * 0.72), Color("9cc4ec") if info[1] else Color("ff6060"), maxf(10.0, s * 0.3))
+			elif not info[1]:
+				_label("⚠", c + Vector2(s * 0.42, -s * 0.3), Color("ff6060"), maxf(10.0, s * 0.4))
 	# 영역 선택·사각형 칠하기 미리보기
 	if not region.size == Vector2i.ZERO:
 		draw_rect(Rect2(pan + Vector2(region.position) * s, Vector2(region.size) * s), Color(0.5, 0.8, 1.0), false, 2.0)
@@ -449,6 +456,15 @@ func _draw() -> void:
 		draw_rect(Rect2(pan + Vector2(pr.position) * s, Vector2(pr.size) * s), pcol)
 	if in_bounds(_hover):
 		draw_rect(Rect2(pan + Vector2(_hover) * s, Vector2(s, s)), Color(1, 1, 1, 0.5), false, 2.0)
+
+
+## 자세히 보여 줄 물체: 고른 것 + 마우스가 올라간 것
+func _focus_objects() -> Array:
+	var out := selection.duplicate()
+	var h := visible_object_at(_hover) if in_bounds(_hover) else {}
+	if not h.is_empty() and not h in out:
+		out.append(h)
+	return out
 
 
 func _center(x: int, y: int) -> Vector2:

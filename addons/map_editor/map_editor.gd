@@ -11,52 +11,60 @@ const ExprRows = preload("res://addons/expr_rows.gd")
 
 const MAP_DIR := "res://tools/maps/"
 const PLAYTEST_FILE := "user://map_playtest.json"
-const TOOLS := [
-	["select", "선택·이동"], ["wall", "벽"], ["floor", "바닥"], ["void", "빈 공간"], ["arrive", "도착 P"], ["run_start", "회차 시작 S"],
-	["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["exit", "출구(문)"], ["passage", "통로"],
-	["transit", "이용"], ["erase", "지우개"],
+## 도구 묶음: [묶음 이름, [[도구 id, 버튼 글자], ...]] — 도구 줄에서 구분선으로 나눈다
+const TOOL_GROUPS := [
+	["", [["select", "선택"]]],
+	["칠하기", [["wall", "벽"], ["floor", "바닥"], ["void", "빈 공간"]]],
+	["위치", [["arrive", "도착 P"], ["run_start", "시작 S"]]],
+	["물체", [["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"]]],
+	["이동", [["exit", "문"], ["passage", "통로"], ["transit", "이용"]]],
+	["", [["erase", "지우개"]]],
 ]
 const TOOL_TIPS := {
-	"select": "물체를 클릭하면 오른쪽 칸에 세부, 끌면 옮김. 빈 칸을 클릭하면 맵 크기 설정",
-	"wall": "누른 채 끌어서 벽을 칠함 (지나갈 수 없음)",
-	"floor": "누른 채 끌어서 바닥을 칠함 (걸어 다니는 곳)",
-	"void": "누른 채 끌어서 빈 공간을 칠함 (검게 보이고 지나갈 수 없음)",
+	"select": "선택·이동: 물체를 클릭하면 오른쪽 칸에 세부, 끌면 옮김.\nShift+클릭 = 여러 개, 빈 곳을 끌면 영역 선택, 빈 칸 클릭 = 맵 설정",
+	"wall": "벽: 누른 채 끌어서 칠함 (지나갈 수 없음)",
+	"floor": "바닥: 누른 채 끌어서 칠함 (걸어 다니는 곳)",
+	"void": "빈 공간: 누른 채 끌어서 칠함 (검게 보이고 지나갈 수 없음)",
+	"arrive": "도착 P: 다른 맵에서 들어올 때 서는 곳. 오른쪽 칸 '이어지는 곳'에서 어느 입구로 오면 여기 설지 고름.\n★ = 기본 P (이어지지 않은 곳 — 베이스캠프만 필수)",
 	"run_start": "회차 시작 S: 새 회차를 이 맵에서 시작할 때 깨어나는 곳 (Config start_map 의 맵에서만 쓰임)",
-	"enemy": "적을 놓음 → 오른쪽 칸에서 적 종류·순찰 방향·칸 수",
-	"investigate": "조사 지점을 놓음 → 오른쪽 칸에서 얻는 것(Loot)·조사 문구",
-	"npc": "NPC 를 놓음 → 오른쪽 칸에서 대화(시작 노드)·나타나는 시간대",
-	"camp": "베이스캠프 거점(식사·물·씻기·잠 메뉴, 엑셀 CampActions)을 놓음",
-	"exit": "출구(문)를 놓음 → 오른쪽 칸에서 이동할 맵·도착 지점. 게임에서는 E 로 열고, 열린 문으로 걸어가면 이동",
-	"passage": "통로를 놓음 → 밟으면 바로 이동 (열고 닫기 없음, 계단·길·동굴 입구)",
-	"transit": "이용 지점을 놓음 → E 를 눌러야 이동 (사다리·엘리베이터 등). 이름이 안내에 나옴",
-	"arrive": "도착 P 를 놓음 → 오른쪽 칸 '이어지는 곳'에서 어느 맵의 어느 입구로 들어오면 여기 설지 고름. ★ = 기본 P (이어지지 않은 곳 — 베이스캠프만 필수)",
-	"erase": "클릭한 물체(또는 S)를 지움. 벽은 바닥으로 칠해서 지움",
+	"enemy": "적: 놓은 뒤 오른쪽 칸에서 적 종류·순찰 방향·칸 수",
+	"investigate": "조사 지점: 놓은 뒤 오른쪽 칸에서 얻는 것(Loot)·조사 문구",
+	"npc": "NPC: 놓은 뒤 오른쪽 칸에서 대화(시작 노드)·나타나는 시간대",
+	"camp": "베이스캠프 거점 (식사·물·씻기·잠 메뉴, 엑셀 CampActions)",
+	"exit": "문: E 로 열고, 열린 문으로 걸어 들어가면 이동. 오른쪽 칸에서 이동할 맵",
+	"passage": "통로: 밟으면 바로 이동 (계단·길·동굴 입구)",
+	"transit": "이용: E 를 눌러야 이동 (사다리·엘리베이터 등). 이름이 안내에 나옴",
+	"erase": "지우개: 클릭한 물체(또는 S)를 지움. 벽은 바닥으로 칠해서 지움",
 }
-const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]   (이 칸은 오른쪽 위 '❓ 사용법' 으로 접고 펼칩니다)
+const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
 
-[b]1. 맵 고르기[/b] — 왼쪽 위 목록에서 맵을 고르거나 [b]새 맵[/b] (맵 ID, 너비·높이 칸 수). 맵 하나 = 파일 하나 (tools/maps/).
-[b]2. 모양 칠하기[/b] — 도구 줄에서 [b]벽[/b] / [b]바닥[/b] / [b]빈 공간[/b]을 고르고, 맵 위를 누른 채 끌면 칠해집니다.
-[b]3. 위치 찍기[/b] — [b]도착 P[/b]: 다른 맵에서 들어올 때 서는 곳. 여러 개 찍고, P 를 눌러 [b]이어지는 곳[/b](어느 맵의 어느 입구로 오면 여기)을 고릅니다.
-      ★ 붙은 P 가 [b]기본 P[/b] — 아무 P 에도 이어지지 않은 곳으로 들어올 때. [b]베이스캠프만 꼭 하나[/b] (부활·불러오기 때 깨어나는 곳),
-      다른 맵은 없어도 되지만 그러면 들어오는 곳마다 P 를 이어 둬야 합니다 (빠지면 빨간 ⚠·변환 오류). P 설정에서 켜고 끔.  [b]회차 시작 S[/b]: 새 회차를 시작하는 곳 (시작 맵에만). 둘 다 바닥 칸에만.
-[b]4. 물체 놓기[/b] — [b]적[/b] · [b]조사[/b] · [b]NPC[/b] · [b]거점[/b] · [b]출구(문)[/b] · [b]통로[/b] · [b]이용[/b] 도구로 바닥 칸을 클릭하면 놓이고, [b]오른쪽 칸[/b]에서 세부를 고릅니다.
-    · 적: 적 종류, 순찰 방향과 칸 수(그 칸 수만큼 왕복). 맵에 순찰 길과 시야가 그려집니다.
-    · 조사: 얻는 것(엑셀 Loot 의 spot), 조사할 때 나오는 문구.
-    · NPC: 대화(시작 노드 = 대화 탭의 첫 카드), 나타나는 시간대 (예: 06:00-12:00, 20:00-23:00).
-    · 맵 이동: [b]출구(문)[/b] E 로 열고 걸어 들어감 / [b]통로[/b] 밟으면 바로 / [b]이용[/b] 사다리처럼 E 를 눌러야 / [b]가장자리[/b] 빈 칸을 클릭해 나오는 맵 설정에서 위·아래·왼쪽·오른쪽 끝으로 나가면 옆 맵.
-      도착하는 자리는 3번의 [b]도착 P[/b] 에서 정합니다 (문 쪽 '도착 P' 칸에서 골라도 됩니다).
-      대화·아이템 효과의 '맵 이동'으로도 옮길 수 있습니다.
-    · 나타나는 조건: [b]＋ 조건 추가[/b]로 골라 둡니다 (예: '플래그가 켜져 있다 met_cat' → 그 플래그가 켜졌을 때만 나타남).
-[b]5. 고치기[/b] — [b]선택·이동[/b] 도구: 물체를 클릭하면 세부, 끌면 옮김. 빈 칸 클릭 = 맵 크기·가장자리 설정.  [b]지우개[/b]: 물체를 지움.
-    · [b]여러 개[/b]: Shift+클릭으로 더하기, 빈 곳을 끌면 영역 선택(그 안의 물체·타일). 고른 것들을 함께 끌어 옮기고, 오른쪽 칸에서 한꺼번에 바꾸기.
-    · [b]□ 사각형[/b]: 켜고(또는 Shift 를 누른 채) 벽·바닥·빈 공간을 끌면 사각형으로 채움.
-    · [b]↶ 실행 취소 / ↷ 다시 실행[/b] (Ctrl+Z / Ctrl+Y),  [b]복사·붙여넣기[/b] (Ctrl+C / Ctrl+V — 마우스가 있는 칸에),  [b]삭제[/b] (Delete). 단축키는 맵을 한 번 누른 뒤.
-[b]연결 보기[/b] — 문·통로·이용 아래에 '→ 맵 · 도착 P', 추가 도착 P 아래에 '← 들어오는 곳'. 잘못된 연결은 빨간 테두리와 ⚠. 문을 [b]더블클릭[/b]하면 이어진 맵을 열고 도착 P 로.
-[b]왼쪽 칸[/b] — [b]찾기[/b]: 이름·ID·종류로 모든 맵에서 검색, 누르면 그 맵·물체로.  [b]맵 목록[/b]: 누르면 열기 (→ 이어지는 맵, 마우스를 올리면 들어오는 곳).  [b]표시 필터[/b]: 끈 종류는 안 보이고 고를 수도 없음.
-[b]6. 화면[/b] — 휠: 확대·축소,  휠 버튼 또는 오른쪽 버튼 누른 채 끌기: 화면 이동.
-[b]7. 반영하기[/b] — [b]저장[/b] → [b]변환·검사[/b] (오류는 맨 아래 칸) → [b]테스트 플레이[/b]로 이 맵에서 바로 실행 (진짜 저장은 건드리지 않음).
+[b]화면[/b]
+  왼쪽 — 찾기(모든 맵에서 이름·ID·종류) · 맵 목록(→ 이어지는 맵) · 표시 필터
+  가운데 — 맵. 휠: 확대·축소, 휠 버튼·오른쪽 버튼 끌기: 화면 이동
+  오른쪽 — 고른 물체의 설정 (아무것도 안 고르면 맵 크기·가장자리 설정)
 
-[b]지도 표시[/b]  [color=#3fae5f]● P[/color] 도착 P (★ 기본) · [color=#b89a2a]S[/color] 회차 시작 · [color=#d05050]● 적[/color] · [color=#e8c35a]● 조[/color] 조사 · [color=#5a8fd0]● N[/color] NPC · [color=#5fae6a]● 거[/color] 거점 · [color=#a07850]● 문[/color] 출구 · [color=#6fa8dc]● 통[/color] 통로 · [color=#c8a060]● 이[/color] 이용 · 맵 바깥 푸른 띠 = 가장자리 이동 · 흐린 빨간 원 = 적 시야, 빨간 선 = 순찰 길
+[b]1. 모양[/b]  [b]칠하기[/b]의 벽 / 바닥 / 빈 공간을 고르고 맵 위를 끌면 칠해집니다. [b]□ 사각형[/b]을 켜거나 Shift 를 누른 채 끌면 사각형으로 채웁니다.
+
+[b]2. 물체[/b]  [b]물체[/b]·[b]이동[/b]·[b]위치[/b]의 도구로 바닥 칸을 클릭해 놓고, 오른쪽 칸에서 고칩니다.
+  · 적: 적 종류, 순찰 방향과 칸 수 (고르면 순찰 길과 시야가 보임)
+  · 조사: 얻는 것(엑셀 Loot), 조사 문구    · NPC: 대화 시작 카드, 나타나는 시간대
+  · 나타나는 조건: [b]＋ 조건 추가[/b]로 고름 (예: 플래그가 켜져 있을 때만)
+
+[b]3. 맵 이동[/b]
+  · 문(E 로 열고 걸어 들어감) · 통로(밟으면 바로) · 이용(E, 사다리 등) · 가장자리(맵 설정에서 위·아래·왼쪽·오른쪽 끝)
+  · [b]도착 P[/b]: 들어올 때 서는 곳. 여러 개 찍고, P 를 눌러 [b]이어지는 곳[/b](어느 맵의 어느 입구로 오면 여기)을 체크합니다.
+  · ★ [b]기본 P[/b]: 아무 P 에도 이어지지 않은 곳으로 들어올 때. [b]베이스캠프만 필수[/b](부활·불러오기 때 깨어나는 곳).
+    다른 맵은 없어도 되지만 그러면 들어오는 곳마다 P 를 이어 둬야 합니다.
+  · 문 아래에 '→ 맵 · 도착 P', P 아래에 '← 들어오는 곳'이 보입니다 (고르거나 마우스를 올렸을 때). 잘못된 연결은 빨간 ⚠.
+  · 문을 [b]더블클릭[/b]하면 이어진 맵을 열고 도착 P 로 갑니다.
+
+[b]4. 고치기[/b]  (단축키는 맵을 한 번 누른 뒤)
+  · 선택: 클릭 · Shift+클릭(여러 개) · 빈 곳 끌기(영역) · Ctrl+A(모두) · Esc(해제). 고른 것들을 함께 끌어 옮기고, 오른쪽 칸에서 한꺼번에 바꿉니다.
+  · ↶ ↷ 실행 취소·다시 실행 (Ctrl+Z / Ctrl+Y)  · [b]편집 ▾[/b]: 복사(Ctrl+C) · 붙여넣기(Ctrl+V, 마우스가 있는 칸) · 삭제(Delete)
+
+[b]5. 반영[/b]  [b]저장[/b] → [b]변환·검사[/b] (오류가 있으면 아래에 결과 칸이 열림) → [b]▶ 테스트 플레이[/b] (진짜 저장은 건드리지 않음)
+
+[b]지도 표시[/b]  [color=#3fae5f]● P[/color] 도착 P (★ 기본) · [color=#b89a2a]S[/color] 회차 시작 · [color=#d05050]● 적[/color] · [color=#e8c35a]● 조[/color] 조사 · [color=#5a8fd0]● N[/color] NPC · [color=#5fae6a]● 거[/color] 거점 · [color=#a07850]● 문[/color] · [color=#6fa8dc]● 통[/color] 통로 · [color=#c8a060]● 이[/color] 이용 · 맵 바깥 푸른 띠 = 가장자리 이동
 """
 const TYPE_NAME :={"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구(문)",
 	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P"}
@@ -72,6 +80,7 @@ var files: OptionButton
 var status: Label
 var inspector: VBoxContainer
 var log_view: TextEdit
+var log_box: VBoxContainer             # 아래 결과 칸 (변환·검사 실패 때만 열림)
 var tool_buttons := {}
 # 목록 (data/*.json 에서)
 var enemies: Array = []              # [[id, 이름]]
@@ -98,61 +107,81 @@ var filter_boxes := {}
 func _init() -> void:
 	size_flags_vertical = SIZE_EXPAND_FILL
 	size_flags_horizontal = SIZE_EXPAND_FILL
+	add_theme_constant_override("separation", 2)
+	# ---- 위 줄: 맵 · 파일 · 실행 취소·편집 · 변환·테스트 · 상태 · 사용법
 	var bar := HBoxContainer.new()
+	bar.add_theme_constant_override("separation", 2)
 	add_child(bar)
 	files = OptionButton.new()
-	files.custom_minimum_size.x = 200
+	files.custom_minimum_size.x = 180
+	files.fit_to_longest_item = false
 	files.item_selected.connect(func(i): open_map(files.get_item_text(i)))
+	files.tooltip_text = "편집할 맵 (tools/maps/). 다른 맵을 고르면 지금 맵은 자동 저장"
 	bar.add_child(files)
-	files.tooltip_text = "편집할 맵 파일 (tools/maps/). 다른 맵을 고르면 지금 맵은 자동 저장"
-	for b in [
-			["새 맵", _ask_new, "새 맵 파일을 만듭니다 (맵 ID: 영문·숫자·_, 너비·높이)"],
-			["저장", save, "지금 맵을 파일로 저장합니다"],
-			["변환·검사", run_convert, "저장한 뒤 변환기를 돌려 오류를 검사합니다. 결과는 맨 아래 칸에.\n오류가 없어야 게임에 반영됩니다"],
-			["테스트 플레이", playtest, "이 맵에서 바로 게임을 실행합니다 (진짜 저장·회차는 건드리지 않음)"],
-			["↶", undo, "실행 취소 (Ctrl+Z)"], ["↷", redo, "다시 실행 (Ctrl+Y)"],
-			["복사", copy_selection, "고른 물체·영역을 복사 (Ctrl+C). 영역은 선택 도구로 빈 곳을 끌어서"],
-			["붙여넣기", func(): paste_at(canvas._hover), "마우스가 있는 칸에 붙여넣기 (Ctrl+V)"],
-			["삭제", delete_selection, "고른 물체 지우기 (Delete)"]]:
-		var btn := Button.new()
-		btn.text = b[0]
-		btn.tooltip_text = b[2]
-		btn.pressed.connect(b[1])
-		bar.add_child(btn)
+	bar.add_child(VSeparator.new())
+	_bar_btn(bar, "새 맵", _ask_new, "새 맵 파일 만들기 (맵 ID: 영문·숫자·_, 너비·높이)")
+	_bar_btn(bar, "저장", save, "지금 맵을 파일로 저장")
+	bar.add_child(VSeparator.new())
+	_bar_btn(bar, "↶", undo, "실행 취소 (Ctrl+Z)")
+	_bar_btn(bar, "↷", redo, "다시 실행 (Ctrl+Y)")
+	var edit_menu := MenuButton.new()
+	edit_menu.text = "편집 ▾"
+	edit_menu.tooltip_text = "복사·붙여넣기·삭제·선택"
+	var pm := edit_menu.get_popup()
+	for it in [["복사   Ctrl+C", copy_selection], ["붙여넣기   Ctrl+V  (마우스가 있는 칸)", func(): paste_at(canvas._hover)],
+			["삭제   Delete", delete_selection], [], ["모두 선택   Ctrl+A", func(): canvas.select_many(map.get("objects", []).filter(canvas.is_visible_object))],
+			["선택 해제   Esc", func(): canvas.select({})]]:
+		if it.is_empty():
+			pm.add_separator()
+			continue
+		pm.add_item(it[0])
+		pm.set_item_metadata(pm.item_count - 1, it[1])
+	pm.index_pressed.connect(func(i): (pm.get_item_metadata(i) as Callable).call())
+	bar.add_child(edit_menu)
+	bar.add_child(VSeparator.new())
+	_bar_btn(bar, "변환·검사", run_convert, "저장하고 변환기로 오류 검사. 오류가 없어야 게임에 반영됩니다")
+	_bar_btn(bar, "▶ 테스트 플레이", playtest, "이 맵에서 바로 게임 실행 (진짜 저장·회차는 건드리지 않음)")
 	status = Label.new()
 	status.size_flags_horizontal = SIZE_EXPAND_FILL
 	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	status.clip_text = true   # 긴 상태 글자가 에디터 폭을 넓히지 않게
-	status.custom_minimum_size.x = 120
+	status.custom_minimum_size.x = 80
+	status.modulate = Color(1, 1, 1, 0.7)
 	bar.add_child(status)
-	# 도구
+	ToolCommon.add_help_window(self, bar, "맵 탭 쓰는 법", HELP_TEXT)
+	# ---- 도구 줄: 묶음별 (선택 │ 칠하기 │ 위치 │ 물체 │ 이동 │ 지우개)
 	var tools := HBoxContainer.new()
+	tools.add_theme_constant_override("separation", 2)
 	add_child(tools)
 	var group := ButtonGroup.new()
-	for t in TOOLS:
-		var b := Button.new()
-		b.text = t[1]
-		b.toggle_mode = true
-		b.button_group = group
-		b.tooltip_text = TOOL_TIPS.get(t[0], "")
-		b.pressed.connect(set_tool.bind(t[0]))
-		tools.add_child(b)
-		tool_buttons[t[0]] = b
-	var rect := Button.new()
-	rect.text = "□ 사각형"
-	rect.toggle_mode = true
-	rect.tooltip_text = "켜면 벽·바닥·빈 공간을 끌어서 사각형으로 채움 (Shift 를 누른 채 끌어도 됨)"
-	rect.toggled.connect(func(on): canvas.rect_mode = on)
-	tools.add_child(rect)
-	var help := Label.new()
-	help.text = "   휠: 확대   가운데·오른쪽 끌기: 이동   Shift+클릭: 여러 개"
-	help.modulate = Color(1, 1, 1, 0.6)
-	help.clip_text = true
-	help.size_flags_horizontal = SIZE_EXPAND_FILL
-	help.custom_minimum_size.x = 40
-	help.tooltip_text = help.text
-	tools.add_child(help)
-	# 캔버스 | 오른쪽 칸
+	for gi in TOOL_GROUPS.size():
+		var g: Array = TOOL_GROUPS[gi]
+		if gi > 0:
+			tools.add_child(VSeparator.new())
+		if g[0] != "":
+			var cap := Label.new()
+			cap.text = g[0]
+			cap.modulate = Color(1, 1, 1, 0.45)
+			tools.add_child(cap)
+		for t in g[1]:
+			var b := Button.new()
+			b.text = t[1]
+			b.toggle_mode = true
+			b.flat = true
+			b.button_group = group
+			b.tooltip_text = TOOL_TIPS.get(t[0], "")
+			b.pressed.connect(set_tool.bind(t[0]))
+			tools.add_child(b)
+			tool_buttons[t[0]] = b
+		if g[0] == "칠하기":
+			var rect := Button.new()
+			rect.text = "□ 사각형"
+			rect.toggle_mode = true
+			rect.flat = true
+			rect.tooltip_text = "켜면 벽·바닥·빈 공간을 끌어서 사각형으로 채움 (Shift 를 누른 채 끌어도 됨)"
+			rect.toggled.connect(func(on): canvas.rect_mode = on)
+			tools.add_child(rect)
+	# ---- 왼쪽 칸 │ 맵 │ 오른쪽 칸
 	var outer := HSplitContainer.new()
 	outer.size_flags_vertical = SIZE_EXPAND_FILL
 	add_child(outer)
@@ -177,19 +206,48 @@ func _init() -> void:
 	canvas.activated.connect(follow_link)
 	split.add_child(canvas)
 	var side := ScrollContainer.new()
-	side.custom_minimum_size.x = 380
+	side.custom_minimum_size.x = 340
 	side.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED   # 긴 글자는 칸 폭에 맞춰 줄임
 	split.add_child(side)
+	var pad := MarginContainer.new()
+	pad.size_flags_horizontal = SIZE_EXPAND_FILL
+	for m in ["margin_left", "margin_right", "margin_top"]:
+		pad.add_theme_constant_override(m, 8)
+	side.add_child(pad)
 	inspector = VBoxContainer.new()
 	inspector.size_flags_horizontal = SIZE_EXPAND_FILL
-	side.add_child(inspector)
+	inspector.add_theme_constant_override("separation", 4)
+	pad.add_child(inspector)
+	# ---- 아래: 변환·검사 결과 (실패했을 때만 열림, 닫을 수 있음)
+	log_box = VBoxContainer.new()
+	log_box.visible = false
+	add_child(log_box)
+	var log_head := HBoxContainer.new()
+	log_box.add_child(log_head)
+	var lt := Label.new()
+	lt.text = "변환·검사 결과"
+	lt.size_flags_horizontal = SIZE_EXPAND_FILL
+	log_head.add_child(lt)
+	var lclose := Button.new()
+	lclose.text = "✕"
+	lclose.flat = true
+	lclose.tooltip_text = "결과 닫기"
+	lclose.pressed.connect(func(): log_box.visible = false)
+	log_head.add_child(lclose)
 	log_view = TextEdit.new()
 	log_view.editable = false
-	log_view.custom_minimum_size.y = 100
-	log_view.placeholder_text = "변환·검사 결과가 여기에 나옵니다."
-	add_child(log_view)
-	ToolCommon.add_help(self, 2, bar, "map", HELP_TEXT)
+	log_view.custom_minimum_size.y = 120
+	log_box.add_child(log_view)
 	set_tool("select")
+
+
+func _bar_btn(bar: HBoxContainer, text: String, action: Callable, tip: String) -> void:
+	var b := Button.new()
+	b.text = text
+	b.flat = true
+	b.tooltip_text = tip
+	b.pressed.connect(action)
+	bar.add_child(b)
 
 
 func _ready() -> void:
@@ -358,7 +416,8 @@ func run_convert() -> bool:
 	if dirty:
 		save()
 	var ok: bool = ToolCommon.run_convert(log_view)
-	_status("변환 성공" if ok else "변환 실패 — 아래 오류를 확인하세요")
+	log_box.visible = not ok
+	_status("변환 성공 ✓" if ok else "변환 실패 — 아래 결과를 확인하세요")
 	if ok:
 		_load_lookups()
 	return ok
@@ -387,17 +446,32 @@ func _edit_map() -> void:
 	_clear_inspector()
 	if map.is_empty():
 		return
-	_title("맵: " + map.map_id)
+	_title("맵  " + map.map_id)
+	_hint("물체를 고르면 여기에 설정이 나옵니다.")
+	_section("크기 (칸)")
 	var w := String(map.tiles[0]).length() if not map.tiles.is_empty() else 0
-	var ws := _spin("너비 (칸)", w, 3, 300)
-	var hs := _spin("높이 (칸)", map.tiles.size(), 3, 300)
+	var row := HBoxContainer.new()
+	var ws := SpinBox.new()
+	ws.min_value = 3
+	ws.max_value = 300
+	ws.value = w
+	ws.prefix = "너비"
+	ws.size_flags_horizontal = SIZE_EXPAND_FILL
+	var hs := SpinBox.new()
+	hs.min_value = 3
+	hs.max_value = 300
+	hs.value = map.tiles.size()
+	hs.prefix = "높이"
+	hs.size_flags_horizontal = SIZE_EXPAND_FILL
 	var apply := Button.new()
-	apply.text = "크기 적용"
+	apply.text = "적용"
 	apply.pressed.connect(func(): resize_map(int(ws.value), int(hs.value)))
-	inspector.add_child(apply)
-	_hint("도착 P = 다른 맵에서 들어올 때 서는 곳 (★ 기본 P 는 베이스캠프만 필수)\nS = 새 회차를 시작하는 곳 (Config start_map 의 맵에서만 쓰임, 없으면 기본 P·첫 P)\n물체를 고르면 여기에 세부가 나옵니다.")
-	_title("가장자리로 나가면")
-	_hint("그쪽 맨 끝 칸(바닥)에 닿으면 이동. 맵 끝에 바닥 칸을 터 두세요.")
+	row.add_child(ws)
+	row.add_child(hs)
+	row.add_child(apply)
+	inspector.add_child(row)
+	_section("가장자리로 나가면")
+	_hint("그쪽 맨 끝 바닥 칸에 닿으면 이동 (맵 끝에 바닥을 터 두세요)")
 	if not map.has("edges") or not map.edges is Dictionary:
 		map.edges = {}
 	for d in EDGES:
@@ -413,7 +487,7 @@ func _edit_map() -> void:
 			canvas.queue_redraw()
 			_edit_map.call_deferred())
 		if e.get("ref", "") != "":
-			_option("    도착 지점", _arrive_options(e.ref), e.get("arrive", ""), func(v):
+			_option("   도착 P", _arrive_options(e.ref), e.get("arrive", ""), func(v):
 				checkpoint()
 				map.edges[dir_id].arrive = v
 				dirty = true)
@@ -430,54 +504,56 @@ func _edit_object(o: Dictionary) -> void:
 	_title("%s  (%d, %d)" % [TYPE_NAME.get(o.type, o.type), o.x, o.y])
 	var link: Array = canvas.link_labels.get(o.object_id, [])
 	if not link.is_empty():
-		var ll := Label.new()
-		ll.text = ("연결: " if link[1] else "⚠ 연결 문제: ") + link[0]
-		ll.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		ll.add_theme_color_override("font_color", Color("9cc4ec") if link[1] else Color("ff6060"))
-		inspector.add_child(ll)
+		_note(("" if link[1] else "⚠ ") + link[0], Color("9cc4ec") if link[1] else Color("ff6060"))
 	if o.type in ["exit", "passage", "transit"] and o.get("ref", "") in _all_maps:
 		var go := Button.new()
-		go.text = "→ %s 열기 (도착 위치로)" % o.ref
-		go.tooltip_text = "이어진 맵을 열고 도착하는 P 를 고릅니다 (캔버스에서 더블클릭해도 됨)"
+		go.text = "→ %s 열기" % o.ref
+		go.tooltip_text = "이어진 맵을 열고 도착하는 P 를 고릅니다 (맵에서 더블클릭해도 됨)"
 		go.pressed.connect(follow_link.bind(o))
 		inspector.add_child(go)
-	_line("object_id", o.object_id, func(v): set_field(o, "object_id", v))
+	_section("기본")
+	_line("ID", o.object_id, func(v): set_field(o, "object_id", v))
 	_line("이름", o.get("name", ""), func(v): set_field(o, "name", v), "화면에 보이는 이름")
 	match o.type:
 		"enemy":
-			_option("적 종류", enemies, o.get("ref", ""), func(v): set_field(o, "ref", v))
+			_section("적")
+			_option("종류", enemies, o.get("ref", ""), func(v): set_field(o, "ref", v))
 			_option("순찰 방향", [["", "(가만히)"], ["up", "위"], ["down", "아래"], ["left", "왼쪽"], ["right", "오른쪽"]],
 				o.get("patrol_dir", ""), func(v): set_field(o, "patrol_dir", v))
-			var sp := _spin("순찰 칸 수 (왕복)", int(o.get("patrol_len", 0)), 0, 100)
+			var sp := _spin("순찰 칸 수", int(o.get("patrol_len", 0)), 0, 100)
+			sp.tooltip_text = "그 칸 수만큼 왕복"
 			sp.value_changed.connect(func(v): set_field(o, "patrol_len", int(v)))
 		"npc":
-			_option("대화 (시작 노드)", dialogue_starts, o.get("ref", ""), func(v): set_field(o, "ref", v))
-			_line("루틴 시간대 (schedule)", o.get("schedule", ""), func(v): set_field(o, "schedule", v), "예: 06:00-12:00, 20:00-23:00 (비우면 항상)")
+			_section("NPC")
+			_option("대화", dialogue_starts, o.get("ref", ""), func(v): set_field(o, "ref", v))
+			_line("시간대", o.get("schedule", ""), func(v): set_field(o, "schedule", v), "06:00-12:00, 20:00-23:00 (비우면 항상)")
 		"investigate":
-			_option("얻는 것 (Loot spot)", [["", "(없음)"]] + loot_spots, o.get("ref", ""), func(v): set_field(o, "ref", v))
-			var l := Label.new()
-			l.text = "조사 문구"
-			inspector.add_child(l)
+			_section("조사")
+			_option("얻는 것", [["", "(없음)"]] + loot_spots, o.get("ref", ""), func(v): set_field(o, "ref", v))
 			var te := TextEdit.new()
 			te.text = o.get("text", "")
-			te.custom_minimum_size.y = 110
+			te.placeholder_text = "조사할 때 나오는 문구"
+			te.custom_minimum_size.y = 90
 			te.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 			te.text_changed.connect(func(): set_field(o, "text", te.text))
 			inspector.add_child(te)
 		"exit", "passage", "transit":
+			_section("이동")
 			_option("이동할 맵", map_ids.map(func(m): return [m, m]), o.get("ref", ""), func(v):
 				set_field(o, "ref", v)
 				set_field(o, "arrive", "")
 				_edit_object.call_deferred(o))
 			if o.get("ref", "") != "":
-				_option("도착 P (비우면 그 맵 P 쪽 설정 → 기본 P)", _arrive_options(o.ref), o.get("arrive", ""), func(v): set_field(o, "arrive", v))
+				_option("도착 P", _arrive_options(o.ref), o.get("arrive", ""), func(v): set_field(o, "arrive", v))
 		"arrive":
+			_section("도착 P")
 			var dcb := CheckBox.new()
 			var base: bool = map.map_id == basecamp_id
-			dcb.text = "★ 기본 P (아무 P 에도 이어지지 않은 곳으로 들어올 때%s)" % (" · 부활·불러오기 때 깨어나는 곳 — 베이스캠프는 꼭 하나" if base else " · 이 맵은 없어도 됨")
-			dcb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			dcb.text = "★ 기본 P"
+			dcb.tooltip_text = "아무 P 에도 이어지지 않은 곳으로 들어올 때 서는 P.%s" % (
+				"\n베이스캠프는 부활·불러오기 때 깨어나는 곳이라 꼭 하나 (다른 P 에서 체크해야 옮겨짐)" if base else "\n이 맵은 없어도 됨 (그러면 들어오는 곳마다 P 를 이어 둘 것)")
 			dcb.button_pressed = o.get("default", false)
-			dcb.disabled = base and o.get("default", false)   # 베이스캠프는 다른 P 에서 체크해야 옮겨짐
+			dcb.disabled = base and o.get("default", false)
 			dcb.toggled.connect(func(on):
 				checkpoint()
 				for x in map.objects:
@@ -490,11 +566,11 @@ func _edit_object(o: Dictionary) -> void:
 				canvas.queue_redraw()
 				_edit_object.call_deferred(o))
 			inspector.add_child(dcb)
-			_title("이어지는 곳")
-			_hint("체크한 곳으로 이 맵에 들어오면 이 P 에 도착합니다. 아무 P 에도 이어지지 않은 곳은 ★ 기본 P.")
+			_section("이어지는 곳")
+			_hint("체크한 입구로 이 맵에 들어오면 이 P 에 섭니다")
 			var ents := _entrances_to(map.map_id)
 			if ents.is_empty():
-				_hint("이 맵으로 들어오는 문·통로·이용·가장자리가 아직 없습니다.")
+				_hint("이 맵으로 들어오는 곳이 아직 없습니다")
 			var from: Array = o.get("from", [])
 			for e in ents:
 				var cb := CheckBox.new()
@@ -502,14 +578,15 @@ func _edit_object(o: Dictionary) -> void:
 				cb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 				cb.button_pressed = e[0] in from
 				var src: String = e[0]
-				var row := HBoxContainer.new()
+				var erow := HBoxContainer.new()
 				cb.size_flags_horizontal = SIZE_EXPAND_FILL
-				row.add_child(cb)
+				erow.add_child(cb)
 				var open := Button.new()
 				open.text = "↗"
+				open.flat = true
 				open.tooltip_text = "그 입구가 있는 맵을 열고 그 물체를 고릅니다"
 				open.pressed.connect(func(): goto_entrance(src))
-				row.add_child(open)
+				erow.add_child(open)
 				cb.toggled.connect(func(on):
 					var f: Array = o.get("from", []).duplicate()
 					if on and not src in f:
@@ -517,18 +594,18 @@ func _edit_object(o: Dictionary) -> void:
 					elif not on:
 						f.erase(src)
 					set_field(o, "from", f))
-				inspector.add_child(row)
-	var cl := Label.new()
-	cl.text = "나타나는 조건 (맞을 때만 맵에 있음)"
-	inspector.add_child(cl)
+				inspector.add_child(erow)
+	_section("나타나는 조건")
 	var rows: Node = ExprRows.new().setup("cond", o.get("condition", ""), lookups)
 	rows.changed.connect(func(v): set_field(o, "condition", v))
 	inspector.add_child(rows)
+	inspector.add_child(HSeparator.new())
 	var del := Button.new()
 	del.text = "이 물체 지우기"
+	del.add_theme_color_override("font_color", Color("ff7070"))
 	del.pressed.connect(func():
 		if o.type == "arrive" and not canvas.release_p(o):
-			_status("마지막 도착 P 는 지울 수 없음")
+			_status("베이스캠프의 마지막 기본 P 는 지울 수 없음")
 			return
 		checkpoint()
 		map.objects.erase(o)
@@ -599,14 +676,12 @@ func _edit_multi(objs: Array) -> void:
 			"npc":
 				_multi_option(objs, "대화 (시작 노드)", dialogue_starts, "ref")
 			"investigate":
-				_multi_option(objs, "얻는 것 (Loot spot)", [["", "(없음)"]] + loot_spots, "ref")
+				_multi_option(objs, "얻는 것", [["", "(없음)"]] + loot_spots, "ref")
 			"exit", "passage", "transit":
 				_multi_option(objs, "이동할 맵", map_ids.map(func(m): return [m, m]), "ref")
 	else:
 		_hint("종류가 섞여 있어 공통 칸(나타나는 조건)만 바꿀 수 있습니다.")
-	var cl := Label.new()
-	cl.text = "나타나는 조건 (모두에 적용)"
-	inspector.add_child(cl)
+	_section("나타나는 조건 (모두에 적용)")
 	var same := objs.all(func(o): return o.get("condition", "") == objs[0].get("condition", ""))
 	var rows: Node = ExprRows.new().setup("cond", objs[0].get("condition", "") if same else "", lookups)
 	rows.changed.connect(func(v):
@@ -615,8 +690,10 @@ func _edit_multi(objs: Array) -> void:
 			o.condition = v
 		dirty = true)
 	inspector.add_child(rows)
+	inspector.add_child(HSeparator.new())
 	var del := Button.new()
 	del.text = "고른 %d개 지우기 (Delete)" % objs.size()
+	del.add_theme_color_override("font_color", Color("ff7070"))
 	del.pressed.connect(delete_selection)
 	inspector.add_child(del)
 
@@ -774,43 +851,43 @@ func delete_selection() -> void:
 # ---------------------------------------------------------------- 왼쪽 칸: 검색 · 맵 목록 · 표시 필터
 func _build_left_panel() -> Control:
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size.x = 260
+	scroll.custom_minimum_size.x = 230
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	var vb := VBoxContainer.new()
 	vb.size_flags_horizontal = SIZE_EXPAND_FILL
 	vb.size_flags_vertical = SIZE_EXPAND_FILL
+	vb.add_theme_constant_override("separation", 4)
 	scroll.add_child(vb)
-	var t1 := Label.new()
-	t1.text = "찾기 (모든 맵)"
-	vb.add_child(t1)
+	# 찾기
+	var find_box := _fold(vb, "찾기", true)
 	search = LineEdit.new()
-	search.placeholder_text = "이름·ID·종류 (예: 고양이, 문, enemy_test)"
+	search.placeholder_text = "이름·ID·종류 (모든 맵)"
 	search.clear_button_enabled = true
 	search.text_changed.connect(func(_t): _run_search())
-	vb.add_child(search)
+	find_box.add_child(search)
 	results = ItemList.new()
-	results.custom_minimum_size.y = 140
+	results.custom_minimum_size.y = 120
 	results.visible = false
 	results.item_clicked.connect(func(i, _p, _b):
 		var m: Array = results.get_item_metadata(i)
 		goto_object(m[0], m[1]))
-	vb.add_child(results)
-	var t2 := Label.new()
-	t2.text = "맵 목록 (→ 이어지는 맵)"
-	vb.add_child(t2)
+	find_box.add_child(results)
+	# 맵 목록
+	var list_box := _fold(vb, "맵 목록", true)
 	map_list = ItemList.new()
-	map_list.custom_minimum_size.y = 200
+	map_list.custom_minimum_size.y = 180
 	map_list.size_flags_vertical = SIZE_EXPAND_FILL
+	map_list.tooltip_text = "누르면 열기 (마우스를 올리면 이어지는 맵)"
 	map_list.item_clicked.connect(func(i, _p, _b): open_map(map_list.get_item_metadata(i)))
-	vb.add_child(map_list)
-	var t3 := Label.new()
-	t3.text = "표시 필터"
-	vb.add_child(t3)
+	list_box.add_child(map_list)
+	list_box.size_flags_vertical = SIZE_EXPAND_FILL
+	# 표시 필터
+	var filt_box := _fold(vb, "표시", false)
 	var grid := GridContainer.new()
 	grid.columns = 2
-	vb.add_child(grid)
+	filt_box.add_child(grid)
 	for f in [["tiles", "타일"], ["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"],
-			["travel", "문·통로·이용"], ["arrive", "도착 P"], ["sight", "시야·순찰"], ["names", "이름표"], ["links", "연결 표시"]]:
+			["travel", "문·통로·이용"], ["arrive", "도착 P"], ["sight", "순찰"], ["names", "이름표"], ["links", "연결"]]:
 		var cb := CheckBox.new()
 		cb.text = f[1]
 		cb.button_pressed = true
@@ -822,6 +899,25 @@ func _build_left_panel() -> Control:
 		grid.add_child(cb)
 		filter_boxes[key] = cb
 	return scroll
+
+
+## 접고 펼치는 구역: 머리글 버튼 + 내용 상자 (내용 상자를 돌려준다)
+func _fold(parent: Control, title: String, open: bool) -> VBoxContainer:
+	var head := Button.new()
+	head.flat = true
+	head.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	head.toggle_mode = true
+	head.button_pressed = open
+	parent.add_child(head)
+	var body := VBoxContainer.new()
+	body.visible = open
+	parent.add_child(body)
+	var set_text := func(on: bool): head.text = ("▾ " if on else "▸ ") + title
+	set_text.call(open)
+	head.toggled.connect(func(on):
+		body.visible = on
+		set_text.call(on))
+	return body
 
 
 ## 모든 맵 파일을 읽어 둔다 (연결 검사·맵 목록·검색). 지금 맵은 편집 중인 내용으로
@@ -852,12 +948,13 @@ func _refresh_map_list() -> void:
 		for d in m.get("edges", {}):
 			if m.edges[d].get("ref", "") != "":
 				outs[m.edges[d].ref] = true
-		var i := map_list.add_item(("▶ " if mid == map.get("map_id", "") else "") + mid + ("  → " + ", ".join(outs.keys()) if not outs.is_empty() else ""))
+		var i := map_list.add_item(("▶ " if mid == map.get("map_id", "") else "   ") + mid)
 		map_list.set_item_metadata(i, mid)
 		var ins := []
 		for e in _entrances_to(mid):
-			ins.append(e[1])
-		map_list.set_item_tooltip(i, "들어오는 곳:\n" + ("\n".join(ins) if not ins.is_empty() else "(없음)"))
+			ins.append("  " + e[1])
+		map_list.set_item_tooltip(i, "%s\n\n→ 나가는 곳: %s\n← 들어오는 곳:\n%s" % [mid, ", ".join(outs.keys()) if not outs.is_empty() else "(없음)",
+			"\n".join(ins) if not ins.is_empty() else "  (없음)"])
 
 
 func _run_search() -> void:
@@ -1066,6 +1163,7 @@ func _clear_inspector() -> void:
 		c.queue_free()
 
 
+## 맨 위 제목
 func _title(t: String) -> void:
 	var l := Label.new()
 	l.text = t
@@ -1073,30 +1171,75 @@ func _title(t: String) -> void:
 	inspector.add_child(l)
 
 
+## 구역 머리글 (구분선 + 흐린 글자)
+func _section(t: String) -> void:
+	var gap := Control.new()
+	gap.custom_minimum_size.y = 4
+	inspector.add_child(gap)
+	var row := HBoxContainer.new()
+	var l := Label.new()
+	l.text = t
+	l.modulate = Color(0.65, 0.78, 1.0)
+	row.add_child(l)
+	var line := HSeparator.new()
+	line.size_flags_horizontal = SIZE_EXPAND_FILL
+	line.size_flags_vertical = SIZE_SHRINK_CENTER
+	row.add_child(line)
+	inspector.add_child(row)
+
+
 func _hint(t: String) -> void:
 	var l := Label.new()
 	l.text = t
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.modulate = Color(1, 1, 1, 0.6)
+	l.modulate = Color(1, 1, 1, 0.5)
 	inspector.add_child(l)
+
+
+## 색 있는 알림 상자 (연결 정보 등)
+func _note(t: String, col: Color) -> void:
+	var box := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(col, 0.12)
+	sb.border_color = Color(col, 0.6)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(3)
+	sb.set_content_margin_all(6)
+	box.add_theme_stylebox_override("panel", sb)
+	var l := Label.new()
+	l.text = t
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.add_theme_color_override("font_color", col)
+	box.add_child(l)
+	inspector.add_child(box)
+
+
+## '이름 | 입력칸' 한 줄
+func _row(label: String, ctrl: Control) -> void:
+	var row := HBoxContainer.new()
+	var l := Label.new()
+	l.text = label
+	l.custom_minimum_size.x = 110
+	l.clip_text = true
+	l.modulate = Color(1, 1, 1, 0.75)
+	l.tooltip_text = label
+	l.mouse_filter = MOUSE_FILTER_PASS
+	row.add_child(l)
+	ctrl.size_flags_horizontal = SIZE_EXPAND_FILL
+	row.add_child(ctrl)
+	inspector.add_child(row)
 
 
 func _line(label: String, value: String, on_change: Callable, hint := "") -> void:
-	var l := Label.new()
-	l.text = label
-	inspector.add_child(l)
 	var e := LineEdit.new()
 	e.text = value
 	e.placeholder_text = hint
 	e.text_changed.connect(func(v): on_change.call(v))
-	inspector.add_child(e)
+	_row(label, e)
 
 
 ## items: [[값, 표시]] — 지금 값이 목록에 없으면 '(목록에 없음)' 으로 맨 위에 둔다
 func _option(label: String, items: Array, current: String, on_change: Callable) -> void:
-	var l := Label.new()
-	l.text = label
-	inspector.add_child(l)
 	var o := OptionButton.new()
 	o.fit_to_longest_item = false
 	o.clip_text = true
@@ -1110,16 +1253,13 @@ func _option(label: String, items: Array, current: String, on_change: Callable) 
 		if list[i][0] == current:
 			o.select(i)
 	o.item_selected.connect(func(i): on_change.call(list[i][0]))
-	inspector.add_child(o)
+	_row(label, o)
 
 
 func _spin(label: String, value: int, lo: int, hi: int) -> SpinBox:
-	var l := Label.new()
-	l.text = label
-	inspector.add_child(l)
 	var s := SpinBox.new()
 	s.min_value = lo
 	s.max_value = hi
 	s.value = value
-	inspector.add_child(s)
+	_row(label, s)
 	return s

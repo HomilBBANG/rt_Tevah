@@ -129,9 +129,7 @@
     "text": "",
     "condition": "",
     "arrive": "",
-    "from": [
-     "tt_ladder"
-    ],
+    "from": [],
     "default": false,
     "map_id": "test_arrive",
     "x": 2,
@@ -148,9 +146,7 @@
     "text": "",
     "condition": "",
     "arrive": "",
-    "from": [
-     "test_travel:left"
-    ],
+    "from": [],
     "default": false,
     "map_id": "test_arrive",
     "x": 4,
@@ -421,7 +417,7 @@
    {
     "object_id": "tt_ladder",
     "type": "transit",
-    "ref": "test_arrive",
+    "ref": "test_field",
     "name": "사다리",
     "text": "",
     "condition": "",
@@ -455,7 +451,7 @@
   ],
   "edges": {
    "left": {
-    "ref": "test_arrive",
+    "ref": "test_field",
     "arrive": ""
    },
    "down": {

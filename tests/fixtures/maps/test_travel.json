@@ -1,0 +1,85 @@
+{
+ "map_id": "test_travel",
+ "tiles": [
+  "#########",
+  "........#",
+  "#.......#",
+  "#.......#",
+  "#.......#",
+  "####.####"
+ ],
+ "start": [
+  4,
+  2
+ ],
+ "run_start": null,
+ "objects": [
+  {
+   "object_id": "test_travel_p",
+   "type": "arrive",
+   "x": 4,
+   "y": 2,
+   "ref": "",
+   "name": "기본",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": "",
+   "default": true
+  },
+  {
+   "object_id": "tt_to_camp",
+   "type": "passage",
+   "x": 6,
+   "y": 2,
+   "ref": "basecamp",
+   "name": "베이스캠프 통로",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": ""
+  },
+  {
+   "object_id": "tt_ladder",
+   "type": "transit",
+   "x": 2,
+   "y": 3,
+   "ref": "test_arrive",
+   "name": "사다리",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": ""
+  },
+  {
+   "object_id": "tt_center",
+   "type": "arrive",
+   "x": 4,
+   "y": 3,
+   "ref": "",
+   "name": "가운데",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": ""
+  }
+ ],
+ "edges": {
+  "left": {
+   "ref": "test_arrive",
+   "arrive": ""
+  },
+  "down": {
+   "ref": "basecamp",
+   "arrive": ""
+  }
+ }
+}
