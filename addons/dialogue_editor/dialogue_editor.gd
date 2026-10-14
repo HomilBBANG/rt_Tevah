@@ -43,10 +43,17 @@ func _init() -> void:
 	files.custom_minimum_size.x = 220
 	files.item_selected.connect(func(i): open_dialogue(files.get_item_text(i)))
 	bar.add_child(files)
-	for b in [["새 대화", _ask_new], ["대사 추가", add_card_at_center], ["엔딩 카드", _add_end_card],
-			["저장", save], ["변환·검사", run_convert], ["미리보기", preview]]:
+	files.tooltip_text = "편집할 대화 파일 (tools/dialogues/). 다른 대화를 고르면 지금 대화는 자동 저장"
+	for b in [
+			["새 대화", _ask_new, "새 대화 파일을 만듭니다 (대화 ID: 영문·숫자·_)"],
+			["대사 추가", add_card_at_center, "화면 가운데에 새 대사 카드를 만듭니다"],
+			["엔딩 카드", _add_end_card, "에피소드 대화용 엔딩(END:id) 카드. 필드 대화는 '대화 끝 (EXIT)' 카드를 씁니다"],
+			["저장", save, "지금 대화를 파일로 저장합니다"],
+			["변환·검사", run_convert, "저장한 뒤 변환기를 돌려 오류를 검사합니다. 결과는 맨 아래 칸에.\n오류가 없어야 게임에 반영됩니다"],
+			["미리보기", preview, "고른 카드(없으면 첫 카드)부터 실제 대화 화면으로 실행합니다"]]:
 		var btn := Button.new()
 		btn.text = b[0]
+		btn.tooltip_text = b[2]
 		btn.pressed.connect(b[1])
 		bar.add_child(btn)
 	status = Label.new()
@@ -60,6 +67,7 @@ func _init() -> void:
 	graph = GraphEdit.new()
 	graph.size_flags_horizontal = SIZE_EXPAND_FILL
 	graph.right_disconnects = true
+	graph.panning_scheme = GraphEdit.SCROLL_ZOOMS   # 휠 = 확대·축소 (사용법 설명과 맞춤)
 	graph.connection_request.connect(_on_connect)
 	graph.disconnection_request.connect(_on_disconnect)
 	graph.delete_nodes_request.connect(_on_delete)
@@ -77,6 +85,29 @@ func _init() -> void:
 	log_view.custom_minimum_size.y = 110
 	log_view.placeholder_text = "변환·검사 결과가 여기에 나옵니다."
 	add_child(log_view)
+	ToolCommon.add_help(self, 1, bar, "dialogue", HELP_TEXT)
+
+
+const HELP_TEXT := """[b]대화 탭 쓰는 법[/b]   (이 칸은 오른쪽 위 '❓ 사용법' 으로 접고 펼칩니다)
+
+[b]1. 대화 고르기[/b] — 왼쪽 위 목록에서 대화를 고르거나 [b]새 대화[/b]. 대화 하나 = 파일 하나 (tools/dialogues/).
+[b]2. 대사 쓰기[/b] — [b]대사 추가[/b]로 카드를 만들고, 카드 안에서 [b]화자[/b]를 고르고 대사를 씁니다. 화자를 (내레이션)으로 두면 상황 설명.
+[b]3. 선으로 잇기[/b] — 카드 오른쪽의 [color=#8fb8ff]●[/color] 점을 마우스로 끌어 다른 카드 왼쪽 위의 점에 놓습니다.
+    · [b]다음 →[/b] : 선택지가 없을 때 이어지는 곳
+    · [b]선택지 줄[/b] : 그 선택지를 고르면 가는 곳 (전투 선택지는 [b]이겼을 때[/b])
+    · [color=#e46a6a]판정 실패 →[/color] / [color=#e46a6a]도주 →[/color] : 주사위에 실패했을 때 / 전투에서 도망쳤을 때 가는 곳
+    · 대화를 끝내려면 [b]대화 끝 (EXIT)[/b] 카드에 잇습니다.
+    · 선 끊기: 선이 들어가는 쪽 끝(카드 왼쪽 점)을 잡아 빈 곳으로 끌어 놓습니다.
+[b]4. 선택지[/b] — 카드 아래 [b]+ 선택지[/b]. 선택지 옆 [b]⋯[/b] 를 누르면 오른쪽 칸에서 종류·조건·효과를 고칩니다. [b]✕[/b] = 선택지 삭제.
+    · 종류: [b]일반[/b] / [b]아이템[/b](조건의 has: 아이템이 있으면 고를 수 있음) / [b]판정[/b](주사위 d20) / [b]전투[/b](적과 싸움, 지면 사망 처리)
+[b]5. 카드 세부[/b] — 화자 옆 [b]⋯[/b] : 카드 ID, 카드에 들어올 때 효과, 다른 파일로 가는 이동(직접 입력).
+[b]6. 카드 지우기[/b] — 카드를 클릭해 고른 뒤 Delete 키.   [b]화면[/b] — 휠: 확대·축소,  휠 버튼 누른 채 끌기: 화면 이동,  빈 곳 끌기: 여러 카드 고르기.
+[b]7. 반영하기[/b] — [b]저장[/b] → [b]변환·검사[/b] (오류는 맨 아래 칸) → [b]미리보기[/b]로 확인. 오류가 하나라도 있으면 게임에 반영되지 않습니다.
+[b]8. NPC에 붙이기[/b] — [b]맵[/b] 탭에서 NPC를 고르고 '대화 (시작 노드)'에 이 대화의 첫 카드를 고릅니다.
+
+[b]조건 예[/b]  has:knife  /  has:water>=2  /  flag:met  /  !flag:met  /  surv:hunger<30  /  cut:left_arm  /  count:death>=1   (그리고 &, 또는 |, 아님 !)
+[b]효과 예[/b]  item:+food*2  /  item:-water  /  setflag:met  /  surv:thirst+50  /  restore:left_arm  /  save   (여러 개는 ; 로 구분)
+"""
 
 
 func _ready() -> void:
@@ -172,6 +203,7 @@ func _build_graph() -> void:
 	_selected_card = null
 	_counter = 0
 	_clear_inspector()
+	_empty_hint()
 	var by_node := {}
 	for c in dialogue.get("choices", []):
 		if not by_node.has(c.node_id):
@@ -312,6 +344,7 @@ func _on_delete(names: Array) -> void:
 		if node == _selected_card:
 			_selected_card = null
 			_clear_inspector()
+			_empty_hint()
 	for card in _cards():
 		card.rebuild()
 	dirty = true
@@ -537,6 +570,12 @@ func _clear_inspector() -> void:
 	for c in inspector.get_children():
 		inspector.remove_child(c)
 		c.queue_free()
+
+
+## 아무것도 고르지 않았을 때 오른쪽 칸 안내
+func _empty_hint() -> void:
+	_title("세부 칸")
+	_hint("· 카드를 클릭하면 카드 세부 (ID·들어올 때 효과·이동)\n· 선택지 옆 ⋯ 를 누르면 선택지 세부 (종류·조건·효과·판정·전투)\n\n자세한 쓰는 법은 오른쪽 위 '❓ 사용법'.")
 
 
 func _title(t: String) -> void:

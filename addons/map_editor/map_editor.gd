@@ -14,7 +14,38 @@ const TOOLS := [
 	["select", "선택·이동"], ["wall", "벽"], ["floor", "바닥"], ["void", "빈 공간"], ["start", "도착 P"], ["run_start", "회차 시작 S"],
 	["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["exit", "출구"], ["erase", "지우개"],
 ]
-const TYPE_NAME := {"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구"}
+const TOOL_TIPS := {
+	"select": "물체를 클릭하면 오른쪽 칸에 세부, 끌면 옮김. 빈 칸을 클릭하면 맵 크기 설정",
+	"wall": "누른 채 끌어서 벽을 칠함 (지나갈 수 없음)",
+	"floor": "누른 채 끌어서 바닥을 칠함 (걸어 다니는 곳)",
+	"void": "누른 채 끌어서 빈 공간을 칠함 (검게 보이고 지나갈 수 없음)",
+	"start": "도착 위치 P: 출구로 들어오거나 베이스캠프에서 깨어나는 곳 (맵마다 꼭 하나, 바닥에만)",
+	"run_start": "회차 시작 S: 새 회차를 이 맵에서 시작할 때 깨어나는 곳 (Config start_map 의 맵에서만 쓰임)",
+	"enemy": "적을 놓음 → 오른쪽 칸에서 적 종류·순찰 방향·칸 수",
+	"investigate": "조사 지점을 놓음 → 오른쪽 칸에서 얻는 것(Loot)·조사 문구",
+	"npc": "NPC 를 놓음 → 오른쪽 칸에서 대화(시작 노드)·나타나는 시간대",
+	"camp": "베이스캠프 거점(식사·물·씻기·잠 메뉴, 엑셀 CampActions)을 놓음",
+	"exit": "출구(문)를 놓음 → 오른쪽 칸에서 이동할 맵. 게임에서는 E 로 열고 닫음",
+	"erase": "클릭한 물체(또는 S)를 지움. 벽은 바닥으로 칠해서 지움",
+}
+const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]   (이 칸은 오른쪽 위 '❓ 사용법' 으로 접고 펼칩니다)
+
+[b]1. 맵 고르기[/b] — 왼쪽 위 목록에서 맵을 고르거나 [b]새 맵[/b] (맵 ID, 너비·높이 칸 수). 맵 하나 = 파일 하나 (tools/maps/).
+[b]2. 모양 칠하기[/b] — 도구 줄에서 [b]벽[/b] / [b]바닥[/b] / [b]빈 공간[/b]을 고르고, 맵 위를 누른 채 끌면 칠해집니다.
+[b]3. 위치 찍기[/b] — [b]도착 P[/b]: 출구로 들어오거나 베이스캠프에서 깨어나는 곳 (맵마다 꼭 하나).  [b]회차 시작 S[/b]: 새 회차를 시작하는 곳 (시작 맵에만). 둘 다 바닥 칸에만.
+[b]4. 물체 놓기[/b] — [b]적[/b] · [b]조사[/b] · [b]NPC[/b] · [b]거점[/b] · [b]출구[/b] 도구로 바닥 칸을 클릭하면 놓이고, [b]오른쪽 칸[/b]에서 세부를 고릅니다.
+    · 적: 적 종류, 순찰 방향과 칸 수(그 칸 수만큼 왕복). 맵에 순찰 길과 시야가 그려집니다.
+    · 조사: 얻는 것(엑셀 Loot 의 spot), 조사할 때 나오는 문구.
+    · NPC: 대화(시작 노드 = 대화 탭의 첫 카드), 나타나는 시간대 (예: 06:00-12:00, 20:00-23:00).
+    · 출구(문): 이동할 맵. 문으로 들어오면 그 맵의 P 에 도착합니다.
+    · 나타나는 조건: 예) flag:met 이면 그 플래그가 있을 때만 나타남.
+[b]5. 고치기[/b] — [b]선택·이동[/b] 도구: 물체를 클릭하면 세부, 끌면 옮김. 빈 칸 클릭 = 맵 크기 바꾸기.  [b]지우개[/b]: 물체를 지움.
+[b]6. 화면[/b] — 휠: 확대·축소,  휠 버튼 또는 오른쪽 버튼 누른 채 끌기: 화면 이동.
+[b]7. 반영하기[/b] — [b]저장[/b] → [b]변환·검사[/b] (오류는 맨 아래 칸) → [b]테스트 플레이[/b]로 이 맵에서 바로 실행 (진짜 저장은 건드리지 않음).
+
+[b]지도 표시[/b]  [color=#2f8f4f]P[/color] 도착 · [color=#b89a2a]S[/color] 회차 시작 · [color=#d05050]● 적[/color] · [color=#e8c35a]● 조[/color] 조사 · [color=#5a8fd0]● N[/color] NPC · [color=#5fae6a]● 거[/color] 거점 · [color=#a07850]● 문[/color] 출구 · 흐린 빨간 원 = 적 시야, 빨간 선 = 순찰 길
+"""
+const TYPE_NAME :={"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구"}
 
 var dir := MAP_DIR                   # 테스트에서 바꿔 쓴다
 var map := {}
@@ -43,9 +74,15 @@ func _init() -> void:
 	files.custom_minimum_size.x = 200
 	files.item_selected.connect(func(i): open_map(files.get_item_text(i)))
 	bar.add_child(files)
-	for b in [["새 맵", _ask_new], ["저장", save], ["변환·검사", run_convert], ["테스트 플레이", playtest]]:
+	files.tooltip_text = "편집할 맵 파일 (tools/maps/). 다른 맵을 고르면 지금 맵은 자동 저장"
+	for b in [
+			["새 맵", _ask_new, "새 맵 파일을 만듭니다 (맵 ID: 영문·숫자·_, 너비·높이)"],
+			["저장", save, "지금 맵을 파일로 저장합니다"],
+			["변환·검사", run_convert, "저장한 뒤 변환기를 돌려 오류를 검사합니다. 결과는 맨 아래 칸에.\n오류가 없어야 게임에 반영됩니다"],
+			["테스트 플레이", playtest, "이 맵에서 바로 게임을 실행합니다 (진짜 저장·회차는 건드리지 않음)"]]:
 		var btn := Button.new()
 		btn.text = b[0]
+		btn.tooltip_text = b[2]
 		btn.pressed.connect(b[1])
 		bar.add_child(btn)
 	status = Label.new()
@@ -61,6 +98,7 @@ func _init() -> void:
 		b.text = t[1]
 		b.toggle_mode = true
 		b.button_group = group
+		b.tooltip_text = TOOL_TIPS.get(t[0], "")
 		b.pressed.connect(set_tool.bind(t[0]))
 		tools.add_child(b)
 		tool_buttons[t[0]] = b
@@ -91,6 +129,7 @@ func _init() -> void:
 	log_view.custom_minimum_size.y = 100
 	log_view.placeholder_text = "변환·검사 결과가 여기에 나옵니다."
 	add_child(log_view)
+	ToolCommon.add_help(self, 2, bar, "map", HELP_TEXT)
 	set_tool("select")
 
 

@@ -22,6 +22,45 @@ static func run_convert(log_view: TextEdit) -> bool:
 	return code == 0
 
 
+const HELP_CFG := "user://editor_help.cfg"
+
+
+## 사용법 칸: bar 오른쪽 끝에 '❓ 사용법' 버튼, parent 의 index 자리에 접을 수 있는 설명 칸.
+## 처음에는 펼쳐 두고, 접거나 펼친 상태는 user://editor_help.cfg 에 기억한다. 만든 설명 칸을 돌려준다.
+static func add_help(parent: Container, index: int, bar: HBoxContainer, key: String, bbcode: String) -> PanelContainer:
+	var cfg := ConfigFile.new()
+	cfg.load(HELP_CFG)
+	var panel := PanelContainer.new()
+	panel.name = "Help"
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.13, 0.16, 0.22)
+	sb.border_color = Color(0.45, 0.6, 0.85)
+	sb.set_border_width_all(1)
+	sb.set_content_margin_all(10)
+	panel.add_theme_stylebox_override("panel", sb)
+	var text := RichTextLabel.new()
+	text.bbcode_enabled = true
+	text.text = bbcode
+	text.custom_minimum_size.y = 240
+	text.selection_enabled = true
+	panel.add_child(text)
+	parent.add_child(panel)
+	parent.move_child(panel, index)
+	var btn := Button.new()
+	btn.text = "❓ 사용법"
+	btn.toggle_mode = true
+	btn.tooltip_text = "이 에디터 쓰는 법을 펼치거나 접습니다"
+	bar.add_child(btn)
+	var set_open := func(open: bool):
+		panel.visible = open
+		btn.set_pressed_no_signal(open)
+		cfg.set_value("help", key, open)
+		cfg.save(HELP_CFG)
+	btn.toggled.connect(set_open)
+	set_open.call(bool(cfg.get_value("help", key, true)))
+	return panel
+
+
 static func read_json(path: String, default: Variant) -> Variant:
 	if not FileAccess.file_exists(path):
 		return default
