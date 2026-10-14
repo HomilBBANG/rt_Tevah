@@ -11,7 +11,7 @@ const ToolCommon = preload("res://addons/tool_common.gd")
 const MAP_DIR := "res://tools/maps/"
 const PLAYTEST_FILE := "user://map_playtest.json"
 const TOOLS := [
-	["select", "선택·이동"], ["wall", "벽"], ["floor", "바닥"], ["start", "도착 P"], ["run_start", "회차 시작 S"],
+	["select", "선택·이동"], ["wall", "벽"], ["floor", "바닥"], ["void", "빈 공간"], ["start", "도착 P"], ["run_start", "회차 시작 S"],
 	["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["exit", "출구"], ["erase", "지우개"],
 ]
 const TYPE_NAME := {"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구"}
@@ -192,7 +192,7 @@ func save() -> void:
 	_status("저장함: " + path.get_file())
 
 
-## 크기 바꾸기: 늘리면 바깥은 벽, 줄이면 밖으로 나간 물체·위치는 지움
+## 크기 바꾸기: 늘리면 바깥은 빈 공간, 줄이면 밖으로 나간 물체·위치는 지움
 func resize_map(w: int, h: int) -> void:
 	w = clampi(w, 3, 300)
 	h = clampi(h, 3, 300)
@@ -201,7 +201,7 @@ func resize_map(w: int, h: int) -> void:
 		var row := String(map.tiles[y]) if y < map.tiles.size() else ""
 		row = row.substr(0, w)
 		while row.length() < w:
-			row += "#"
+			row += " "
 		tiles.append(row)
 	map.tiles = tiles
 	map.objects = map.objects.filter(func(o): return o.x < w and o.y < h)

@@ -93,18 +93,31 @@ func _ready() -> void:
 	await _press_button("닫기")
 	await _snap("cat_back")
 
-	# 문은 통과 못 함: 출구 (7,6) 위에서 아래로 걸어도 막힘
+	# 닫힌 문은 통과 못 함: 출구 (7,6) 위에서 아래로 걸어도 막힘
 	_teleport(7, 5)   # 출구 (7,6) 위
 	await _wait(0.15)
 	Input.action_press("move_down")
 	await _wait(0.5)
 	Input.action_release("move_down")
-	check(f.player.position.y < 6.0 * f.tile, "문은 통과 못 함 (y=%.0f, 문 칸 위쪽 %.0f)" % [f.player.position.y, 6.0 * f.tile])
+	check(f.player.position.y < 6.0 * f.tile, "닫힌 문은 통과 못 함 (y=%.0f, 문 칸 위쪽 %.0f)" % [f.player.position.y, 6.0 * f.tile])
 	_teleport(7, 5)
 	await _wait(0.15)
+	check("문 열기" in f.get_node("%Prompt").text, "문 앞 → '문 열기' 안내")
 	_press("interact")
-	await _wait(0.3)
-	check(f.map.map_id == "test_field" and GameState.current_map == "test_field", "출구 → 탐험 지역")
+	await _wait(0.2)
+	var door: Dictionary = f.spots.filter(func(s): return s.kind == "exit")[0]
+	check(door.open and f.map.map_id == "basecamp" and "문 닫기" in f.get_node("%Prompt").text, "E → 문이 열리기만 함 (아직 이동 안 함)")
+	await _snap("door_open")
+	_press("interact")
+	await _wait(0.2)
+	check(not door.open, "E 다시 → 문 닫힘")
+	_press("interact")
+	await _wait(0.2)
+	Input.action_press("move_down")
+	await _wait(0.6)
+	Input.action_release("move_down")
+	await _wait(0.2)
+	check(f.map.map_id == "test_field" and GameState.current_map == "test_field", "열린 문으로 걸어 나가면 → 탐험 지역")
 	# 실시간 흐름: 1초 ≈ 2분
 	var t1 := GameState.clock
 	var h1 := GameState.get_survival("hunger")

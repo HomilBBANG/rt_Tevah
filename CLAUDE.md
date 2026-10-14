@@ -128,6 +128,8 @@ tools/
 - 화면 `scenes/field/field.tscn` (타이틀 "탐험 테스트"). 플레이어 신체 상태(부상·절단)는 한 회차 동안 전투 사이에 이어진다.
 - 맵: **`tools/maps/<map_id>.json`** (Godot '맵' 탭 = addons/map_editor 로 편집). tiles(`#` 벽 `.` 바닥), start(P 도착), run_start(S 회차 시작), objects(x,y 좌표). 아트가 들어오면 TileMap 으로 옮길 것.
 - 맵 위 물체(맵 파일 objects): enemy(ref=enemy_id, patrol_dir·patrol_len 왕복) / investigate(text, ref=Loot spot_id) / npc / camp / exit. 조정값 Config `field_*`. 맵 에디터 '테스트 플레이'는 user://playtest_saves/ 만 쓴다.
+- **문(exit)**: 처음엔 닫힘. 닫힌 문은 플레이어·적 모두 통과 못 하고 적의 시야도 가린다(DOOR_LAYER 8). E 로 열고 닫는다. 열린 문 칸으로 걸어 들어가면 그 맵(ref)으로 나간다.
+- **빈 공간**: 맵 칸 `' '`(공백) = 검은색, 지나갈 수 없음. 맵 바깥도 검게 그린다. 맵 에디터 '빈 공간' 도구.
 - 적 순찰 경로는 매 회차 같다 (외워서 피하기, §6). 도주하면 `field_flee_grace` 초 동안 다시 덤비지 않는다.
 - 입력 액션은 `core/input_actions.gd` 한 곳에서 등록 (move_*, interact, dodge_*).
 - **NPC 대화**: Nodes 에서 `episode_id` 를 비운 노드 = 필드 대화, 끝은 `next_node`(또는 `fail_next`)에 `EXIT`. 맵 물체 `type=npc`, `ref`=시작 노드. 말을 걸 때마다 시작 노드부터 (플래그·조건으로 분기). 대화 화면은 `scenes/main_play` 를 `embedded=true` 로 필드 위에 띄우고 `StoryRunner.start_dialogue()` (mode="field": 엔딩·스탯 규칙·자동 저장 없음).

@@ -47,6 +47,11 @@ func _ready() -> void:
 	ed.set_tool("floor")
 	cv.apply_tool(Vector2i(5, 6))
 	check(cv.is_floor(Vector2i(5, 6)), "바닥 칠하기")
+	ed.set_tool("void")
+	cv.apply_tool(Vector2i(5, 6))
+	check(String(ed.map.tiles[6])[5] == " " and not cv.is_floor(Vector2i(5, 6)), "빈 공간 칠하기")
+	ed.set_tool("floor")
+	cv.apply_tool(Vector2i(5, 6))
 	ed.set_tool("wall")
 	cv.apply_tool(Vector2i(10, 1))   # NPC 1 자리
 	check(cv.is_floor(Vector2i(10, 1)), "물체가 있는 칸은 벽으로 안 바뀜")

@@ -77,6 +77,22 @@ func _ready() -> void:
 	await _wait(0.2)
 	check(f._dialogue_ui == null and not f.frozen, "대화 끝내기 → 복귀")
 
+	# 닫힌 문은 시야를 가린다: 문 (2,2) 를 사이에 두고 적 (2,4) ↔ 플레이어 (2,1)
+	var e0: Node = f.enemies[0]
+	var e0_pos: Vector2 = e0.position
+	var door: Dictionary = f.spots.filter(func(s): return s.kind == "exit")[0]
+	e0.position = Vector2(2.5, 4.5) * f.tile
+	_teleport(2, 1)
+	await get_tree().physics_frame
+	check(not e0._can_see(f.player.global_position), "닫힌 문 너머는 안 보임")
+	f.toggle_door(door)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	check(door.open and e0._can_see(f.player.global_position), "문을 열면 보임")
+	f.toggle_door(door)
+	e0.position = e0_pos
+	await get_tree().physics_frame
+
 	# 추격: 적 1 (21,2) 시야 안, 벽 없는 곳으로
 	var e1: Node = f.enemies[0]
 	_teleport(floorf(e1.position.x / f.tile) - 3, 3)   # 같은 방, 3칸 옆 한 줄 아래

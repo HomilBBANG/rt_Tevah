@@ -4,7 +4,9 @@ extends Node2D
 ## - 이동 중 게임 시계가 실시간으로 흐르고 생존 파라미터가 줄어든다 (전투·대화·메뉴 중에는 멈춤).
 ## - 적과 닿으면 턴제 전투(화면 위에 겹쳐 띄움) → 승리: 적 제거 / 도주: 잠시 유예 / 사망: 회차 종료
 ## - NPC 에게 말을 걸면 대화 화면(scenes/main_play)을 겹쳐 띄우고 필드 대화 진행, EXIT 에서 복귀.
-## - 베이스캠프 거점(camp)에서 식사·위생·잠(1시간 단위, 자고 나면 저장). 출구(exit)로 맵 이동.
+## - 베이스캠프 거점(camp)에서 식사·위생·잠(1시간 단위, 자고 나면 저장).
+## - 문(exit): E 로 열고 닫는다. 닫힌 문은 막히고 시야도 가린다. 열린 문 칸으로 걸어 들어가면 그 맵으로 나간다.
+## - 맵 칸: '#' 벽, '.' 바닥, ' ' 빈 공간(검은색, 지나갈 수 없음).
 ## - 저장은 베이스캠프에서만: 잠을 자면 저장되고, 고양이가 와 있으면 고양이에게도 저장할 수 있다(대화 효과 save).
 ## - NPC 는 FieldObjects.schedule 의 시간대에만 나타난다 (예: 고양이의 하루 루틴). 시계가 흐르면 바로 반영.
 ## 회차 상태(시계·생존·몸·처치한 적·조사한 곳·소지품)는 GameState 에 있고, 베이스캠프에서만 저장된다.
@@ -25,7 +27,7 @@ const EnemyScript = preload("res://scenes/field/field_enemy.gd")
 const WALL_LAYER := 1
 const ACTOR_LAYER := 2
 const NPC_LAYER := 4
-const DOOR_LAYER := 8            # 문(출구): 플레이어·적 모두 통과 못 함. 시야(벽 레이어)는 막지 않음
+const DOOR_LAYER := 8            # 닫힌 문: 플레이어·적 모두 통과 못 하고, 적의 시야도 막는다 (field_enemy._can_see)
 const INTERACT_RANGE := 1.1      # 칸
 const TOAST_TIME := 3.0
 
@@ -111,6 +113,11 @@ func load_map(map_id: String) -> void:
 	_update_hud()
 
 
+## 지나갈 수 없는 칸: 벽(#)과 빈 공간(공백)
+static func _is_solid(ch: String) -> bool:
+	return ch != "."
+
+
 func _build_walls() -> void:
 	var body := StaticBody2D.new()
 	body.collision_layer = WALL_LAYER
@@ -121,11 +128,11 @@ func _build_walls() -> void:
 		var row: String = map.tiles[y]
 		var x := 0
 		while x < row.length():
-			if row[x] != "#":
+			if not _is_solid(row[x]):
 				x += 1
 				continue
 			var start := x
-			while x < row.length() and row[x] == "#":
+			while x < row.length() and _is_solid(row[x]):
 				x += 1
 			var shape := CollisionShape2D.new()
 			var rect := RectangleShape2D.new()
@@ -194,7 +201,8 @@ func _build_actors() -> void:
 				spots.append({"kind": kind, "data": o, "pos": pos,
 					"done": GameState.field_has(map.map_id, "done", o.object_id)})
 				if o.type == "exit":
-					_add_door_body(pos)
+					spots.back().open = false
+					spots.back().body = _add_door_body(pos)
 			"npc":
 				var n := StaticBody2D.new()
 				n.set_script(NpcScript)
@@ -235,8 +243,8 @@ static func in_schedule(schedule: Array, minute: int) -> bool:
 	return false
 
 
-## 문 칸을 막는 충돌체 (문 앞에서 조사 키로 이동)
-func _add_door_body(pos: Vector2) -> void:
+## 닫힌 문 칸을 막는 충돌체 (열면 꺼진다)
+func _add_door_body(pos: Vector2) -> StaticBody2D:
 	var body := StaticBody2D.new()
 	body.collision_layer = DOOR_LAYER
 	body.collision_mask = 0
@@ -247,6 +255,17 @@ func _add_door_body(pos: Vector2) -> void:
 	shape.shape = rect
 	body.add_child(shape)
 	%World.add_child(body)
+	return body
+
+
+## 문 열기·닫기. 문 칸 위에 서 있으면 닫지 않는다.
+func toggle_door(s: Dictionary) -> void:
+	if s.open and Rect2(s.pos - Vector2(tile, tile) / 2.0, Vector2(tile, tile)).grow(player.radius).has_point(player.global_position):
+		return
+	s.open = not s.open
+	s.body.collision_layer = 0 if s.open else DOOR_LAYER
+	%MapView.queue_redraw()
+	_near_spot = {}   # 안내 문구 다시 쓰기
 
 
 func _tile_center(x: float, y: float) -> Vector2:
@@ -273,6 +292,10 @@ func _physics_process(delta: float) -> void:
 	for e in enemies:
 		if e.grace == 0.0 and e.global_position.distance_to(player.global_position) < player.radius + e.radius:
 			_start_combat(e)
+			return
+	for s in spots:
+		if s.kind == "exit" and s.open and Rect2(s.pos - Vector2(tile, tile) / 2.0, Vector2(tile, tile)).has_point(player.global_position):
+			load_map(s.data.ref)
 			return
 	_update_near_spot()
 
@@ -306,8 +329,12 @@ func _update_near_spot() -> void:
 		_near_spot = best
 		%Prompt.visible = not best.is_empty()
 		if not best.is_empty():
-			var verb: String = {"npc": "대화", "camp": "거점", "exit": "이동", "spot": "조사"}[best.kind]
-			%Prompt.text = "[E / Space]  %s: %s%s" % [verb, best.data.name, "  (조사함)" if best.kind == "spot" and best.done else ""]
+			var verb: String = {"npc": "대화", "camp": "거점", "exit": "문 열기", "spot": "조사"}[best.kind]
+			var extra := "  (조사함)" if best.kind == "spot" and best.done else ""
+			if best.kind == "exit" and best.open:
+				verb = "문 닫기"
+				extra = "   —   열린 문으로 걸어가면 나감"
+			%Prompt.text = "[E / Space]  %s: %s%s" % [verb, best.data.name, extra]
 
 
 # ---------------------------------------------------------------- 상호작용
@@ -318,7 +345,7 @@ func interact() -> void:
 	match s.kind:
 		"npc": _start_dialogue(s)
 		"camp": _open_camp()
-		"exit": load_map(s.data.ref)
+		"exit": toggle_door(s)
 		"spot": await _investigate(s)
 
 

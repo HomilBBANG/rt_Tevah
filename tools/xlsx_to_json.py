@@ -66,7 +66,7 @@ OPTIONAL_SHEETS = {"Abilities", "PlayerParts", "Enemies", "EnemyParts", "EnemyAt
 FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit"}
 CAMP_KINDS = {"", "sleep"}   # sleep: 1시간 단위로 골라 자고, 자고 나면 저장 (effects 는 1시간마다)
 PATROL_DIRS = {"": (0, 0), "up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
-MAP_TILES = {"#", "."}   # 벽 / 바닥
+MAP_TILES = {"#", ".", " "}   # 벽 / 바닥 / 빈 공간(검은색, 지나갈 수 없음)
 # ID 중복 검사를 여러 열 조합으로 하는 시트
 DUP_KEYS = {"EnemyParts": ("enemy_id", "part_id")}
 DODGE_KEYS = {"W", "A", "S", "D"}
@@ -749,7 +749,7 @@ def validate_field(d, maps, rep, enemies):
         for y, row in enumerate(tiles):
             bad = set(row) - MAP_TILES
             if bad:
-                rep.err(wm, f"{y + 1}행에 알 수 없는 칸 {sorted(bad)} (# 벽 / . 바닥)")
+                rep.err(wm, f"{y + 1}행에 알 수 없는 칸 {sorted(bad)} (# 벽 / . 바닥 / 공백 빈 공간)")
 
         def floor(x, y):
             return 0 <= y < len(tiles) and 0 <= x < len(tiles[y]) and tiles[y][x] == "."
@@ -833,7 +833,7 @@ def export_maps(d, maps):
     out = []
     for mid, m in maps.items():
         width = max(len(r) for r in m["tiles"])
-        tiles = [r.ljust(width, "#") for r in m["tiles"]]
+        tiles = [r.ljust(width, " ") for r in m["tiles"]]   # 짧은 줄의 나머지는 빈 공간
         objects = []
         for o in m["objects"]:
             e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition")}

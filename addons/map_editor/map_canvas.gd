@@ -86,9 +86,9 @@ func apply_tool(t: Vector2i, first := true) -> void:
 	if map.is_empty() or not in_bounds(t):
 		return
 	match tool:
-		"wall":
+		"wall", "void":
 			if object_at(t).is_empty() and not _is_marker(t, "start") and not _is_marker(t, "run_start"):
-				set_tile(t, "#")
+				set_tile(t, "#" if tool == "wall" else " ")
 		"floor":
 			set_tile(t, ".")
 		"start", "run_start":
@@ -153,7 +153,7 @@ func _gui_input(event: InputEvent) -> void:
 		var t := tile_at(mm.position)
 		if t != _hover:
 			_hover = t
-			if _painting and (tool == "wall" or tool == "floor"):
+			if _painting and tool in ["wall", "floor", "void"]:
 				apply_tool(t, false)
 			elif _painting and tool == "select" and not _dragging.is_empty() and is_floor(t) and object_at(t).is_empty():
 				_dragging.x = t.x
@@ -178,7 +178,7 @@ func _draw() -> void:
 		var row := String(tiles[y])
 		for x in row.length():
 			var r := Rect2(pan + Vector2(x, y) * s, Vector2(s, s))
-			draw_rect(r, Color("16171d") if row[x] == "#" else Color("3a3e4a"))
+			draw_rect(r, Color.BLACK if row[x] == " " else (Color("16171d") if row[x] == "#" else Color("3a3e4a")))
 			draw_rect(r, Color(1, 1, 1, 0.05), false, 1.0)
 	# 적 시야·순찰
 	for o in map.objects:

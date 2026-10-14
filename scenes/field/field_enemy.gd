@@ -56,7 +56,7 @@ func _move_toward(target: Vector2, speed: float) -> void:
 
 
 func _can_see(target: Vector2) -> bool:
-	var q := PhysicsRayQueryParameters2D.create(global_position, target, 1)   # 1 = 벽
+	var q := PhysicsRayQueryParameters2D.create(global_position, target, 1 | 8)   # 1 = 벽, 8 = 닫힌 문
 	return get_world_2d().direct_space_state.intersect_ray(q).is_empty()
 
 
