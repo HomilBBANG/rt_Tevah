@@ -38,6 +38,11 @@ func _init() -> void:
 	add_child(_name)
 
 
+## 본문 글자 칸 (대화 화면이 한 자씩 내보낼 때 visible_characters 를 바꾼다)
+func text_label() -> Label:
+	return _label
+
+
 ## name_color 가 비어 있으면 기본색
 func show_line(text: String, side: String, is_dimmed: bool, speaker_name := "", name_color := "") -> void:
 	_label.text = text

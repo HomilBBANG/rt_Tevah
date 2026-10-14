@@ -35,6 +35,10 @@ OUT_DIR = ROOT / "data"
 STATS = {"hp", "sanity", "time"}
 SHOW_MODES = {"", "hide", "gray"}
 NODE_KINDS = {"", "line", "effect", "branch"}
+# 대본 페이지 (core/script_pages.gd 와 같은 규칙). 노드의 pages 가 없으면 speaker_id·text 로 페이지 1개.
+PAGE_DISPLAYS = {"narration", "bubble", "system"}
+PAGE_SPEEDS = {"", "instant", "slow", "normal", "fast"}
+PAUSE_RE = re.compile(r"\{w=(\d+(?:\.\d+)?)\}")
 CHOICE_TYPES = {"", "normal", "item", "dice", "combat"}
 REQUIRED_CONFIG = ["inventory_slots", "hp_start", "hp_max", "sanity_start", "sanity_max", "time_start", "time_max"]
 
@@ -131,9 +135,13 @@ BONUS_RE = re.compile(r"^([A-Za-z0-9_]+)\s*([+-]\d+)$")
 class Report:
     def __init__(self):
         self.errors = []
+        self.warnings = []   # 변환은 하지만 확인해 볼 것 (빈 대사 등)
 
     def err(self, where, msg):
         self.errors.append(f"[{where}] {msg}")
+
+    def warn(self, where, msg):
+        self.warnings.append(f"[{where}] {msg}")
 
 
 # ---------------------------------------------------------------- 조건·효과 문법
@@ -614,6 +622,7 @@ def validate(d, rep):
                 out.add(n["next_node"])
         elif nid not in choices_by_node and not out:
             rep.err(w, "출구 없음 (선택지·next_node·END/EXIT 모두 없음)")
+        check_pages(w, n, chars, rep)
         kind = n["kind"]
         if kind not in NODE_KINDS:
             rep.err(w, f"kind 는 line / effect / branch: '{kind}'")
@@ -807,6 +816,65 @@ def validate_combat(d, rep, pparts, enemies, eparts):
             rep.err(w, "windup(전조 시간, 초)은 0보다 커야 함")
 
 
+def check_pages(w, n, chars, rep):
+    """대본 페이지 검사. 오류: 표시 종류·화자·속도·넘김·{ } 표시. 경고: 빈 본문."""
+    pages = n.get("pages") or []
+    if n.get("kind") in ("effect", "branch"):
+        if pages:
+            rep.err(w, "효과·조건 분기 카드에는 대본 페이지를 둘 수 없음")
+        return
+    if n.get("text_speed", "") not in PAGE_SPEEDS and not _is_pos_number(n.get("text_speed", "")):
+        rep.err(w, f"대화 파일의 text_speed 가 이상함: '{n['text_speed']}'")
+    if not pages:
+        if isinstance(n["_row"], str) and not n["text"].strip():
+            rep.warn(w, "대사가 비어 있음")
+        return
+    seen = set()
+    for i, p in enumerate(pages):
+        pw = f"{w} 페이지 {i + 1}"
+        if not isinstance(p, dict):
+            rep.err(pw, "페이지 형식이 아님")
+            continue
+        pid = str(p.get("page_id", "") or "")
+        if pid and pid in seen:
+            rep.err(pw, f"page_id 중복 '{pid}'")
+        seen.add(pid)
+        disp = str(p.get("display", "") or "")
+        sp = str(p.get("speaker_id", "") or "")
+        if disp not in PAGE_DISPLAYS:
+            rep.err(pw, f"display 는 narration / bubble / system: '{disp}'")
+        elif disp == "bubble" and not sp:
+            rep.err(pw, "말풍선 페이지에 화자(speaker_id)가 없음")
+        if sp and sp not in chars:
+            rep.err(pw, f"없는 speaker_id '{sp}'")
+        speed = _dlg_str(p.get("speed", ""))
+        if speed not in PAGE_SPEEDS and not _is_pos_number(speed):
+            rep.err(pw, f"speed 는 instant / slow / normal / fast / 초당 글자 수: '{speed}'")
+        adv = str(p.get("advance", "") or "input")
+        if adv not in ("input", "auto"):
+            rep.err(pw, f"advance 는 input / auto: '{adv}'")
+        if adv == "auto" and _dlg_str(p.get("auto_wait", "1")) and not _is_number(_dlg_str(p.get("auto_wait", "1"))):
+            rep.err(pw, f"auto_wait 는 초(숫자): '{p.get('auto_wait')}'")
+        text = str(p.get("text", "") or "")
+        rest = PAUSE_RE.sub("", text)
+        if "{" in rest or "}" in rest:
+            rep.err(pw, "알 수 없는 { } 표시 (대기는 {w=0.5} 꼴)")
+        if not PAUSE_RE.sub("", text).strip():
+            rep.warn(pw, "본문이 비어 있음")
+
+
+def _is_number(v):
+    try:
+        float(v)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _is_pos_number(v):
+    return _is_number(v) and float(v) > 0
+
+
 def loc(sheet, r):
     """오류 위치: 엑셀 행이면 '시트 N행', 대화 파일이면 '대화 파일.json'"""
     return f"대화 {r['_row']}" if isinstance(r["_row"], str) else f"{sheet} {r['_row']}행"
@@ -825,9 +893,12 @@ def read_dialogues(d, rep):
             rep.err(f"대화 {f.name}", f"파일을 읽을 수 없음: {e}")
             continue
         episode = str(dlg.get("episode_id", "") or "")
+        speed = _dlg_str(dlg.get("text_speed", ""))
         for n in dlg.get("nodes", []):
             rec = {c: _dlg_str(n.get(c, "")) for c in node_cols}
             rec["episode_id"] = episode
+            rec["pages"] = n.get("pages") if isinstance(n.get("pages"), list) else []
+            rec["text_speed"] = speed
             rec["_row"] = f"{f.name}"
             d["Nodes"].append(rec)
         for c in dlg.get("choices", []):
@@ -1111,7 +1182,7 @@ def export(d, maps):
 
     out = {
         "episodes": clean(d["Episodes"]),
-        "nodes": clean(d["Nodes"]),
+        "nodes": [dict(n, pages=n.get("pages") or [], text_speed=n.get("text_speed", "")) for n in clean(d["Nodes"])],
         "choices": [choice(r) for r in clean(d["Choices"])],
         "items": [dict(r, dice_bonus=bonuses(r["dice_bonus"])) for r in clean(d["Items"])],
         "loot": clean(d["Loot"]),
@@ -1195,12 +1266,21 @@ def _run(path, say):
         say(f"오류 {len(rep.errors)}개 — JSON을 쓰지 않았습니다.")
         for e in rep.errors:
             say("  " + e)
+        _say_warnings(rep, say)
         return 1
     out = export(data, maps)
     say("변환 완료 → " + str(OUT_DIR))
     for k, v in out.items():
         say(f"  {k}.json: {len(v)}개")
+    _say_warnings(rep, say)
     return 0
+
+
+def _say_warnings(rep, say):
+    if rep.warnings:
+        say(f"경고 {len(rep.warnings)}개 (변환은 됨):")
+        for w in rep.warnings:
+            say("  경고 " + w)
 
 
 if __name__ == "__main__":

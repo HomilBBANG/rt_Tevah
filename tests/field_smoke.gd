@@ -11,6 +11,7 @@ var f: Node
 func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute("user://field_smoke")
 	seed(3)
+	DataLoader.config["text_speed_default"] = "instant"   # 대사가 한 자씩 나오지 않게 (타이핑은 script_play_smoke)
 	SaveManager.save_dir = "user://test_saves/"
 	SaveManager.delete_all()
 	SaveManager.begin_run()

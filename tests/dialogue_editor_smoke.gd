@@ -17,7 +17,8 @@ func _ready() -> void:
 	for f in DirAccess.get_files_at(TEST_DIR):
 		DirAccess.remove_absolute(TEST_DIR + f)
 	for f in ["npc1", "cat", "npc2"]:
-		var src := FileAccess.get_file_as_string("res://tools/dialogues/%s.json" % f)
+		# 테스트 전용 복사본 (tools/dialogues 의 대화를 고쳐도 테스트가 안 깨지게)
+		var src := FileAccess.get_file_as_string("res://tests/fixtures/dialogues/%s.json" % f)
 		var w := FileAccess.open(TEST_DIR + f + ".json", FileAccess.WRITE)
 		w.store_string(src)
 		w.close()
@@ -52,7 +53,7 @@ func _ready() -> void:
 
 	# 카드 추가 → 선택지 추가 → EXIT 로 연결 → 판정으로 바꾸면 실패 연결점 생김
 	var card: GraphNode = ed.add_card(Vector2(40, 600))
-	card.data.text = "새 대사"
+	card.data.pages[0].text = "새 대사"
 	card.add_choice()
 	await _frames(1)
 	check(card.choices.size() == 1 and card.choices[0].choice_id == "npc1_c1", "선택지 추가, ID 자동 (npc1_c1)")
@@ -137,6 +138,118 @@ func _ready() -> void:
 	var ne2: GraphNode = ed.graph.get_node(ne_name)
 	check(nb2 is FuncCard and nb2.data.kind == "branch" and nb2.data.condition == "flag:fx_done" and nb2.data.fail_next == "fd_npc2_no"
 		and ne2.data.kind == "effect" and ne2.data.next_node == nb_name, "저장 후 다시 열어도 기능 카드 그대로")
+
+	# ---- 대본 블록: 여러 페이지 (기획 v1.0 1차)
+	ed.open_dialogue("cat")
+	await _frames(2)
+	var cat: GraphNode = ed.graph.get_node("fd_cat_a")
+	ed._select(cat)
+	await _frames(1)
+	var sp: Node = ed.script_panel
+	check(sp.card == cat and sp.page_boxes.size() == 1 and cat.data.pages[0].display == "bubble", "카드 고르기 → 대본 칸에 1페이지 (말풍선)")
+	sp.add_page(0)
+	cat.data.pages[0].display = "narration"
+	cat.data.pages[0].speaker_id = ""
+	cat.data.pages[0].text = "고양이가 당신을 올려다본다.
+
+잠시 침묵이 흐른다.{w=0.5}"
+	sp.add_page(2)
+	var sys_page: Dictionary = cat.data.pages[2]
+	sys_page.display = "system"
+	sys_page.text = "저장할 수 있을 것 같다."
+	sys_page.speed = "instant"
+	sys_page.advance = "auto"
+	sys_page.auto_wait = 1.0
+	cat.data.pages[1].speed = "slow"
+	sp.edit(cat)
+	cat.rebuild()
+	await _frames(2)
+	check(sp.page_boxes.size() == 3 and cat.data.pages.map(func(p): return p.page_id).size() == 3
+		and cat.data.pages[0].page_id != cat.data.pages[1].page_id, "페이지 3개 (묘사 → 말풍선 → 시스템), page_id 겹치지 않음")
+	await _snap("script_pages")
+	ed.save()
+	var cs: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "cat.json"))
+	var cn: Dictionary = cs.nodes[0]
+	check(cn.pages.size() == 3 and cn.pages[0].display == "narration" and cn.pages[1].speaker_id == "char_cat" and cn.pages[1].speed == "slow"
+		and cn.pages[2].advance == "auto" and not cn.pages[0].has("speaker_id") and cn.text == "고양이가 당신을 올려다본다.
+
+잠시 침묵이 흐른다.",
+		"저장: pages 3개 + 예전 칸(text)은 첫 페이지 글 (대기 표시 뺌)")
+	ed.open_dialogue("npc1")
+	ed.open_dialogue("cat")
+	await _frames(2)
+	cat = ed.graph.get_node("fd_cat_a")
+	check(cat.data.pages.size() == 3 and cat.data.pages[2].auto_wait == 1.0 and "{w=0.5}" in cat.data.pages[0].text, "다시 열어도 페이지 그대로")
+	# 페이지 순서 바꾸기·지우기
+	ed._select(cat)
+	sp.move_page(2, 0)
+	check(cat.data.pages[0].display == "system", "페이지 옮기기 (3 → 1)")
+	sp.remove_page(0)
+	check(cat.data.pages.size() == 2 and cat.data.pages[0].display == "narration", "페이지 지우기")
+
+	# ---- 실행 취소 / 다시 실행
+	var n_before: int = ed._cards().size()
+	ed.add_card(Vector2(0, 900))
+	check(ed._cards().size() == n_before + 1, "카드 추가")
+	ed.undo()
+	await _frames(1)
+	check(ed._cards().size() == n_before, "실행 취소 → 카드가 사라짐")
+	ed.redo()
+	await _frames(1)
+	check(ed._cards().size() == n_before + 1, "다시 실행 → 카드가 돌아옴")
+	ed.undo()
+	ed.undo()   # 페이지 지우기 되돌림
+	await _frames(1)
+	check(ed.graph.get_node("fd_cat_a").data.pages.size() == 3, "실행 취소로 지운 페이지도 돌아옴")
+
+	# ---- 복사·붙여넣기 (새 ID, 선택지 ID 도 새로)
+	cat = ed.graph.get_node("fd_cat_a")
+	for c in ed.graph.get_children():
+		if c is GraphNode:
+			c.selected = c == cat
+	ed.copy_selected()
+	var made: Array = ed.paste()
+	var all_cids := []
+	for c in ed._cards():
+		for ch in c.choices:
+			all_cids.append(ch.choice_id)
+	var uniq := {}
+	for x in all_cids:
+		uniq[x] = true
+	check(made.size() == 1 and made[0].data.node_id != "fd_cat_a" and made[0].choices.size() == cat.choices.size()
+		and uniq.size() == all_cids.size() and made[0].data.pages.size() == 3, "붙여넣기: 새 노드 ID·선택지 ID 안 겹침, 페이지도 복사")
+	check(ed.dirty and ed._save_btn.text == "저장 ●", "저장 안 한 변경 표시 (저장 ●)")
+	# 다른 대화를 화면에서 고르면 묻는다
+	ed._request_open("npc2")
+	await _frames(1)
+	var asked := ed.get_children().filter(func(c): return c is ConfirmationDialog and c.visible)
+	check(asked.size() == 1 and ed.dialogue.dialogue_id == "cat", "저장 안 하고 다른 대화 열기 → 확인 창 (아직 cat)")
+	for d in asked:
+		d.get_cancel_button().pressed.emit()
+	ed.undo()   # 붙여넣기 취소
+	ed.save()
+
+	# ---- 찾기 (모든 대화)
+	ed.search.text = "올려다본다"
+	ed._run_search()
+	check(ed.results.item_count >= 1 and ed.results.get_item_metadata(0) == ["cat", "fd_cat_a", 1], "찾기: 대사 글 → cat · fd_cat_a · 2쪽 (%s)" % [ed.results.get_item_metadata(0) if ed.results.item_count > 0 else "없음"])
+	ed.search.text = "showed_knife"
+	ed._run_search()
+	check(ed.results.item_count >= 1 and ed.results.get_item_metadata(0)[0] in ["npc1", "npc2"], "찾기: 플래그 이름")
+	ed.search.text = ""
+	ed._run_search()
+	# ---- 검사 결과 줄 → 그 자리로
+	ed.log_view.text = "오류 1개 — JSON을 쓰지 않았습니다.
+  [대화 cat.json (fd_cat_a) 페이지 2] 말풍선 페이지에 화자(speaker_id)가 없음
+경고 1개 (변환은 됨):
+  경고 [대화 npc2.json (fd_npc2_b)] 대사가 비어 있음"
+	var counts: Array = ed._fill_problems()
+	check(counts == [1, 1] and ed.problems.get_item_metadata(0) == ["cat", "fd_cat_a", 1] and ed.problems.get_item_metadata(1) == ["npc2", "fd_npc2_b", -1],
+		"검사 결과: 오류 1·경고 1, 누르면 갈 곳 (cat 2쪽 / npc2)")
+	ed.goto("npc2", "fd_npc2_b")
+	await _frames(2)
+	check(ed.dialogue.dialogue_id == "npc2" and ed._selected_card != null and ed._selected_card.name == &"fd_npc2_b", "검사 결과로 이동 → npc2 의 카드를 고름")
+	await _snap("npc2_goto")
 
 	# 새 대화
 	check(ed.new_dialogue("t_new"), "새 대화 만들기")

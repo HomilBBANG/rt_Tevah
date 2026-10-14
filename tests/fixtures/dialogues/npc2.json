@@ -1,0 +1,164 @@
+{
+ "dialogue_id": "npc2",
+ "episode_id": "",
+ "nodes": [
+  {
+   "node_id": "fd_npc2_a",
+   "speaker_id": "char_npc2",
+   "text": "필드 대화 노드 4 (NPC 2)",
+   "next_node": "",
+   "on_enter": "",
+   "pos": [
+    40,
+    60
+   ]
+  },
+  {
+   "node_id": "fd_npc2_b",
+   "speaker_id": "char_npc2",
+   "text": "필드 대화 노드 5 (flag:showed_knife 일 때만)",
+   "next_node": "EXIT",
+   "on_enter": "",
+   "pos": [
+    560,
+    20
+   ]
+  },
+  {
+   "node_id": "fd_npc2_win",
+   "speaker_id": "char_npc2",
+   "text": "필드 대화 노드 6 (전투 승리)",
+   "next_node": "EXIT",
+   "on_enter": "",
+   "pos": [
+    560,
+    300
+   ]
+  },
+  {
+   "node_id": "fd_npc2_fled",
+   "speaker_id": "char_npc2",
+   "text": "필드 대화 노드 7 (전투 도주)",
+   "next_node": "EXIT",
+   "on_enter": "",
+   "pos": [
+    560,
+    540
+   ]
+  },
+  {
+   "node_id": "fd_npc2_fx",
+   "kind": "effect",
+   "speaker_id": "",
+   "text": "",
+   "next_node": "fd_npc2_br",
+   "on_enter": "item:+water;setflag:fx_done",
+   "pos": [
+    560,
+    800
+   ]
+  },
+  {
+   "node_id": "fd_npc2_br",
+   "kind": "branch",
+   "speaker_id": "",
+   "text": "",
+   "next_node": "fd_npc2_yes",
+   "fail_next": "fd_npc2_no",
+   "condition": "has:water & flag:fx_done",
+   "on_enter": "",
+   "pos": [
+    1120,
+    800
+   ]
+  },
+  {
+   "node_id": "fd_npc2_yes",
+   "speaker_id": "char_npc2",
+   "text": "필드 대화 노드 8 (분기: 조건 맞음)",
+   "next_node": "EXIT",
+   "on_enter": "",
+   "pos": [
+    1680,
+    760
+   ]
+  },
+  {
+   "node_id": "fd_npc2_no",
+   "speaker_id": "char_npc2",
+   "text": "필드 대화 노드 9 (분기: 조건 안 맞음)",
+   "next_node": "EXIT",
+   "on_enter": "",
+   "pos": [
+    1680,
+    1020
+   ]
+  }
+ ],
+ "choices": [
+  {
+   "choice_id": "fdc5",
+   "node_id": "fd_npc2_a",
+   "text": "칼 이야기 (flag:showed_knife)",
+   "condition": "flag:showed_knife",
+   "show_mode": "hide",
+   "cost": "",
+   "effects": "",
+   "next_node": "fd_npc2_b",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  },
+  {
+   "choice_id": "fdc6",
+   "node_id": "fd_npc2_a",
+   "text": "대화 끝내기",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "",
+   "next_node": "EXIT",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  },
+  {
+   "choice_id": "fdc7",
+   "node_id": "fd_npc2_a",
+   "text": "싸운다 (테스트)",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "setflag:beat_npc2",
+   "next_node": "fd_npc2_win",
+   "type": "combat",
+   "check": "enemy_test",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "setflag:fled_npc2",
+   "fail_next": "fd_npc2_fled"
+  },
+  {
+   "choice_id": "fdc8",
+   "node_id": "fd_npc2_a",
+   "text": "기능 카드 테스트",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "",
+   "next_node": "fd_npc2_fx",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  }
+ ]
+}

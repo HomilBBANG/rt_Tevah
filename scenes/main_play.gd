@@ -9,8 +9,12 @@ extends Control
 ##               주인공은 얼굴·이름이 나오지 않는다 (꼬리 없는 말풍선).
 ##               NPC는 먼저 말한 쪽이 왼쪽, 나중에 등장한 쪽이 오른쪽.
 ## 마지막 페이지에서 선택지를 띄우고, 선택지 없는 노드면 다음 클릭에 continue_story().
+## 노드의 대본 페이지(core/script_pages.gd)는 글자가 한 자씩 나온다: 속도·{w=초} 대기·자동 넘김.
+## 나오는 중에 입력 1번 = 이 페이지 전체 표시, 그다음 입력 = 다음 페이지.
 
 const ChoiceButton = preload("res://ui/choice_button.gd")
+const ScriptPages = preload("res://core/script_pages.gd")
+const KIND_OF := {"narration": "situation", "bubble": "dialogue", "system": "system"}
 
 ## 탐험 필드 위에 겹쳐 띄운 NPC 대화가 끝남 (embedded 일 때만)
 signal finished
@@ -23,6 +27,8 @@ const PREV_BUBBLE_Y := [0.485, 0.635]
 
 ## 필드에서 NPC 대화용으로 띄울 때 add_child 전에 true. 이때는 launch() 대신 필드가 start_dialogue() 를 부른다.
 var embedded := false
+## 처음 보여줄 노드에서 몇 번째 페이지부터 볼지 (대화 에디터 미리보기)
+var start_page := 0
 
 var _pages: Array = []          # [{kind, text, speaker_id}]
 var _page_i := -1
@@ -37,6 +43,14 @@ var _slot_spoke := [0, 0]       # 각 자리가 마지막으로 말한 순번
 var _line_no := 0
 var _closing := false           # 필드 대화가 끝났고 남은 페이지만 보여주는 중
 var _links: Array = []          # [[signal, callable]] — 화면이 닫힐 때 끊는다
+# 글자 출력 (타이핑)
+var _type_label: Label          # 지금 글자가 나오는 칸 (null = 다 나옴)
+var _type_shown := 0.0
+var _type_total := 0
+var _type_cps := 0.0
+var _type_pauses: Array = []    # [[글자 위치, 초], ...] 남은 대기
+var _type_wait := 0.0
+var _auto_left := -1.0          # 자동 넘김까지 남은 초 (-1 = 없음)
 
 
 func _ready() -> void:
@@ -88,6 +102,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## 다음 페이지로. 마지막 페이지이고 선택지 없는 노드면 스토리를 진행.
 func advance() -> void:
+	_auto_left = -1.0
+	if _type_label != null:
+		_finish_typing()   # 나오는 중 → 이 페이지 전체 표시
+		return
 	if StoryRunner.busy or %Choices.get_child_count() > 0:
 		return
 	if %DicePanel.is_rolling:
@@ -110,8 +128,11 @@ func _next_page() -> void:
 func _on_node_shown(node: Dictionary, _speaker_name: String) -> void:
 	_pages = []
 	_flush_messages()
-	var speaker: String = node.get("speaker_id", "")
-	_pages.append({"kind": "dialogue" if speaker != "" else "situation", "text": node.get("text", ""), "speaker_id": speaker})
+	for p in ScriptPages.pages_of(node):
+		var parsed := ScriptPages.parse_text(p.text)
+		_pages.append({"kind": KIND_OF[p.display], "text": parsed.text, "pauses": parsed.pauses, "speaker_id": p.speaker_id,
+			"cps": ScriptPages.cps(p.speed, DataLoader.config, node.get("text_speed", "")),
+			"advance": p.advance, "auto_wait": p.auto_wait})
 
 
 func _on_choices_shown(entries: Array) -> void:
@@ -154,7 +175,8 @@ func _flush_messages() -> void:
 
 func _start_pages() -> void:
 	_clear_choices()
-	_page_i = -1
+	_page_i = clampi(start_page, 0, maxi(_pages.size() - 1, 0)) - 1
+	start_page = 0
 	if not _pages.is_empty():
 		_next_page()
 
@@ -162,6 +184,8 @@ func _start_pages() -> void:
 # ---------------------------------------------------------------- 그리기
 func _show_page(p: Dictionary) -> void:
 	_clear_choices()
+	_type_label = null
+	_auto_left = -1.0
 	%SituationBox.visible = p.kind == "situation"
 	%SystemBox.visible = p.kind == "system"
 	%DicePanel.visible = p.kind == "dice"
@@ -182,7 +206,61 @@ func _show_page(p: Dictionary) -> void:
 			%DicePanel.play(p.result)
 		"dialogue":
 			_show_dialogue(p)
+	match p.kind:
+		"situation": _begin_typing(%SituationText, p)
+		"system": _begin_typing(%SystemText, p)
+		"dialogue": _begin_typing(%Bubble.text_label(), p)
+		_: _page_done()
 
+
+## 글자를 한 자씩 내보내기 시작 (속도 0 = 즉시)
+func _begin_typing(label: Label, p: Dictionary) -> void:
+	label.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING
+	_type_total = label.text.length()
+	_type_cps = float(p.get("cps", 0.0))
+	if _type_cps <= 0.0 or _type_total == 0:
+		label.visible_characters = -1
+		_page_done()
+		return
+	_type_label = label
+	_type_shown = 0.0
+	_type_wait = 0.0
+	_type_pauses = p.get("pauses", []).duplicate()
+	label.visible_characters = 0
+	%AdvanceHint.visible = false
+
+
+func _process(delta: float) -> void:
+	if _type_label == null:
+		if _auto_left >= 0.0 and not %Inventory.visible:
+			_auto_left -= delta
+			if _auto_left < 0.0:
+				advance()
+		return
+	if _type_wait > 0.0:
+		_type_wait -= delta
+		return
+	_type_shown += _type_cps * delta
+	if not _type_pauses.is_empty() and _type_shown >= _type_pauses[0][0]:
+		_type_shown = _type_pauses[0][0]
+		_type_wait = _type_pauses[0][1]
+		_type_pauses.pop_front()
+	if _type_shown >= _type_total:
+		_finish_typing()
+	else:
+		_type_label.visible_characters = int(_type_shown)
+
+
+func _finish_typing() -> void:
+	if _type_label != null:
+		_type_label.visible_characters = -1
+		_type_label = null
+	_page_done()
+
+
+## 페이지가 다 나옴: 마지막 페이지면 선택지, 자동 넘김이면 타이머
+func _page_done() -> void:
+	var p: Dictionary = _pages[_page_i] if _page_i >= 0 and _page_i < _pages.size() else {}
 	var last := _page_i == _pages.size() - 1
 	if last and _ended:
 		var b := ChoiceButton.new()
@@ -197,6 +275,8 @@ func _show_page(p: Dictionary) -> void:
 			b.pressed.connect(StoryRunner.choose.bind(e.choice.choice_id))
 			%Choices.add_child(b)
 	%AdvanceHint.visible = %Choices.get_child_count() == 0
+	if p.get("advance", "input") == "auto" and %Choices.get_child_count() == 0:
+		_auto_left = float(p.get("auto_wait", 1.0))
 
 
 func _show_dialogue(p: Dictionary) -> void:

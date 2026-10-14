@@ -28,5 +28,9 @@
  "carry_max_weight": 30,
  "carry_heavy_weight": 20,
  "carry_heavy_speed_mult": 0.5,
- "ability_chart_max": 10
+ "ability_chart_max": 10,
+ "text_speed_default": "normal",
+ "text_speed_slow": 15,
+ "text_speed_normal": 35,
+ "text_speed_fast": 70
 }

@@ -33,7 +33,7 @@ func rebuild() -> void:
 	var rows: Node = ExprRows.new().setup("cond" if is_branch else "effect", data.get(field, ""), lookups)
 	rows.changed.connect(func(t):
 		data[field] = t
-		changed.emit())
+		changed.emit("expr:" + data.node_id))
 	_add_row(rows, false, false)
 	if is_branch:
 		var yes := Label.new()
@@ -53,6 +53,10 @@ func rebuild() -> void:
 		nx.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		_add_row(nx, false, true)
 		out_ports.append(["next", -1])
+
+
+func uses_pages() -> bool:
+	return false
 
 
 func port_target(port: int) -> Array:

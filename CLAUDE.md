@@ -193,3 +193,10 @@ tools/
 - **기능 카드** (노드 `kind`, 엑셀 Nodes 에서도 선택 열): `effect` = on_enter 효과만 실행하고 next_node 로 (화면에 안 보임) / `branch` = `condition` 이 맞으면 next_node, 아니면 `fail_next`. 기본(빈 값·line) = 대사. 도구줄 '＋ 기능 카드' 또는 그래프 오른쪽 클릭.
 - **직접 입력 대신 고르기**: 조건·효과 칸은 `addons/expr_rows.gd` (줄마다 종류·아이템·수치를 목록에서 고름, 괄호 식·goto 는 '직접 입력 보기'로만). 이동 칸은 갈 곳 목록. 목록 이름표는 `ToolCommon.load_lookups()` (data/*.json, 쓰이는 플래그 이름 포함). 맵 탭 물체의 '나타나는 조건'도 같은 부품. 문법을 바꾸면 expr_rows 의 EFFECTS·CONDS 도 맞출 것.
 - 테스트: `tests/dialogue_editor_smoke.tscn` (에디터 화면을 게임 안에서 띄워 열기·연결·저장·새 대화·변환 확인).
+- **v1.0 개편** (2026-10-14, 기획 `tevah_dialogue_editor_v1.0_spec.md` 1·2차): "대본을 쓰고 노드로 흐름을 설계". 화면 = 왼쪽(대화 목록·모든 대화 찾기·카드 팔레트 끌어 놓기) / 가운데 위 그래프(미니맵) · 아래 **대본 칸**(`script_panel.gd`, ⤢ 크게) / 오른쪽 세부(기본·조건·결과·고급 접기) / 아래 검사 결과(⛔ 오류·⚠ 경고, 누르면 그 카드·페이지).
+  - **대본 블록 = 노드 하나에 페이지 여러 개.** 노드 선택 필드 `pages: [{page_id, display(narration/bubble/system), speaker_id(bubble만), text, speed?, advance?("auto"), auto_wait?}]`. **pages 가 없으면 예전처럼 speaker_id·text 로 1페이지** (호환). 에디터는 기본값 1페이지면 예전 형식으로 저장, 아니면 pages + 예전 칸(첫 페이지)도 맞춰 씀. 대화 파일 선택 필드 `text_speed` = 그 대화의 기본 속도. 공용 규칙 `core/script_pages.gd` (런타임·에디터·테스트), 변환기 `check_pages` 가 같은 규칙으로 검사.
+  - 본문: 빈 줄 = 문단, 줄바꿈 = 강제 줄바꿈, `{w=0.5}` = 0.5초 대기(⏸ 버튼으로 넣고 주황색 표시). 속도 기본/instant/slow/normal/fast/숫자(초당 글자) → Config `text_speed_default`·`text_speed_slow/normal/fast` (임시값, TODO 기획 §10.3).
+  - 게임(`main_play`): 글자가 한 자씩, 출력 중 입력 1번 = 페이지 전체, 다음 입력 = 다음 페이지, 자동 넘김은 다 나오고 auto_wait 초 뒤. 선택지는 마지막 페이지가 다 나온 뒤. 미리보기는 고른 페이지부터(`start_page`). 대화 화면을 클릭으로 넘기는 테스트는 `DataLoader.config.text_speed_default = "instant"` 로 둔다.
+  - 편집: 실행 취소·다시 실행(대화 전체 스냅샷 `_touch(key)`, 같은 key 의 연속 입력은 한 번으로), 복사·붙여넣기·복제(새 node·choice ID, 복사한 카드끼리의 연결만 새 ID 로), 연결점을 빈 곳에 놓으면 새 카드+연결, 카드 접기(노드 `fold`), 자동 정렬, F = 가운데로, 저장 안 함 표시(●)·다른 대화 열 때 확인. 없는 곳으로 가는 연결은 카드에 ⚠.
+  - 변환기 경고(`Report.warn`, 변환은 됨): 빈 대사·빈 페이지. 테스트 `tests/test_script_pages`(헤드리스), 대화 에디터 테스트는 **`tests/fixtures/dialogues/`** 복사본을 씀.
+  - 아직 안 한 것(기획 3~5차): 굵게·색 강조, 효과음, 게임 옵션의 텍스트 속도 우선, 미리보기 테스트 상태 주입·d20 고정·실행 경로 표시, 템플릿, 시퀀스 호출·복귀 노드.

@@ -1,5 +1,5 @@
 extends Control
-## 대화 에디터의 '미리보기': user://dialogue_preview.json 의 노드부터 실제 대화 화면으로 실행.
+## 대화 에디터의 '미리보기': user://dialogue_preview.json 의 노드(와 page 번째 페이지)부터 실제 대화 화면으로 실행.
 ## 새 회차 상태(소지품 없음·플래그 없음)에서 시작한다. 저장 효과(save)는 실제로 저장하지 않는다.
 
 const DialogueScene = preload("res://scenes/main_play.tscn")
@@ -7,12 +7,14 @@ const CombatScene = preload("res://scenes/combat.tscn")
 
 var _ui: Node
 var _combat: Node
+var _start_page := 0   # 대본 칸에서 고른 페이지부터
 
 
 func _ready() -> void:
 	var d = JSON.parse_string(FileAccess.get_file_as_string("user://dialogue_preview.json")) \
 		if FileAccess.file_exists("user://dialogue_preview.json") else null
 	var start: String = d.get("node", "") if d is Dictionary else ""
+	_start_page = int(d.get("page", 0)) if d is Dictionary else 0
 	if not DataLoader.nodes.has(start):
 		%Info.text = "미리볼 노드가 없습니다: '%s'\n대화 에디터에서 변환·검사를 먼저 하세요." % start
 		return
@@ -28,6 +30,7 @@ func _start(node_id: String) -> void:
 		_ui.queue_free()
 	_ui = DialogueScene.instantiate()
 	_ui.embedded = true
+	_ui.start_page = _start_page
 	_ui.finished.connect(func(): %Info.text = "대화 끝 (EXIT).  Esc 로 다시 시작, 창을 닫으면 에디터로.")
 	%Stage.add_child(_ui)
 	StoryRunner.start_dialogue(node_id)
