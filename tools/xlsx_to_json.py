@@ -50,8 +50,9 @@ SCHEMA = {
                               "next_node"], {}),
     "Items": ("item_id", ["item_id", "name", "type", "description", "use_effects", "stack_max"],
               {"stack_max": (int, 1), "weight": (float, 0.0), "bag_slots": (int, 0)}),
-    # 장비 칸 (장비창). Items.equip_slot 이 이 slot_id 면 그 칸에 장착
-    "EquipSlots": ("slot_id", ["slot_id", "name"], {}),
+    # 장비 칸 (장비창). kind = 들어가는 종류 (Items.equip_slot 과 같으면 장착, hand 는 아무 아이템이나),
+    # col·row = 장비창 격자 위치
+    "EquipSlots": ("slot_id", ["slot_id", "name", "kind", "col", "row"], {"col": (float, 0.0), "row": (float, 0.0)}),
     "Loot": ("loot_id", ["loot_id", "spot_id", "item_id", "amount", "chance", "time_cost"],
              {"amount": (int, 1), "chance": (float, 100.0), "time_cost": (int, 0)}),
     # ---- 등장인물: 플레이어(주인공)와 NPC(적 포함 — NPC 와도 싸울 수 있다). 능력치 6개는 주사위 판정에도 쓴다
@@ -102,7 +103,7 @@ OPTIONAL = {
     "Npcs": ["name_color", "traits", "image", "flee_chance", "walk_speed", "run_speed"] + ABILITY_COLS,
     "Items": ["dice_bonus",         # 소지 시 판정 보정 "strength+2, all+1"
               "weight",             # 무게 (개당). 들고 있는 무게가 Config carry_* 를 넘으면 느려지고, 최대면 못 움직임
-              "equip_slot",         # 장착 칸 (EquipSlots 의 slot_id). 비우면 장착 못 함
+              "equip_slot",         # 장착 종류 (EquipSlots 의 kind). 비워도 손(kind=hand)에는 들 수 있음
               "bag_slots"],         # 장착하면 늘어나는 인벤토리 칸 수 (가방)
     # 선택지 종류: normal(기본) / item / dice
     # dice: check=능력치, dc=목표값, mod=상황 보정, 실패 시 fail_effects·fail_next
@@ -478,14 +479,18 @@ def validate(d, rep):
 
     # Items
     equip_slots = index("EquipSlots")
+    equip_kinds = {r["kind"] for r in equip_slots.values() if r["kind"]}
+    for r in equip_slots.values():
+        if not r["kind"]:
+            rep.err(loc("EquipSlots", r), "kind(들어가는 종류)가 비어 있음")
     for it in d["Items"]:
         w = f"Items {it['_row']}행 ({it['item_id']})"
         if it["stack_max"] is not None and it["stack_max"] < 1:
             rep.err(w, "stack_max 는 1 이상")
         if (it["weight"] or 0) < 0:
             rep.err(w, "weight 는 0 이상")
-        if it["equip_slot"] and it["equip_slot"] not in equip_slots:
-            rep.err(w, f"equip_slot 은 EquipSlots 의 slot_id (player.xlsx): '{it['equip_slot']}'")
+        if it["equip_slot"] and it["equip_slot"] not in equip_kinds:
+            rep.err(w, f"equip_slot 은 EquipSlots 의 kind (player.xlsx): '{it['equip_slot']}' (가능: {', '.join(sorted(equip_kinds))})")
         if (it["bag_slots"] or 0) < 0:
             rep.err(w, "bag_slots 는 0 이상")
         if it["bag_slots"] and not it["equip_slot"]:

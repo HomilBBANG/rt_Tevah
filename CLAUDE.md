@@ -168,11 +168,12 @@ tools/
 - **시간**: 탐험 중 실시간 (Config `time_scale` = 실제 1초당 게임 분). 전투·대화·메뉴·메시지 중에는 멈춤. 베이스캠프 행동 `minutes`, 조사 Loot `time_cost` 만큼 흐름.
 - **생존 파라미터**: 엑셀 `Survival` (start, max, decay_per_hour, warn). 100 = 좋음. 조건 `surv:hunger<30`, 효과 `surv:hunger+40`.
 - **베이스캠프**: 맵 `tools/maps/basecamp.json`, 물체 `camp` = 거점 메뉴(엑셀 `CampActions`: minutes, condition, effects, kind=sleep), `exit` = 맵 이동(도착은 그 맵의 P).
-- **소지품·장비** (2026-10-14): 소지품(I) = 격자 칸 (`scenes/inventory.gd`, 필드에서는 오른쪽에 붙음). 장비창(Q) = 왼쪽, [장비] 탭(엑셀 player.xlsx `EquipSlots` 칸마다 장착) + [능력치] 탭(맨 위 내 상태, 아래 능력치 6개 육각형 `ui/ability_hexagon.gd`). 둘을 같이 열어 끌어다 놓기(`ui/item_cell.gd`)로 장착·벗기, 소지품 우클릭 = 장착, 장비 칸 우클릭 = 벗기.
-  - item.xlsx Items: `weight`(개당 무게), `equip_slot`(EquipSlots id), `bag_slots`(장착 시 늘어나는 칸 — 가방). 칸 수 = Config `inventory_slots` + 장착한 bag_slots. 가방을 벗어 칸이 모자라면 못 벗음.
+- **소지품·장비** (2026-10-14): 소지품(I) = 격자 칸 (`scenes/inventory.gd`, 필드에서는 오른쪽에 붙음). 장비창(Q) = 왼쪽, [장비] 탭(엑셀 player.xlsx `EquipSlots`: slot_id·name·kind·col·row — 가방 / 머리 / 왼손·몸·오른손 / 왼다리·오른다리 배치) + [능력치] 탭(맨 위 내 상태, 아래 능력치 6개 육각형 `ui/ability_hexagon.gd`). 둘을 같이 열어 끌어다 놓기(`ui/item_cell.gd`)로 장착·벗기, 소지품 우클릭 = 장착, 장비 칸 우클릭 = 벗기.
+  - item.xlsx Items: `weight`(개당 무게), `equip_slot`(장착 종류 = EquipSlots 의 kind: bag/head/hand/body/leg), `bag_slots`(장착 시 늘어나는 칸 — 가방). 칸 수 = Config `inventory_slots`(4, 가방 없을 때) + 장착한 bag_slots. 가방을 벗어 칸이 모자라면 못 벗음.
+  - **손(kind=hand)에는 아무 아이템이나 1개씩 들 수 있고, 손에 든 것은 소지품 칸에 안 셈** (확정). 우클릭 장착은 맞는 빈 칸 → 없으면 첫 칸과 바꿔 끼기, 종류 없는 아이템은 손.
   - 무게 = 소지품 + 장비. Config `carry_heavy_weight` 이상이면 이동 속도 x`carry_heavy_speed_mult`, `carry_max_weight` 이상이면 못 움직임. TODO(기획): 기준값·근력과의 관계 미정 (지금 임시값).
   - 장착한 아이템도 `has:` 조건·판정 보정(dice_bonus)에 들어가고, `item:-x` 효과는 소지품에 없으면 장비에서 뺀다. GameState `equipment` 는 회차 저장에 들어감. 전투 중에는 장착 불가(소모품만).
-  - 장비 칸 가방 외(무기·머리·몸)는 더미 — TODO(기획).
+  - 머리·몸·다리 칸에 들어갈 장비 아이템은 아직 없음 — TODO(기획).
 - 필드 소지품: I / Tab. 필드 조사·거점 행동·아이템 사용은 `StoryRunner.run_effects()` / `use_item()` (대화 밖, mode="field") 으로 같은 효과 엔진을 쓴다.
 - 임시·미구현(TODO, 기획 미확정): 파라미터가 낮거나 0일 때의 효과·사망 여부(§5), 시간 배율·행동 시간(§4), 탐험 중 종료 처리(§13.2), 사망·부활 연출(§11).
 

@@ -107,12 +107,11 @@ func _refresh() -> void:
 	if item.is_empty():
 		%Desc.text = "아이템을 선택하세요." if _mode == "browse" else ""
 	else:
-		var slot_name := _slot_name(item.get("equip_slot", ""))
-		%Desc.text = "[%s] %s\n무게 %s%s" % [item.type, item.description, _num(item.get("weight", 0.0)),
-			"   ·   장착: %s" % slot_name if slot_name != "" else ""]
+		%Desc.text = "[%s] %s\n무게 %s   ·   %s" % [item.type, item.description, _num(item.get("weight", 0.0)),
+			_where(item.get("equip_slot", ""))]
 	var story_over := StoryRunner.ended and StoryRunner.mode == "episode" and not use_handler.is_valid()   # 필드에서는 대화 밖에서도 사용 가능
 	%UseButton.disabled = item.get("use_effects", "") == "" or story_over
-	%EquipButton.disabled = item.get("equip_slot", "") == ""
+	%EquipButton.disabled = item.is_empty()
 
 
 func _show_weight() -> void:
@@ -131,11 +130,12 @@ func _show_weight() -> void:
 	%Weight.add_theme_color_override("font_color", col)
 
 
-func _slot_name(slot_id: String) -> String:
-	for s in DataLoader.equip_slots:
-		if s.slot_id == slot_id:
-			return s.name
-	return slot_id
+## 어디에 장착하나: 그 종류의 칸 이름들 (종류가 없으면 손)
+func _where(kind: String) -> String:
+	var names := DataLoader.equip_slots.filter(func(s): return s.kind == (kind if kind != "" else "hand")).map(func(s): return s.name)
+	if names.is_empty():
+		return "장착 안 됨"
+	return ("장착: " if kind != "" and kind != "hand" else "손에 들 수 있음: ") + " / ".join(names)
 
 
 static func _num(v: float) -> String:

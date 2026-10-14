@@ -271,15 +271,46 @@ func carry_speed_mult() -> float:
 	return 1.0
 
 
-## 인벤토리 index 칸의 아이템을 장착. 같은 칸에 이미 장비가 있으면 그것은 인벤토리로 돌아온다.
-## 실패하면 이유(문자열), 성공하면 "".
-func equip(index: int) -> String:
+## 장비 칸 정의 { slot_id, name, kind, col, row } (없으면 {})
+func equip_slot_def(slot_id: String) -> Dictionary:
+	for s in DataLoader.equip_slots:
+		if s.slot_id == slot_id:
+			return s
+	return {}
+
+
+## item 을 slot_id 칸에 넣을 수 있나: 손(kind=hand)은 아무 아이템이나, 그 밖에는 아이템 equip_slot 과 칸 kind 가 같아야
+func can_equip_in(item_id: String, slot_id: String) -> bool:
+	var slot := equip_slot_def(slot_id)
+	if slot.is_empty() or not DataLoader.items.has(item_id):
+		return false
+	return slot.kind == "hand" or slot.kind == DataLoader.items[item_id].get("equip_slot", "")
+
+
+## 칸을 정하지 않고 장착할 때(우클릭) 고를 칸: 맞는 빈 칸 → 맞는 칸(바꿔 끼기). 종류가 없으면 손.
+func pick_equip_slot(item_id: String) -> String:
+	var kind: String = DataLoader.items.get(item_id, {}).get("equip_slot", "")
+	var want := kind if kind != "" else "hand"
+	var fits: Array = DataLoader.equip_slots.filter(func(s): return s.kind == want)
+	if fits.is_empty():
+		return ""
+	for s in fits:
+		if not equipment.has(s.slot_id):
+			return s.slot_id
+	return fits[0].slot_id
+
+
+## 인벤토리 index 칸의 아이템(1개)을 slot_id 칸에 장착 (비우면 pick_equip_slot). 손에 든 것은 소지품 칸을 차지하지 않는다.
+## 그 칸에 이미 장비가 있으면 그것은 인벤토리로 돌아온다. 실패하면 이유(문자열), 성공하면 "".
+func equip(index: int, slot_id := "") -> String:
 	if index < 0 or index >= inventory.size():
 		return "없는 칸"
 	var id: String = inventory[index].id
-	var slot_id: String = DataLoader.items.get(id, {}).get("equip_slot", "")
 	if slot_id == "":
-		return "%s 은(는) 장착할 수 없다." % DataLoader.item_name(id)
+		slot_id = pick_equip_slot(id)
+	if not can_equip_in(id, slot_id):
+		var slot := equip_slot_def(slot_id)
+		return "%s 은(는) %s 칸에 넣을 수 없다." % [DataLoader.item_name(id), slot.get("name", "그")]
 	var old: String = equipment.get(slot_id, "")
 	if old != "" and not _can_hold_after(slot_id, id, 0):
 		return "바꿔 낀 %s 을(를) 넣을 칸이 없다." % DataLoader.item_name(old)

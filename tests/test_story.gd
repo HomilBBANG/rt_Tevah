@@ -69,9 +69,11 @@ func _run() -> void:
 	discard_answers = [0, -1]   # 첫 요청: 0번 칸(붕대) 버림, 두 번째: 포기
 	await StoryRunner.choose("c_b3")
 	check(full_events == 2, "인벤토리 초과 요청 2회 (%d)" % full_events)
-	check(GameState.inventory.size() == 8, "8칸 가득 (%d)" % GameState.inventory.size())
-	check(GameState.item_count("junk") == 7 and GameState.item_count("bandage") == 0 and GameState.item_count("knife") == 1,
-		"붕대 버리고 잡동사니 7개, 칼 유지")
+	# 칸 수 = Config inventory_slots (가방 없음). 붕대·칼 + 잡동사니로 가득 → 붕대 버리고 잡동사니 1개 더
+	var slots := GameState.slot_count()
+	check(GameState.inventory.size() == slots, "%d칸 가득 (%d)" % [slots, GameState.inventory.size()])
+	check(GameState.item_count("junk") == slots - 1 and GameState.item_count("bandage") == 0 and GameState.item_count("knife") == 1,
+		"붕대 버리고 잡동사니 %d개, 칼 유지" % (slots - 1))
 	check(messages.any(func(m): return m.begins_with("포기")), "포기 메시지")
 
 	# ---------- 저장 후 재개
@@ -91,7 +93,7 @@ func _run() -> void:
 	check(_ids().has("c_d3") and not _enabled("c_d4"), "trait 선택지 표시, 복합조건 비활성")
 	discard_answers = [1]   # 가득 차 있으므로 1번 칸(잡동사니) 버리고 알약 받기
 	await StoryRunner.choose("c_d3")
-	check(GameState.item_count("pill") == 1 and GameState.item_count("junk") == 6, "알약 획득 (잡동사니 1 버림)")
+	check(GameState.item_count("pill") == 1 and GameState.item_count("junk") == slots - 2, "알약 획득 (잡동사니 1 버림)")
 	check(_enabled("c_d4"), "복합조건 (has:pill) 활성")
 	var pill_slot := GameState.inventory.find_custom(func(s): return s.id == "pill")
 	await StoryRunner.use_item(pill_slot)

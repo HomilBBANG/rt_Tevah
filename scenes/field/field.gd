@@ -739,5 +739,10 @@ func _update_hud() -> void:
 	%Body.text = "부상: " + ("없음" if hurt.is_empty() else "  ·  ".join(hurt))
 	var heavy := GameState.carry_speed_mult()
 	%InventoryButton.text = "소지품 %d/%d · 무게 %s/%s%s" % [GameState.inventory.size(), GameState.slot_count(),
-		String.num(GameState.carry_weight(), 1), String.num(GameState.carry_max(), 1),
+		_fmt(GameState.carry_weight()), _fmt(GameState.carry_max()),
 		" (못 움직임)" if heavy <= 0.0 else (" (느림)" if heavy < 1.0 else "")]
+
+
+## 무게 표시: 정수면 소수점 없이, 아니면 한 자리
+static func _fmt(v: float) -> String:
+	return str(int(v)) if is_equal_approx(v, roundf(v)) else "%.1f" % v

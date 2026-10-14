@@ -1,14 +1,17 @@
 extends Control
 ## 장비창 (필드에서 Q). 화면 왼쪽에 붙고, 소지품 창(I, 오른쪽)과 같이 열어 끌어다 놓을 수 있다.
-##   장비 탭  — EquipSlots 칸마다 장착한 아이템. 소지품에서 끌어와 놓으면 장착, 칸을 우클릭하거나 소지품으로 끌면 벗기
+##   장비 탭  — EquipSlots 칸(엑셀 col·row 위치)마다 장착한 아이템. 소지품에서 끌어와 놓으면 장착,
+##              칸을 우클릭하거나 소지품으로 끌면 벗기. 손 칸에는 아무 아이템이나 들 수 있다
 ##   능력치 탭 — 맨 위 '내 상태'(부위 HP), 아래 능력치 6개 육각형
 
 const ItemCell = preload("res://ui/item_cell.gd")
 const BodyDiagram = preload("res://ui/body_diagram.gd")
 const Hexagon = preload("res://ui/ability_hexagon.gd")
+const CELL := 124.0            # 장비 칸 한 변
+const GAP := 10.0
 
 var _tabs: TabContainer
-var _slots_box: GridContainer
+var _slots_box: Control        # 장비 칸들 (col·row 로 자리 잡음)
 var _info: Label
 var _status: Label
 var _body: Control
@@ -43,17 +46,16 @@ func _ready() -> void:
 	equip.name = "장비"
 	equip.add_theme_constant_override("separation", 14)
 	_tabs.add_child(equip)
-	_slots_box = GridContainer.new()
-	_slots_box.columns = 2
-	_slots_box.add_theme_constant_override("h_separation", 20)
-	_slots_box.add_theme_constant_override("v_separation", 12)
-	equip.add_child(_slots_box)
+	var center := CenterContainer.new()
+	equip.add_child(center)
+	_slots_box = Control.new()
+	center.add_child(_slots_box)
 	_info = Label.new()
 	_info.add_theme_font_size_override("font_size", 22)
 	_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	equip.add_child(_info)
 	var hint := Label.new()
-	hint.text = "소지품(I)에서 끌어와 놓거나 소지품에서 우클릭하면 장착.\n칸을 우클릭하거나 소지품으로 끌면 벗기."
+	hint.text = "소지품(I)에서 끌어와 놓거나 소지품에서 우클릭하면 장착. 손에는 아무 아이템이나 들 수 있고,\n손에 든 것은 소지품 칸을 차지하지 않는다. 칸을 우클릭하거나 소지품으로 끌면 벗기."
 	hint.add_theme_font_size_override("font_size", 20)
 	hint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
 	equip.add_child(hint)
@@ -105,23 +107,26 @@ func refresh() -> void:
 	for c in _slots_box.get_children():
 		_slots_box.remove_child(c)
 		c.queue_free()
+	var extent := Vector2.ZERO
 	for s in DataLoader.equip_slots:
-		var l := Label.new()
-		l.text = s.name
-		l.custom_minimum_size.x = 90
-		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		_slots_box.add_child(l)
 		var cell := ItemCell.new()
 		cell.source = "equip"
 		cell.slot_id = s.slot_id
-		cell.custom_minimum_size = Vector2(380, 84)
-		cell.setup(GameState.equipment.get(s.slot_id, ""), 1, "(비어 있음)")
+		cell.custom_minimum_size = Vector2(CELL, CELL)
+		cell.size = Vector2(CELL, CELL)
+		cell.position = Vector2(float(s.col), float(s.row)) * (CELL + GAP)
+		extent = extent.max(cell.position + cell.size)
+		var held: String = GameState.equipment.get(s.slot_id, "")
+		cell.setup(held, 1, s.name)
+		if held != "":
+			cell.text = "%s\n%s" % [s.name, DataLoader.item_name(held)]
 		var sid: String = s.slot_id
 		cell.right_clicked.connect(func(): _status.text = GameState.unequip(sid))
-		# 소지품에서 끌어온, 이 칸에 맞는 아이템만 받는다
-		cell.accept = func(d): return d.from == "inv" and DataLoader.items.get(d.item_id, {}).get("equip_slot", "") == sid
-		cell.on_drop = func(d): _status.text = GameState.equip(d.index)
+		# 소지품에서 끌어온, 이 칸에 넣을 수 있는 아이템만 받는다 (손은 아무거나)
+		cell.accept = func(d): return d.from == "inv" and GameState.can_equip_in(d.item_id, sid)
+		cell.on_drop = func(d): _status.text = GameState.equip(d.index, sid)
 		_slots_box.add_child(cell)
+	_slots_box.custom_minimum_size = extent
 	var base := DataLoader.get_config_int("inventory_slots", 8)
 	var bonus := GameState.slot_count() - base
 	_info.text = "소지품 칸: 기본 %d%s = %d칸\n무게 %s / %s" % [base, " + 가방 %d" % bonus if bonus > 0 else "", GameState.slot_count(),

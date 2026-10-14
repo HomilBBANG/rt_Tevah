@@ -1,18 +1,51 @@
 [
  {
   "slot_id": "bag",
-  "name": "가방"
- },
- {
-  "slot_id": "weapon",
-  "name": "무기"
+  "name": "가방",
+  "kind": "bag",
+  "col": 0.0,
+  "row": 0.0
  },
  {
   "slot_id": "head",
-  "name": "머리"
+  "name": "머리",
+  "kind": "head",
+  "col": 1.0,
+  "row": 1.0
+ },
+ {
+  "slot_id": "left_hand",
+  "name": "왼손",
+  "kind": "hand",
+  "col": 0.0,
+  "row": 2.0
  },
  {
   "slot_id": "body",
-  "name": "몸"
+  "name": "몸",
+  "kind": "body",
+  "col": 1.0,
+  "row": 2.0
+ },
+ {
+  "slot_id": "right_hand",
+  "name": "오른손",
+  "kind": "hand",
+  "col": 2.0,
+  "row": 2.0
+ },
+ {
+  "slot_id": "left_leg",
+  "name": "왼다리",
+  "kind": "leg",
+  "col": 0.5,
+  "row": 3.0
+ },
+ {
+  "slot_id": "right_leg",
+  "name": "오른다리",
+  "kind": "leg",
+  "col": 1.5,
+  "row": 3.0
  }
 ]

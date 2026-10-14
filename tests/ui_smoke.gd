@@ -36,7 +36,7 @@ func _ready() -> void:
 	await _snap("inventory_full")
 	await _press(play, "잡동사니(테스트) 포기")
 	await _advance(play)
-	await _press(play, "인벤토리 (8/8)")
+	await _press(play, "인벤토리 (%d/%d)" % [GameState.slot_count(), GameState.slot_count()])
 	await _press(play, "칼(테스트)")   # 격자 칸: 1개면 이름만
 	await _snap("inventory_browse")
 	await _press(play, "닫기")

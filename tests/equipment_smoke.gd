@@ -24,37 +24,42 @@ func _ready() -> void:
 
 	_press("inventory")
 	await _wait(0.2)
-	check(inv.visible and f.frozen and inv.get_node("%Slots").get_child_count() == 8, "I → 소지품 격자 8칸, 필드 멈춤")
+	check(inv.visible and f.frozen and inv.get_node("%Slots").get_child_count() == 4, "I → 소지품 격자 4칸 (가방 없음), 필드 멈춤")
 	_press("equipment")
 	await _wait(0.2)
 	check(eq.visible and inv.visible, "Q → 장비창 (소지품과 같이 열림)")
 	await _snap("both_open")
 
-	# 우클릭으로 가방 장착 → 12칸
+	# 우클릭으로 가방 장착 → 8칸
 	_cell(inv, 0).right_clicked.emit()
 	await _wait(0.1)
-	check(GameState.equipment.get("bag") == "small_bag" and inv.get_node("%Slots").get_child_count() == 12, "가방 우클릭 → 장착, 12칸")
-	# 칼을 장비창 무기 칸으로 끌어다 놓기 (물은 안 받음)
-	var weapon: Control = _equip_cell(eq, "weapon")
+	check(GameState.equipment.get("bag") == "small_bag" and inv.get_node("%Slots").get_child_count() == 8, "가방 우클릭 → 장착, 8칸")
+	# 장비 칸 배치: 엑셀 col·row (가방 왼쪽 위, 머리, 왼손·몸·오른손, 왼다리·오른다리)
+	var head: Control = _equip_cell(eq, "head")
+	check(_equip_cell(eq, "bag").position == Vector2.ZERO and head.position.x > 0 and head.position.y > 0
+		and _equip_cell(eq, "left_leg").position.x > 0 and eq._slots_box.get_child_count() == 7, "장비 칸 7개, 그림대로 배치")
+	# 칼을 오른손으로 끌어다 놓기 (머리 칸은 칼·물 모두 안 받음, 손은 아무거나)
+	var weapon: Control = _equip_cell(eq, "right_hand")
 	var knife_cell: Control = _cell(inv, 0)
 	var water_cell: Control = _cell(inv, 1)
 	check(knife_cell.item_id == "knife" and weapon._can_drop_data(Vector2.ZERO, knife_cell.info())
-		and not weapon._can_drop_data(Vector2.ZERO, water_cell.info()), "무기 칸: 칼은 받고 물은 안 받음")
+		and weapon._can_drop_data(Vector2.ZERO, water_cell.info()) and not head._can_drop_data(Vector2.ZERO, knife_cell.info()),
+		"손 칸: 칼·물 모두 받음 / 머리 칸: 칼 안 받음")
 	weapon._drop_data(Vector2.ZERO, knife_cell.info())
 	await _wait(0.1)
-	check(GameState.equipment.get("weapon") == "knife", "칼을 끌어다 놓기 → 무기 칸에 장착")
+	check(GameState.equipment.get("right_hand") == "knife" and GameState.inventory.size() == 2, "칼을 끌어다 놓기 → 오른손, 소지품 칸에서 빠짐")
 	await _snap("equipped")
-	# 무기 칸을 소지품으로 끌기 → 벗기
-	weapon = _equip_cell(eq, "weapon")
+	# 손을 소지품으로 끌기 → 벗기
+	weapon = _equip_cell(eq, "right_hand")
 	var empty_cell: Control = _cell(inv, 5)
 	check(empty_cell._can_drop_data(Vector2.ZERO, weapon.info()), "소지품 칸은 장비를 받음")
 	empty_cell._drop_data(Vector2.ZERO, weapon.info())
 	await _wait(0.1)
-	check(not GameState.equipment.has("weapon") and GameState.item_count("knife") == 1, "장비를 소지품으로 끌기 → 벗기")
-	# 장비 칸 우클릭 → 벗기 (가방을 벗으면 8칸, 소지품 3칸 + 가방 1 = 4칸 → 가능)
+	check(not GameState.equipment.has("right_hand") and GameState.item_count("knife") == 1, "장비를 소지품으로 끌기 → 벗기")
+	# 장비 칸 우클릭 → 벗기 (가방을 벗으면 4칸, 소지품 3칸 + 가방 1 = 4칸 → 가능)
 	_equip_cell(eq, "bag").right_clicked.emit()
 	await _wait(0.1)
-	check(not GameState.equipment.has("bag") and GameState.slot_count() == 8, "가방 칸 우클릭 → 벗기, 8칸")
+	check(not GameState.equipment.has("bag") and GameState.slot_count() == 4, "가방 칸 우클릭 → 벗기, 4칸")
 
 	# 능력치 탭: 내 상태 + 육각형
 	eq.open(1)
@@ -69,8 +74,11 @@ func _ready() -> void:
 
 	# 무게: 최대(30) 이상이면 못 움직임, 20 이상이면 느려짐
 	GameState.inventory = []
-	for i in 6:
-		GameState.add_item("water", 5)   # 30
+	for i in 4:
+		GameState.add_item("water", 5)   # 20
+	for slot in ["left_hand", "right_hand", "head", "left_leg", "right_leg"]:
+		GameState.equipment[slot] = "junk"   # +10 = 30
+	GameState.equipment_changed.emit()
 	var x0: float = f.player.position.x
 	Input.action_press("move_right")
 	await _wait(0.3)
