@@ -167,12 +167,15 @@ func _build_actors() -> void:
 	player.collision_mask = WALL_LAYER | NPC_LAYER | DOOR_LAYER
 	# 새 회차는 맵 한복판(S)에서 깨어나고, 이동해 왔으면 고른 도착 지점(arrive), 그 밖에는 P
 	var spawn: Array = map.get("run_start", map.start) if GameState.wake_at_run_start else map.start
-	if not GameState.wake_at_run_start and GameState.arrive_at != "":
+	if not GameState.wake_at_run_start:
+		# 출발 쪽에서 고른 도착 P(arrive) → 없으면 들어온 곳을 '이어지는 곳'(from)으로 고른 도착 P → 없으면 기본 P
 		for o in map.objects:
-			if o.type == "arrive" and o.object_id == GameState.arrive_at:
+			if o.type == "arrive" and ((GameState.arrive_at != "" and o.object_id == GameState.arrive_at)
+					or (GameState.arrive_at == "" and GameState.arrive_from != "" and GameState.arrive_from in o.get("from", []))):
 				spawn = [o.x, o.y]
 	GameState.wake_at_run_start = false
 	GameState.arrive_at = ""
+	GameState.arrive_from = ""
 	_travel_lock = Vector2i(int(spawn[0]), int(spawn[1]))
 	player.position = _tile_center(spawn[0], spawn[1])
 	_add_circle_shape(player, player.radius)
@@ -321,11 +324,11 @@ func _physics_process(delta: float) -> void:
 		for s in spots:
 			if (s.kind == "passage" or (s.kind == "exit" and s.open)) \
 					and Rect2(s.pos - Vector2(tile, tile) / 2.0, Vector2(tile, tile)).has_point(player.global_position):
-				travel(s.data.ref, s.data.get("arrive", ""))
+				travel(s.data.ref, s.data.get("arrive", ""), s.data.object_id)
 				return
 		var edge := _edge_at(here)
 		if not edge.is_empty():
-			travel(edge.ref, edge.get("arrive", ""))
+			travel(edge.ref, edge.get("arrive", ""), "%s:%s" % [map.map_id, edge.dir])
 			return
 	_update_near_spot()
 
@@ -384,24 +387,26 @@ func interact() -> void:
 		"npc": _start_dialogue(s)
 		"camp": _open_camp()
 		"exit": toggle_door(s)
-		"transit": travel(s.data.ref, s.data.get("arrive", ""))
+		"transit": travel(s.data.ref, s.data.get("arrive", ""), s.data.object_id)
 		"spot": await _investigate(s)
 
 
-## 맵 이동: map_id 의 도착 지점 arrive(비면 P)로
-func travel(map_id: String, arrive := "") -> void:
+## 맵 이동: map_id 의 도착 P 로. arrive = 출발 쪽에서 고른 도착 P, from = 들어온 곳(도착 P 의 '이어지는 곳'과 맞춤).
+## 둘 다 맞는 게 없으면 기본 P.
+func travel(map_id: String, arrive := "", from := "") -> void:
 	GameState.arrive_at = arrive
+	GameState.arrive_from = from
 	load_map(map_id)
 
 
-## 가장자리 이동: 플레이어가 맵 맨 끝 칸(edges 가 정해진 쪽)에 있으면 그 edge { ref, arrive }
+## 가장자리 이동: 플레이어가 맵 맨 끝 칸(edges 가 정해진 쪽)에 있으면 그 edge { ref, arrive, dir }
 func _edge_at(t: Vector2i) -> Dictionary:
 	var edges: Dictionary = map.get("edges", {})
 	for d in edges:
 		var hit: bool = (d == "left" and t.x <= 0) or (d == "right" and t.x >= int(map.width) - 1) \
 			or (d == "up" and t.y <= 0) or (d == "down" and t.y >= int(map.height) - 1)
 		if hit:
-			return edges[d]
+			return edges[d].merged({"dir": d})
 	return {}
 
 

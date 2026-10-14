@@ -863,7 +863,7 @@ def read_maps(rep):
             continue
         m["file"] = f.name
         m["tiles"] = [str(r) for r in m.get("tiles", [])]
-        m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len") else v for k, v in o.items()}
+        m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len", "from") else v for k, v in o.items()}
                         for o in m.get("objects", [])]
         maps[f.stem] = m
     for f in sorted(MAPS_DIR.glob("*.txt")):
@@ -877,6 +877,24 @@ def field_objects(maps):
     for mid, m in maps.items():
         for o in m["objects"]:
             out.append(dict(o, map_id=mid, _row=m["file"]))
+    return out
+
+
+def arrive_from(o):
+    f = o.get("from", [])
+    return [s for s in (f if isinstance(f, list) else split_list(str(f))) if s]
+
+
+def entrances_to(maps, mid):
+    """mid 맵으로 들어오는 곳: {id: 설명} — 문·통로·이용 object_id, 가장자리 '맵:방향'"""
+    out = {}
+    for sm, m in maps.items():
+        for o in m.get("objects", []):
+            if o.get("type") in TRAVEL_TYPES and o.get("ref") == mid:
+                out[o.get("object_id", "")] = o
+        for d, e in (m.get("edges") or {}).items():
+            if e and e.get("ref") == mid:
+                out[f"{sm}:{d}"] = dict(e, type="edge")
     return out
 
 
@@ -929,6 +947,25 @@ def validate_field(d, maps, rep, enemies):
                 err = travel_error(maps, e["ref"], e.get("arrive", ""))
                 if err:
                     rep.err(f"{wm} 가장자리 {edir}", err)
+        # 도착 P 의 '이어지는 곳': 이 맵으로 들어오는 곳이어야 하고, 한 곳은 한 도착 P 에만
+        ents = entrances_to(maps, mid)
+        claimed = {}
+        for o in m["objects"]:
+            if o.get("type") != "arrive":
+                if arrive_from(o):
+                    rep.err(f"{wm} 물체 {o.get('object_id', '')}", "이어지는 곳(from)은 도착 P(arrive)에만")
+                continue
+            for src in arrive_from(o):
+                w = f"{wm} 도착 P {o.get('object_id', '')}"
+                if src not in ents:
+                    rep.err(w, f"이어지는 곳 '{src}' 는 이 맵({mid})으로 들어오는 문·통로·이용·가장자리가 아님")
+                elif src in claimed:
+                    rep.err(w, f"'{src}' 는 이미 도착 P {claimed[src]} 에 이어져 있음 (한 곳은 한 도착 P 에만)")
+                else:
+                    claimed[src] = o.get("object_id", "")
+                    other = ents[src].get("arrive", "")
+                    if other and other != o.get("object_id", ""):
+                        rep.err(w, f"'{src}' 는 출발 쪽에서 도착 지점 '{other}' 를 따로 골랐음 (한쪽에서만 정할 것)")
         occupied = {}
         for o in m["objects"]:
             oid = o.get("object_id", "")
@@ -1007,6 +1044,7 @@ def export_maps(d, maps):
         objects = []
         for o in m["objects"]:
             e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition", "arrive")}
+            e["from"] = arrive_from(o)   # 도착 P: 이어지는 곳 (object_id / "맵:방향")
             e.update(map_id=mid, x=int(o["x"]), y=int(o["y"]), patrol_dir=o.get("patrol_dir", ""),
                      patrol_len=int(o.get("patrol_len", 0) or 0),
                      schedule=[parse_time_range(r) for r in split_list(o.get("schedule", ""))])

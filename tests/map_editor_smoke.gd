@@ -105,7 +105,26 @@ func _ready() -> void:
 	await _snap("passage_selected")
 	ed.save()
 	var tt: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_travel.json"))
-	check(tt.edges.left.ref == "test_field" and tt.objects[0].arrive == "bc_gate", "저장: 가장자리·도착 지점 유지")
+	check(tt.edges.left.ref == "test_field" and tt.edges.down.ref == "basecamp", "저장: 가장자리 유지")
+	# 도착 P(추가)의 '이어지는 곳': 베이스캠프 정문 ← test_travel 통로·아래 가장자리
+	ed.open_map("basecamp")
+	await _frames(2)
+	var gate: Dictionary = ed.map.objects.filter(func(o): return o.object_id == "bc_gate")[0]
+	ed.canvas.select(gate)
+	await _frames(2)
+	var boxes: Array = ed.inspector.find_children("*", "CheckBox", true, false)
+	var checked: Array = boxes.filter(func(b): return b.button_pressed).map(func(b): return b.text)
+	check(boxes.size() >= 3 and checked.size() == 2 and checked.any(func(t): return "통로" in t)
+		and checked.any(func(t): return "아래 가장자리" in t), "정문 P: 이어지는 곳 목록, 통로·아래 가장자리 체크 (%s)" % [checked])
+	await _snap("arrive_p")
+	var other: CheckBox = boxes.filter(func(b): return not b.button_pressed)[0]
+	other.button_pressed = true
+	check(gate.from.size() == 3, "체크하면 이어지는 곳 추가")
+	other.button_pressed = false
+	check(gate.from.size() == 2, "체크 풀면 빠짐")
+	ed.save()
+	var bc: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "basecamp.json"))
+	check(bc.objects.filter(func(o): return o.object_id == "bc_gate")[0].from == ["tt_to_camp", "test_travel:down"], "저장: 이어지는 곳 유지")
 
 	# 새 맵 · 크기 바꾸기
 	check(ed.new_map("t_new", 12, 8), "새 맵 만들기")

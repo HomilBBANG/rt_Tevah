@@ -35,7 +35,8 @@ var player_body := {}         # 전투 부위 상태 (부상·절단), 전투 �
 var statuses: Array = []      # 걸려 있는 상태이상 status_id (StatusEffects 시트). 효과 status:+id / status:-id
 var equipment := {}           # 장비: slot_id(EquipSlots) -> item_id. 장착한 것은 인벤토리 칸을 차지하지 않는다
 var field_state := {}         # map_id -> { "removed": [object_id], "done": [object_id] }
-var arrive_at := ""           # 다음 맵 로드 때 도착할 도착 지점(arrive 물체) id. 비면 P (저장 안 함)
+var arrive_at := ""           # 다음 맵 로드 때 도착할 도착 지점(arrive 물체) id (저장 안 함)
+var arrive_from := ""         # 어디로 들어왔나: 문·통로·이용 object_id 또는 "맵:방향"(가장자리). 도착 P 의 from 과 맞추어 도착
 var wake_at_run_start := false   # 다음 맵 로드 때 그 맵의 S(회차 시작 위치)에서 깨어남 (저장 안 함)
 
 # --- 월드 상태 (월드 파일에 저장, 회차가 바뀌어도 유지)
