@@ -18,6 +18,7 @@ func _ready() -> void:
 	await _snap("player_turn")
 	check(ui.get_node("%EnemyName").text == "적 A (테스트)", "왼쪽 위 적 이름")
 	check(ui.get_node("%PlayerBody").figure, "내 상태: 사람 모양")
+	check("나타났다" in ui.get_node("%Message").text, "처음에 '나타났다' 표시")
 
 	# 공격 → 텍스트 창에 적 부위 선택지 (부위 4 + 취소)
 	ui.get_node("%AttackButton").pressed.emit()
@@ -31,6 +32,7 @@ func _ready() -> void:
 	ui.combat.forced_rolls.assign([69.0, 0.0])
 	opts[1].pressed.emit()
 	check(ui.combat.enemy_parts.torso.hp == 20, "몸통 명중 30 → 20")
+	check(not "나타났다" in ui.get_node("%Message").text, "첫 행동 뒤에는 '나타났다' 안 보임")
 
 	# 일반 공격: 전조 1.2초. 0.7초쯤 스크린샷, 타격 시점에 S → 완벽 회피
 	await _wait(0.6 + 0.7)

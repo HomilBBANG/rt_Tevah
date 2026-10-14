@@ -31,6 +31,7 @@ var player_state := {}
 var _state := ""              # player / target / item / rolling / enemy / over
 var _log: PackedStringArray = []
 var _prompt := ""             # 텍스트 창 마지막 줄 (안내·주사위 등)
+var _intro := ""              # "적 이(가) 나타났다." — 첫 행동 결과가 나오기 전까지만 보임 (로그에 남기지 않음)
 var _strike_start := 0
 var _pressed_key := ""
 var _press_time := 0
@@ -67,7 +68,7 @@ func _ready() -> void:
 		%TitleButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
 		%QuitButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
 	%PlayerBody.refresh()
-	_add_log("%s 이(가) 나타났다." % combat.enemy.name)
+	_intro = "%s 이(가) 나타났다." % combat.enemy.name
 	_player_turn()
 
 
@@ -273,6 +274,7 @@ func _finish() -> void:
 
 # ---------------------------------------------------------------- 텍스트 창
 func _add_log(line: String) -> void:
+	_intro = ""
 	_log.append(line)
 	if _log.size() > LOG_LINES:
 		_log = _log.slice(_log.size() - LOG_LINES)
@@ -294,6 +296,8 @@ func _redraw_text() -> void:
 	elif _prompt != "":
 		keep = clampi(4 - _prompt.count("\n") - 1, 1, LOG_LINES)
 	var shown := _log.slice(maxi(0, _log.size() - keep))
+	if shown.is_empty() and _intro != "":
+		shown = PackedStringArray([_intro])
 	for i in shown.size():
 		var col := "#ffffff" if i == shown.size() - 1 and _prompt == "" else "#b8a8a8"
 		lines.append("[color=%s]%s[/color]" % [col, shown[i]])
