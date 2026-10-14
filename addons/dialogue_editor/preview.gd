@@ -3,8 +3,10 @@ extends Control
 ## 새 회차 상태(소지품 없음·플래그 없음)에서 시작한다. 저장 효과(save)는 실제로 저장하지 않는다.
 
 const DialogueScene = preload("res://scenes/main_play.tscn")
+const CombatScene = preload("res://scenes/combat.tscn")
 
 var _ui: Node
+var _combat: Node
 
 
 func _ready() -> void:
@@ -16,6 +18,7 @@ func _ready() -> void:
 		return
 	GameState.reset_run()
 	StoryRunner.save_slot_requested.connect(func(): StoryRunner.choose_save_slot.call_deferred(-1))
+	StoryRunner.combat_requested.connect(_on_combat)
 	%Info.text = "미리보기: %s   (save 효과는 저장하지 않음 · Esc 로 다시 시작)" % start
 	_start(start)
 
@@ -28,6 +31,33 @@ func _start(node_id: String) -> void:
 	_ui.finished.connect(func(): %Info.text = "대화 끝 (EXIT).  Esc 로 다시 시작, 창을 닫으면 에디터로.")
 	%Stage.add_child(_ui)
 	StoryRunner.start_dialogue(node_id)
+
+
+## 전투 선택지: 대화를 숨기고 전투 화면. 이기거나 도주하면 대화 계속, 지면 대화 끝 (미리보기는 사망 처리 없음)
+func _on_combat(enemy_id: String) -> void:
+	_ui.visible = false
+	%Info.visible = false   # 전투 화면의 '내 상태'와 겹침
+	_combat = CombatScene.instantiate()
+	_combat.embedded = true
+	_combat.enemy_id_override = enemy_id
+	_combat.player_state = GameState.player_body
+	_combat.finished.connect(_on_combat_finished)
+	%Stage.add_child(_combat)
+
+
+func _on_combat_finished(outcome: String) -> void:
+	GameState.player_body = _combat.combat.player_parts.duplicate(true)
+	_combat.queue_free()
+	_combat = null
+	%Info.visible = true
+	if outcome == "win" or outcome == "fled":
+		_ui.visible = true
+		StoryRunner.finish_combat(outcome)
+	else:
+		StoryRunner.finish_combat("lose")
+		_ui.queue_free()
+		_ui = null
+		%Info.text = "전투에서 졌다 → 대화 끝 (게임에서는 사망 처리).  Esc 로 다시 시작."
 
 
 func _unhandled_input(event: InputEvent) -> void:
