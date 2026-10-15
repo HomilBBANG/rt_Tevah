@@ -7,7 +7,7 @@ extends RefCounted
 ## 결과는 UTF-8 로그 파일로 받는다 (윈도우 콘솔 출력 인코딩 문제를 피함). 맥은 python3, 윈도우는 python.
 static func run_convert(log_view: TextEdit) -> bool:
 	var script := ProjectSettings.globalize_path("res://tools/xlsx_to_json.py")
-	var python := "python" if OS.get_name() == "Windows" else "python3"
+	var python := _python()
 	var log_path := ProjectSettings.globalize_path("user://convert_log.txt")
 	if FileAccess.file_exists(log_path):
 		DirAccess.remove_absolute(log_path)
@@ -18,9 +18,7 @@ static func run_convert(log_view: TextEdit) -> bool:
 	else:
 		var o := "\n".join(out)
 		if "openpyxl" in o:
-			# 맥에서 Godot 를 Finder 로 열면 PATH 가 짧아서 /usr/bin/python3 이 쓰인다 → 그 파이썬에 깔아야 함
-			log_view.text = "변환에 필요한 openpyxl 이 없습니다. 터미널에서 설치한 뒤 다시 누르세요:\n  %s -m pip install --user openpyxl\n\n%s" % [
-				"python" if OS.get_name() == "Windows" else "/usr/bin/python3", o]
+			log_view.text = "변환에 필요한 openpyxl 이 없습니다. 터미널에서 설치한 뒤 다시 누르세요:\n  %s -m pip install --user openpyxl\n\n%s" % [python, o]
 		elif "Traceback" in o:
 			log_view.text = "변환 스크립트가 오류로 멈췄습니다 (맨 아래 줄이 원인):\n%s" % o
 		else:
@@ -28,6 +26,24 @@ static func run_convert(log_view: TextEdit) -> bool:
 	if code == 0 and Engine.is_editor_hint():
 		EditorInterface.get_resource_filesystem().scan()
 	return code == 0
+
+
+static var _python_found := ""
+
+
+## 변환기를 돌릴 파이썬. 맥에는 파이썬이 여러 개일 수 있어서(시스템·Homebrew·python.org) openpyxl 이 깔린 것을 찾는다.
+## 하나도 없으면 기본 이름(윈도우 python, 맥 python3) → 실행 오류 글에 그 이름으로 설치 안내.
+static func _python() -> String:
+	if _python_found != "":
+		return _python_found
+	var names := ["python", "py"] if OS.get_name() == "Windows" else \
+		["python3", "/opt/homebrew/bin/python3", "/usr/local/bin/python3", "/usr/bin/python3",
+		"/Library/Frameworks/Python.framework/Versions/Current/bin/python3"]
+	for n in names:
+		if OS.execute(n, ["-c", "import openpyxl"]) == 0:
+			_python_found = n
+			return n
+	return names[0]
 
 
 const HELP_CFG := "user://editor_help.cfg"
