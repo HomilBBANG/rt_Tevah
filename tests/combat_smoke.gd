@@ -20,7 +20,7 @@ func _ready() -> void:
 	check(ui.get_node("%PlayerBody").figure, "내 상태: 사람 모양")
 	check("나타났다" in ui.get_node("%Message").text, "처음에 '나타났다' 표시")
 	var acts: Array = ui.get_node("%Actions").get_children().map(func(b): return b.text)
-	check(acts == ["공격", "특수", "아이템", "도주"], "행동 버튼: 공격 · 특수 · 아이템 · 도주 (%s)" % [acts])
+	check(acts == ["공격", "특수", "대화", "아이템", "도주"], "행동 버튼: 공격 · 특수 · 대화 · 아이템 · 도주 (%s)" % [acts])
 	check(is_equal_approx(ui.get_node("TextBox").get_theme_stylebox("panel").bg_color.a, 0.7), "텍스트 창 불투명도 70%")
 	ui.get_node("%SpecialButton").pressed.emit()
 	await _wait(0.1)

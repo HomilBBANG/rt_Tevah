@@ -24,6 +24,7 @@ class FakeCtx:
 	func is_severed(part_id: String) -> bool: return part_id in ["left_arm", "any"]
 	func get_count(name: String) -> int: return {"run": 3, "death": 2, "talk": 0}.get(name, 0)
 	func has_status(id: String) -> bool: return id == "bleeding"
+	func in_combat(id: String) -> bool: return id == "any" or id == "wolf"
 
 
 var _fail := 0
@@ -65,6 +66,8 @@ func _ready() -> void:
 	cond(ctx, "count:run==3", true)
 	cond(ctx, "count:death>2", false)
 	cond(ctx, "count:talk==0", true)
+	cond(ctx, "combat:any & combat:wolf & !combat:bear", true)
+	cond_err(ctx, "combat:any>=1")
 	cond(ctx, "count:talk>=1", false)
 	cond_err(ctx, "count:death")
 	cond_err(ctx, "count:kills>1")
@@ -122,6 +125,7 @@ func _ready() -> void:
 	eff("restore:all", [{"type": "restore", "id": "all"}], 0)
 	eff("restore:", [], 1)
 	eff("status:+bleeding;status:-panic", [{"type": "status", "op": "+", "id": "bleeding"}, {"type": "status", "op": "-", "id": "panic"}], 0)
+	eff("endcombat:win;trait:+brave", [{"type": "endcombat", "id": "win"}, {"type": "trait", "op": "+", "id": "brave"}], 0)
 	eff("status:bleeding", [], 1)
 	eff("move:basecamp;move:basecamp@bc_gate", [{"type": "move", "map": "basecamp", "arrive": ""},
 		{"type": "move", "map": "basecamp", "arrive": "bc_gate"}], 0)

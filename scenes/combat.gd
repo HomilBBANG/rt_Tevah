@@ -3,12 +3,15 @@ extends Control
 ##
 ## 배치: 왼쪽 위 적 이름 / 가운데 적 그림 / 왼쪽 아래 내 상태(부위 HP) / 가운데 아래 텍스트 창 / 그 오른쪽 행동 버튼
 ## 텍스트 창: 시스템 메시지 + 행동 세부 선택지(공격할 부위 등)
-## 플레이어 턴: 공격(텍스트 창에서 적 부위 선택) / 특수(스킬·무기 던지기 등, 아직 없음) / 아이템(인벤토리, 소모품 사용)
+## 플레이어 턴: 공격(텍스트 창에서 적 부위 선택) / 특수(스킬·무기 던지기 등, 아직 없음)
+##   / 대화(상대가 NPC 든 몬스터든: 그 NPC 대화를 전투 화면 위에 — ▶ 대화 시작 카드의 '전투 중이다' 길에서 대사)
+##   / 아이템(인벤토리, 소모품 사용)
 ##   / 도주(주사위 1~100 ≤ 적의 도주 성공률)
 ## 적 턴: 공격 전조 → 회피 원이 고리에 닿는 순간 맞는 방향키(W/A/S/D 또는 방향키·패드) 입력
 
 const Combat = preload("res://core/combat/combat.gd")
 const InputActions = preload("res://core/input_actions.gd")
+const DialogueScene = preload("res://scenes/main_play.tscn")
 
 ## 탐험 필드 안에서 띄웠을 때: 끝나면 결과("win"/"lose"/"fled")를 알린다
 signal finished(outcome: String)
@@ -54,6 +57,8 @@ func _ready() -> void:
 	%PlayerBody.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	%AttackButton.pressed.connect(_on_attack)
 	%SpecialButton.pressed.connect(_on_special)
+	%TalkButton.pressed.connect(_on_talk)
+	GameState.combat_enemy = enemy_id   # 조건 combat:any / combat:enemy_id
 	%ItemButton.pressed.connect(_on_item)
 	%FleeButton.pressed.connect(_on_flee)
 	%Inventory.use_handler = _on_item_used
@@ -87,6 +92,7 @@ func _player_turn() -> void:
 func _set_actions(on: bool) -> void:
 	%AttackButton.disabled = not on or not combat.can_attack()
 	%SpecialButton.disabled = not on
+	%TalkButton.disabled = not on
 	%ItemButton.disabled = not on
 	%FleeButton.disabled = not on or not combat.can_flee()
 
@@ -141,6 +147,48 @@ func _on_special() -> void:
 	_set_prompt("아직 쓸 수 있는 특수 행동이 없다.")
 	_option_button("취소").pressed.connect(_player_turn)
 	%Options.visible = true
+
+
+## 대화 → 상대의 대화(그 NPC 대화 파일의 ▶ 대화 시작 카드)를 전투 화면 위에 띄운다.
+## 대화 효과 endcombat:win(상대가 물러남 = 승리) / endcombat:flee(빠져나옴 = 도주)로 전투를 끝낼 수 있다.
+## 그 밖에는 대화가 끝나면 Config combat_talk_uses_turn(1) 이면 적 차례, 0 이면 다시 내 차례.
+var talk_ui: Control
+
+func _on_talk() -> void:
+	if _state != "player":
+		return
+	var start: String = DataLoader.npc_dialogue.get(combat.enemy.get("enemy_id", ""), "")
+	if start == "":
+		_add_log("%s 은(는) 말이 통하지 않는다." % combat.enemy.name)
+		return
+	_state = "talk"
+	_set_actions(false)
+	_set_prompt("")
+	var saved := StoryRunner.save_state()   # 대화 중에 시작한 전투면 그 대화로 돌아가야 한다
+	StoryRunner.combat_end = ""
+	talk_ui = DialogueScene.instantiate()
+	talk_ui.embedded = true
+	talk_ui.over_combat = true
+	add_child(talk_ui)
+	StoryRunner.start_dialogue(start)
+	await talk_ui.finished
+	talk_ui.queue_free()
+	talk_ui = null
+	StoryRunner.restore_state(saved)
+	match StoryRunner.combat_end:
+		"win":
+			combat.outcome = "win"
+			_add_log("%s 이(가) 물러났다." % combat.enemy.name)
+		"flee":
+			combat.outcome = "fled"
+			_add_log("전투에서 빠져나왔다.")
+	StoryRunner.combat_end = ""
+	if combat.outcome != "":
+		_finish()
+	elif int(DataLoader.config.get("combat_talk_uses_turn", 1)) != 0:
+		await _after_player_action()
+	else:
+		_player_turn()
 
 
 ## 아이템 → 인벤토리 (소모품 사용). TODO(기획): 장비 착용 — 장비 시스템이 아직 없음
@@ -278,8 +326,13 @@ func press_dodge(key: String) -> void:
 
 
 # ---------------------------------------------------------------- 끝
+func _exit_tree() -> void:
+	GameState.combat_enemy = ""
+
+
 func _finish() -> void:
 	_state = "over"
+	GameState.combat_enemy = ""
 	_clear_options()
 	_set_actions(false)
 	match combat.outcome:

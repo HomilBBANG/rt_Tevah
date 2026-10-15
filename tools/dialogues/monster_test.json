@@ -1,0 +1,97 @@
+{
+ "dialogue_id": "monster_test",
+ "npc_id": "enemy_test",
+ "episode_id": "",
+ "nodes": [
+  {
+   "node_id": "monster_test_start",
+   "kind": "start",
+   "routes": [
+    {
+     "condition": "combat:any",
+     "next_node": "monster_test_combat"
+    }
+   ],
+   "speaker_id": "",
+   "text": "",
+   "next_node": "monster_test_idle",
+   "on_enter": "",
+   "pos": [
+    40,
+    60
+   ]
+  },
+  {
+   "node_id": "monster_test_combat",
+   "speaker_id": "enemy_test",
+   "text": "(테스트) 전투 중 몬스터 대사",
+   "next_node": "",
+   "on_enter": "",
+   "pos": [
+    560,
+    40
+   ]
+  },
+  {
+   "node_id": "monster_test_idle",
+   "speaker_id": "enemy_test",
+   "text": "(테스트) 전투 밖 몬스터 대사",
+   "next_node": "EXIT",
+   "on_enter": "",
+   "pos": [
+    560,
+    420
+   ]
+  }
+ ],
+ "choices": [
+  {
+   "choice_id": "monster_test_c1",
+   "node_id": "monster_test_combat",
+   "text": "(테스트) 물러가게 한다",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "endcombat:win",
+   "next_node": "EXIT",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  },
+  {
+   "choice_id": "monster_test_c2",
+   "node_id": "monster_test_combat",
+   "text": "(테스트) 빠져나간다",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "endcombat:flee",
+   "next_node": "EXIT",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  },
+  {
+   "choice_id": "monster_test_c3",
+   "node_id": "monster_test_combat",
+   "text": "(테스트) 말을 그만두고 계속 싸운다",
+   "condition": "",
+   "show_mode": "",
+   "cost": "",
+   "effects": "",
+   "next_node": "EXIT",
+   "type": "normal",
+   "check": "",
+   "dc": 0,
+   "mod": 0,
+   "fail_effects": "",
+   "fail_next": ""
+  }
+ ]
+}

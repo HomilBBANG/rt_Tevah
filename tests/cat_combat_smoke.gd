@@ -10,6 +10,7 @@ var _fail := 0
 
 func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute("user://cat_combat_smoke")
+	DataLoader.config["text_speed_default"] = "instant"
 	# ---------- 미리보기
 	var f := FileAccess.open("user://dialogue_preview.json", FileAccess.WRITE)
 	f.store_string(JSON.stringify({"node": "fd_cat_a"}))
@@ -47,12 +48,18 @@ func _ready() -> void:
 	get_tree().quit(1 if _fail > 0 else 0)
 
 
+## 그 글자로 시작하는 버튼을 누른다. 대사 페이지가 여러 개면 선택지가 나올 때까지 넘긴다
 func _press(root: Node, text: String) -> void:
-	for b in root.find_children("*", "Button", true, false):
-		if b.text.begins_with(text) and b.is_visible_in_tree():
-			b.pressed.emit()
-			await _wait(0.3)
-			return
+	for i in 8:
+		for b in root.find_children("*", "Button", true, false):
+			if b.text.begins_with(text) and b.is_visible_in_tree():
+				b.pressed.emit()
+				await _wait(0.3)
+				return
+		var dlg: Node = root if root.has_method("advance") else root.get("_ui")
+		if dlg and dlg.has_method("advance"):
+			dlg.advance()
+		await _wait(0.1)
 	check(false, "버튼 없음: " + text)
 
 

@@ -87,9 +87,11 @@ static func add_help_window(owner: Control, bar: HBoxContainer, title: String, b
 ## items·survival·abilities·parts·loot·nodes: [[id, 보이는 이름]], flags·wflags·traits: [이름] (이미 쓰이는 것)
 static func load_lookups() -> Dictionary:
 	var lk := {"items": [], "survival": [], "abilities": [], "parts": [], "loot": [], "nodes": [], "endings": [], "statuses": [], "dests": [],
-		"flags": [], "wflags": [], "traits": [], "trait_list": []}
+		"flags": [], "wflags": [], "traits": [], "trait_list": [], "enemies": []}
 	for i in read_json("res://data/items.json", []):
 		lk.items.append([i.item_id, "%s (%s)" % [i.name, i.item_id]])
+	for e in read_json("res://data/enemies.json", []):
+		lk.enemies.append([e.enemy_id, "%s (%s)%s" % [e.name, e.enemy_id, " · 몬스터" if e.get("kind", "") == "monster" else ""]])
 	for st in read_json("res://data/status_effects.json", []):
 		lk.statuses.append([st.status_id, "%s (%s)" % [st.name, st.status_id]])
 	for s in read_json("res://data/survival.json", []):

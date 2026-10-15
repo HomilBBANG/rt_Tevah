@@ -3,6 +3,7 @@
   "enemy_id": "enemy_test",
   "name": "적 A (테스트)",
   "image": "",
+  "kind": "monster",
   "flee_chance": 50.0,
   "walk_speed": 2.0,
   "run_speed": 3.2,

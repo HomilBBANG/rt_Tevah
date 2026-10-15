@@ -41,6 +41,7 @@ var statuses: Array = []      # 걸려 있는 상태이상 status_id (StatusEffe
 var equipment := {}           # 장비: slot_id(EquipSlots) -> item_id. 장착한 것은 인벤토리 칸을 차지하지 않는다
 var field_state := {}         # map_id -> { "removed": [object_id], "done": [object_id] }
 var talk_counts := {}         # 대화 시작 node_id -> 그 대화를 시작한 횟수 (회차 저장에 들어감)
+var combat_enemy := ""        # 지금 싸우는 상대 enemy_id (전투 화면이 정함, 조건 combat:) — 저장 안 함
 var talk_now := 0             # 지금 대화를 전에 몇 번 했나 (조건 count:talk, 첫 대화 = 0)
 var arrive_at := ""           # 다음 맵 로드 때 도착할 도착 지점(arrive 물체) id (저장 안 함)
 var arrive_from := ""         # 어디로 들어왔나: 문·통로·이용 object_id 또는 "맵:방향"(가장자리). 도착 P 의 from 과 맞추어 도착
@@ -435,6 +436,11 @@ func has_wflag(name: String) -> bool:
 func set_wflag(name: String) -> void:
 	world_flags[name] = true
 	flags_changed.emit()
+
+
+## 조건 combat:any / combat:enemy_id
+func in_combat(id: String) -> bool:
+	return combat_enemy != "" and (id == "any" or id == combat_enemy)
 
 
 func has_trait(name: String) -> bool:

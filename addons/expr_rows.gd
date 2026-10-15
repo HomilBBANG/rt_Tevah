@@ -22,6 +22,7 @@ const EFFECTS := [
 	["status_remove", "상태이상 풀기", ["status"]],
 	["trait_add", "특성 얻기 (사건·거래, 다음 회차에도 남음)", ["trait_pick"]],
 	["trait_remove", "특성 잃기", ["trait_pick"]],
+	["endcombat", "전투 끝내기 (전투 중 대화에서)", ["combat_end"]],
 	["loot", "아이템 굴리기 (Loot 표)", ["loot"]],
 	["save", "저장하기 (베이스캠프에서만)", []],
 	["move", "맵 이동 (필드 대화·아이템)", ["dest"]],
@@ -38,6 +39,7 @@ const CONDS := [
 	["abil", "능력치", ["abil", "op_cmp", "num"]],
 	["cut", "팔다리가 잘렸다", ["part_any"]],
 	["not_cut", "팔다리가 잘리지 않았다", ["part_any"]],
+	["combat", "전투 중이다 (대화 버튼으로 말을 걸었을 때)", ["combat_enemy"]],
 	["status", "상태이상에 걸려 있다", ["status"]],
 	["not_status", "상태이상에 걸려 있지 않다", ["status"]],
 	["count", "대화 횟수 · 죽은 횟수 · 회차 수", ["count_kind", "op_cmp", "num"]],
@@ -115,7 +117,7 @@ func _row_text(r: Dictionary) -> String:
 			if p.item == "":
 				return ""
 			return "item:%s%s%s" % ["+" if r.kind == "item_add" else "-", p.item, "*%d" % p.amount if p.amount > 1 else ""]
-		"setflag", "clearflag", "setwflag", "restore", "loot":
+		"setflag", "clearflag", "setwflag", "restore", "loot", "endcombat", "combat":
 			var v: String = p.get(_params_of(r.kind)[0], "")
 			return "" if v == "" else "%s:%s" % [r.kind, v]
 		"save":
@@ -164,7 +166,7 @@ func _parse_effect(e: String) -> Dictionary:
 	if m:
 		return {"kind": "item_add" if m.get_string(1) == "+" else "item_remove",
 			"p": {"item": m.get_string(2), "amount": maxi(1, m.get_string(3).to_int())}}
-	m = _rx("simple", "^(setflag|clearflag|setwflag|restore|loot):(\\w+)$").search(e)
+	m = _rx("simple", "^(setflag|clearflag|setwflag|restore|loot|endcombat):(\\w+)$").search(e)
 	if m:
 		return {"kind": m.get_string(1), "p": {_params_of(m.get_string(1))[0]: m.get_string(2)}}
 	m = _rx("change", "^(surv|abil|stat):(\\w+)([+\\-=])(\\d+)$").search(e)
@@ -199,6 +201,9 @@ func _parse_cond(c: String) -> Dictionary:
 	m = _rx("trait", "^trait:(\\w+)$").search(c)
 	if m:
 		return {"kind": "trait", "p": {"trait": m.get_string(1)}}
+	m = _rx("combat", "^combat:(\\w+)$").search(c)
+	if m:
+		return {"kind": "combat", "p": {"combat_enemy": m.get_string(1)}}
 	m = _rx("cmp", "^(surv|abil|stat|count):(\\w+)(>=|<=|==|>|<)(-?\\d+)$").search(c)
 	if m:
 		return {"kind": m.get_string(1), "p": {_params_of(m.get_string(1))[0]: m.get_string(2),
@@ -244,6 +249,8 @@ func _options(param: String) -> Array:
 		"loot": return lookups.get("loot", [])
 		"status": return lookups.get("statuses", [])
 		"trait_pick": return lookups.get("trait_list", [])
+		"combat_end": return [["win", "상대가 물러남 (이긴 것과 같음 — 맵에서 사라짐)"], ["flee", "빠져나옴 (도주와 같음)"]]
+		"combat_enemy": return [["any", "아무 상대"]] + lookups.get("enemies", [])
 		"dest": return lookups.get("dests", [])
 		"stat": return STATS
 		"count_kind": return COUNT_KINDS

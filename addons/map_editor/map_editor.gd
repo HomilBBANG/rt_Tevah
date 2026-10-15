@@ -1085,9 +1085,15 @@ func _link_out(src: String, ref: String, explicit: String) -> Array:
 # ---------------------------------------------------------------- 도우미
 func _load_lookups() -> void:
 	lookups = ToolCommon.load_lookups()
+	# 적 물체 = 마주치면 전투. 몬스터(Npcs kind=monster)를 먼저, 그 밖의 싸울 수 있는 NPC 는 뒤에
 	enemies = []
+	var others := []
 	for e in ToolCommon.read_json("res://data/enemies.json", []):
-		enemies.append([e.enemy_id, "%s  (%s)" % [e.name, e.enemy_id]])
+		if e.get("kind", "") == "monster":
+			enemies.append([e.enemy_id, "%s  (%s)" % [e.name, e.enemy_id]])
+		else:
+			others.append([e.enemy_id, "%s  (%s) — NPC" % [e.name, e.enemy_id]])
+	enemies.append_array(others)
 	dialogue_starts = []
 	var names := {}
 	for c in ToolCommon.read_json("res://data/characters.json", []):

@@ -127,7 +127,9 @@ tools/
   - **플레이어·NPC 시트 분리** (2026-10-14): NPC 와도 싸울 수 있어서 적은 따로 없고 `Npcs` 에 모두 둔다. `NpcParts`·`NpcAttacks` 가 있는 NPC = 싸울 수 있음 (변환 결과 `data/enemies.json`, enemy_id = npc_id). 대화 화자 = Player + Npcs (`data/characters.json`).
   - 부위별 공격력(`attack`)은 값만 저장 — TODO(기획): 피해 공식. 지금 플레이어 피해는 Config `combat_player_damage`, NPC 피해는 `NpcAttacks.damage`.
   - 이동 속도(칸/초): 플레이어 `walk_speed`, Shift(패드 L1, 액션 `run`) 누르는 동안 `run_speed`. 맵의 적은 순찰 = walk, 추격 = run.
-  - 행동 버튼: 공격 / **특수** / 아이템 / 도주. 특수 = 스킬·무기 던지기 등 — TODO(기획): 데이터가 없어 지금은 '없다' 안내만. 신성력은 스킬용(아직 안 쓰임).
+  - **몬스터 속성** (2026-10-15): Npcs `kind` = monster / npc (비우면 npc). 몬스터는 맵에 '적'으로 놓아 마주치면 전투부터. 맵의 적이 몬스터가 아니면 변환 경고, 맵 탭 적 목록은 몬스터 먼저.
+  - **전투 중 대화**: 행동 버튼 공격 / 특수 / **대화** / 아이템 / 도주. 대화 = 상대(NPC든 몬스터든)의 NPC 대화를 전투 화면 위에 띄움 (`DataLoader.npc_dialogue[npc_id]` = 그 대화의 ▶ 시작 카드, `main_play.over_combat` 은 초상화·인벤토리 숨김). 대사는 시작 카드의 길 조건 **`combat:any`** (또는 `combat:npc_id`, 지금 싸우는 상대 — `GameState.combat_enemy`)로 나눠 쓴다. 효과 **`endcombat:win`**(상대가 물러남 = 승리) / **`endcombat:flee`**(빠져나옴 = 도주). 전투 중 대화의 전투 선택지 = 대화를 끝내고 하던 전투로. 대화가 없는 상대는 '말이 통하지 않는다'(턴 안 씀). 그냥 끝나면 Config `combat_talk_uses_turn`(1 = 적 차례, TODO 기획). 대화 중 시작한 전투에서 말을 걸어도 `StoryRunner.save_state/restore_state` 로 원래 대화로 돌아가고, 숨긴 대화 화면은 StoryRunner 신호를 받지 않는다(`main_play._link`). 더미 `tools/dialogues/monster_test.json` (enemy_test), 테스트 `tests/combat_talk_smoke`.
+  - 행동 버튼: 공격 / **특수** / 아이템 / 도주. (대화 추가 2026-10-15) 특수 = 스킬·무기 던지기 등 — TODO(기획): 데이터가 없어 지금은 '없다' 안내만. 신성력은 스킬용(아직 안 쓰임).
   - 텍스트 창 배경 불투명도 70%.
 - 회피 키: 머리 W / 왼팔·왼다리 A / 몸통 S / 오른팔·오른다리 D. 판정 완벽·일반·실패(기획서 §8.3).
 - **화면 배치** (사용자 시안): 왼쪽 위 적 이름(밑줄) / 가운데 적 그림(Enemies.image, 비우면 실루엣 `ui/enemy_figure.gd`) / 왼쪽 아래 '내 상태' 사람 모양(`body_diagram.figure`) / 가운데 아래 텍스트 창(시스템 메시지 + 공격할 부위 같은 세부 선택지) / 그 오른쪽 행동 버튼 **공격·아이템·도주** (방어 버튼은 시안에 없어 뺐다, 규칙 코드는 남아 있음).

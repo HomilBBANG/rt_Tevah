@@ -255,6 +255,18 @@ theme_override_styles/pressed = SubResource("btn_pressed")
 theme_override_styles/normal = SubResource("btn_normal")
 text = "특수"
 
+[node name="TalkButton" type="Button" parent="Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 36
+theme_override_styles/focus = SubResource("btn_focus")
+theme_override_styles/disabled = SubResource("btn_disabled")
+theme_override_styles/hover = SubResource("btn_hover")
+theme_override_styles/pressed = SubResource("btn_pressed")
+theme_override_styles/normal = SubResource("btn_normal")
+text = "대화"
+
 [node name="ItemButton" type="Button" parent="Actions"]
 unique_name_in_owner = true
 layout_mode = 2

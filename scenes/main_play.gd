@@ -27,6 +27,8 @@ const PREV_BUBBLE_Y := [0.485, 0.635]
 
 ## 필드에서 NPC 대화용으로 띄울 때 add_child 전에 true. 이때는 launch() 대신 필드가 start_dialogue() 를 부른다.
 var embedded := false
+## 전투 화면 위에 띄운 대화 (전투 중 '대화'): 초상화·인벤토리 버튼을 숨긴다 (상대는 전투 화면 가운데에 이미 있음)
+var over_combat := false
 ## 처음 보여줄 노드에서 몇 번째 페이지부터 볼지 (대화 에디터 미리보기)
 var start_page := 0
 
@@ -77,6 +79,9 @@ func _ready() -> void:
 		%Stats.visible = false
 		%MenuButton.visible = false
 		$Scene.color.a = 0.55
+	if over_combat:
+		%InventoryButton.visible = false
+		$Scene.color.a = 0.35
 	else:
 		StoryRunner.launch()
 
@@ -88,9 +93,15 @@ func _exit_tree() -> void:
 	_links.clear()
 
 
+## 신호 연결. 화면이 숨겨져 있으면(전투 중 대화 아래에 깔린 원래 대화 등) 받지 않는다
 func _link(sig: Signal, callable: Callable) -> void:
-	sig.connect(callable)
-	_links.append([sig, callable])
+	var guarded: Callable
+	match callable.get_argument_count():
+		0: guarded = func(): if is_visible_in_tree(): callable.call()
+		1: guarded = func(a): if is_visible_in_tree(): callable.call(a)
+		_: guarded = func(a, b): if is_visible_in_tree(): callable.call(a, b)
+	sig.connect(guarded)
+	_links.append([sig, guarded])
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -309,6 +320,8 @@ func _show_dialogue(p: Dictionary) -> void:
 	var portraits := [%PortraitLeft, %PortraitRight]
 	for j in 2:
 		portraits[j].show_character(DataLoader.character_name(_slots[j]), side == "none" or side == SIDES[j])
+		if over_combat:
+			portraits[j].visible = false
 	_show_line(%Bubble, line, BUBBLE_Y, false)
 	if not _prev_line.is_empty():
 		_show_line(%PrevBubble, _prev_line, PREV_BUBBLE_Y, true)

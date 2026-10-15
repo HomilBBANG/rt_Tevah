@@ -114,7 +114,8 @@ OPTIONAL = {
     "Player": ["name_color",        # 대화 이름표 색 (#RRGGBB). 비우면 기본색
                "traits"],           # 능력(trait:) 쉼표로 여러 개
     # walk_speed·run_speed: 필드 이동 속도(칸/초) — 순찰은 걷기, 추격은 달리기. 부위·공격(NpcParts·NpcAttacks)이 있으면 전투 가능
-    "Npcs": ["name_color", "traits", "image", "flee_chance", "walk_speed", "run_speed"] + ABILITY_COLS,
+    # kind: monster(몬스터, 맵에서 마주치면 전투부터) / npc (비우면 npc)
+    "Npcs": ["kind", "name_color", "traits", "image", "flee_chance", "walk_speed", "run_speed"] + ABILITY_COLS,
     "Items": ["dice_bonus",         # 소지 시 판정 보정 "strength+2, all+1"
               "weight",             # 무게 (개당). 들고 있는 무게가 Config carry_* 를 넘으면 느려지고, 최대면 못 움직임
               "equip_slot",         # 장착 종류 (EquipSlots 의 kind). 비워도 손(kind=hand)에는 들 수 있음
@@ -158,7 +159,7 @@ class Report:
 # ---------------------------------------------------------------- 조건·효과 문법
 # 런타임 파서(core/expr.gd)와 같은 문법. 한쪽을 바꾸면 다른 쪽도 맞춰야 한다.
 COUNTS = {"run", "death", "talk"}   # count: 조건 (월드 run_count·death_count, talk = 이 대화를 전에 한 횟수)
-ATOM_RE = re.compile(r"(has|flag|wflag|stat|trait|abil|surv|cut|count|status):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\d+(?:\.\d+)?))?")
+ATOM_RE = re.compile(r"(has|flag|wflag|stat|trait|abil|surv|cut|count|status|combat):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\d+(?:\.\d+)?))?")
 
 
 class ExprError(Exception):
@@ -195,7 +196,7 @@ def parse_condition(text):
                 raise ExprError(f"'{m.group(0)}': surv 조건에는 비교식이 필요 (예: surv:hunger<30)")
             elif kind == "abil" and not op:
                 raise ExprError(f"'{m.group(0)}': abil 조건에는 비교식이 필요 (예: abil:strength>=3)")
-            elif kind in ("flag", "wflag", "trait", "cut", "status") and op:
+            elif kind in ("flag", "wflag", "trait", "cut", "status", "combat") and op:
                 raise ExprError(f"'{m.group(0)}': {kind} 조건에는 비교식을 쓸 수 없음")
             tokens.append((kind, ident))
             i = m.end()
@@ -252,7 +253,7 @@ EFFECT_RES = [
     ("stat", re.compile(r"^stat:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
     ("abil", re.compile(r"^abil:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
     ("surv", re.compile(r"^surv:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
-    ("simple", re.compile(r"^(setflag|clearflag|setwflag|loot|goto|restore):([A-Za-z0-9_]+)$")),
+    ("simple", re.compile(r"^(setflag|clearflag|setwflag|loot|goto|restore|endcombat):([A-Za-z0-9_]+)$")),
     ("save", re.compile(r"^save$")),   # 회차 저장 (베이스캠프 안에서만 동작)
     ("status", re.compile(r"^status:([+-])([A-Za-z0-9_]+)$")),   # 상태이상 걸기·풀기
     ("trait_fx", re.compile(r"^trait:([+-])([A-Za-z0-9_]+)$")),   # 특성 얻기·잃기 (사건·거래)
@@ -452,6 +453,8 @@ def validate(d, rep):
                 check_limb(where, rid, "all")
             elif kind == "status" and rid not in stats_fx:
                 rep.err(where, f"없는 상태이상 '{rid}' (status.xlsx StatusEffects)")
+            elif kind == "endcombat" and rid not in ("win", "flee"):
+                rep.err(where, f"endcombat 은 win(상대가 물러남) / flee(빠져나옴): '{rid}'")
             elif kind == "trait_fx" and rid not in traits:
                 rep.err(where, f"없는 특성 '{rid}' (player.xlsx Traits)")
             elif kind == "move":
@@ -509,6 +512,8 @@ def validate(d, rep):
                     rep.err(where, f"조건의 없는 상태이상 '{rid}' (status.xlsx StatusEffects)")
                 elif kind == "trait":
                     check_trait(where, rid)
+                elif kind == "combat" and rid != "any" and rid not in enemies:
+                    rep.err(where, f"조건 combat: 은 any 또는 싸울 수 있는 npc_id: '{rid}'")
                 elif kind == "surv" and rid not in survs:
                     rep.err(where, f"조건의 없는 생존 파라미터 '{rid}'")
         except ExprError as e:
@@ -544,6 +549,8 @@ def validate(d, rep):
     for sheet in ("Player", "Npcs"):
         for c in d[sheet]:
             w = loc(sheet, c)
+            if sheet == "Npcs" and c["kind"] not in ("", "npc", "monster"):
+                rep.err(w, f"kind 는 monster / npc: '{c['kind']}'")
             if c["name_color"] and not COLOR_RE.match(c["name_color"]):
                 rep.err(w, f"name_color 는 #RRGGBB 형식: '{c['name_color']}'")
             for t in split_list(c["traits"]):
@@ -1182,6 +1189,8 @@ def validate_field(d, maps, rep, enemies):
                 rep.err(w, f"type 은 {' / '.join(sorted(FIELD_TYPES))}: '{t}'")
             elif t == "enemy" and ref not in enemies:
                 rep.err(w, f"적 종류(ref)는 싸울 수 있는 NPC(NpcParts·NpcAttacks 가 있는 npc_id): '{ref}'")
+            elif t == "enemy" and any(n["npc_id"] == ref and n["kind"] != "monster" for n in d["Npcs"]):
+                rep.warn(w, f"맵의 적 '{ref}' 가 몬스터(Npcs kind=monster)가 아님 — 마주치면 바로 전투")
             elif t == "enemy" and not all(n["walk_speed"] > 0 and n["run_speed"] > 0
                                           for n in d["Npcs"] if n["npc_id"] == ref):
                 rep.err(w, f"맵의 적 '{ref}' 는 Npcs 의 walk_speed(순찰)·run_speed(추격)가 0보다 커야 함")
@@ -1260,7 +1269,7 @@ def export(d, maps):
     def character(r, id_col, is_player):
         return {"char_id": r[id_col], "name": r["name"], "name_color": r["name_color"], "traits": split_list(r["traits"]),
                 "abilities": {a: r[a] for a in ABILITY_COLS}, "walk_speed": r["walk_speed"], "run_speed": r["run_speed"],
-                "is_player": is_player}
+                "is_player": is_player, "kind": "player" if is_player else (r["kind"] or "npc")}
 
     def bonuses(text):
         return [{"ability": m.group(1), "value": int(m.group(2))}
@@ -1289,7 +1298,7 @@ def export(d, maps):
                    for r in clean(d["Traits"])],
         "player_parts": [dict(r, key=r["key"].upper(), vital=is_true(r["vital"])) for r in clean(d["PlayerParts"])],
         # 싸울 수 있는 NPC (부위·공격이 있는 것). enemy_id = npc_id
-        "enemies": [{"enemy_id": e["npc_id"], "name": e["name"], "image": e["image"],
+        "enemies": [{"enemy_id": e["npc_id"], "name": e["name"], "image": e["image"], "kind": e["kind"] or "npc",
                      "flee_chance": float(e["flee_chance"]) if e["flee_chance"] else None,
                      "walk_speed": e["walk_speed"], "run_speed": e["run_speed"],
                      "abilities": {a: e[a] for a in ABILITY_COLS},

@@ -30,6 +30,8 @@ signal dice_rolled(result: Dictionary)
 signal combat_requested(enemy_id: String)
 ## 효과 move: 맵 이동 요청 (필드 화면이 받아서 대화가 끝난 뒤 이동). arrive = 도착 지점 id, 비면 P
 signal travel_requested(map_id: String, arrive: String)
+## 전투 중 대화의 효과 endcombat: 로 정해진 끝 ("win" / "flee", 없으면 "")
+var combat_end := ""
 signal _combat_done(outcome: String)
 signal _discard_chosen(slot: int)
 
@@ -120,6 +122,9 @@ func choose(choice_id: String) -> void:
 		if not result.success:
 			effects = c.fail_effects
 			next = c.fail_next
+	elif c.get("type", "normal") == "combat" and GameState.combat_enemy != "":
+		# 전투 중 대화에서 '싸운다' = 대화를 끝내고 하던 전투로 (전투 안의 전투는 없음)
+		next = "EXIT"
 	elif c.get("type", "normal") == "combat":
 		var outcome := await _fight(c.check)
 		if outcome == "lose":
@@ -358,6 +363,19 @@ func _show_current() -> void:
 	choices_shown.emit(entries)
 
 
+## 전투 중 대화처럼 하던 대화 위에 잠깐 다른 대화를 할 때: 지금 진행 상태를 저장 / 되돌림
+func save_state() -> Dictionary:
+	return {"node_id": GameState.node_id, "mode": mode, "ended": ended, "busy": busy, "talk_now": GameState.talk_now}
+
+
+func restore_state(s: Dictionary) -> void:
+	GameState.node_id = s.node_id
+	mode = s.mode
+	ended = s.ended
+	busy = s.busy
+	GameState.talk_now = s.talk_now
+
+
 ## 이름 + 주격 조사: 받침이 있으면 '이', 없으면 '가' (숫자도 읽는 소리로). 알 수 없으면 '(이)가'
 static func with_subject(name: String) -> String:
 	if name == "":
@@ -422,6 +440,8 @@ func _apply_effects(effects: Array) -> String:
 				if GameState.set_status(e.id, e.op == "+"):
 					var nm: String = DataLoader.status_effects.get(e.id, {}).get("name", e.id)
 					message.emit(("%s 상태가 되었다." if e.op == "+" else "%s 이(가) 나았다.") % nm)
+			"endcombat":
+				combat_end = e.id   # 전투 중 대화가 끝나면 전투 화면이 읽는다 (win / flee)
 			"trait":
 				if GameState.set_trait(e.id, e.op == "+"):
 					# 얻든 잃든 어떤 특성인지는 말하지 않는다 (장비창 특성 탭에서 확인)

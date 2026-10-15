@@ -288,6 +288,36 @@ func _run() -> void:
 	await StoryRunner.start_dialogue("cat_start")
 	check(node_id == "fd_cat_a", "고양이 대화 시작 카드 → fd_cat_a")
 
+	# ---------- 전투 중 대화 (전투 화면의 '대화' 버튼): 조건 combat:, 효과 endcombat:, 하던 대화 상태 되돌리기
+	check(DataLoader.npc_dialogue.get("enemy_test", "") == "monster_test_start" and DataLoader.npc_dialogue.get("char_cat", "") == "cat_start",
+		"NPC → 대화 시작 카드 (몬스터 enemy_test, 고양이)")
+	await StoryRunner.start_dialogue("monster_test_start")
+	check(node_id == "monster_test_idle", "전투 밖에서 말 걸면 → 그 외 길")
+	await StoryRunner.continue_story()
+	await StoryRunner.start_dialogue("fd_npc2_a")          # 대화 중에 전투가 시작됐다고 치고
+	var outer := StoryRunner.save_state()
+	GameState.combat_enemy = "enemy_test"
+	check(StoryRunner.Expr.evaluate("combat:any & combat:enemy_test & !combat:char_cat", GameState), "조건 combat:any / combat:상대")
+	StoryRunner.combat_end = ""
+	await StoryRunner.start_dialogue("monster_test_start")
+	check(node_id == "monster_test_combat", "전투 중에 말 걸면 → '전투 중이다' 길 (%s)" % node_id)
+	await StoryRunner.choose("monster_test_c1")
+	check(StoryRunner.combat_end == "win" and StoryRunner.ended, "endcombat:win → 대화 끝, 전투 화면이 읽을 값 win")
+	StoryRunner.restore_state(outer)
+	check(GameState.node_id == "fd_npc2_a" and not StoryRunner.ended, "전투 중 대화가 끝나면 하던 대화(fd_npc2_a)로 되돌림")
+	# 전투 중 대화에서 전투 선택지 = 대화를 끝내고 하던 전투로 (전투 안의 전투 없음)
+	var fights_before := fights.size()
+	DataLoader.nodes["tct_a"] = {"node_id": "tct_a", "kind": "", "speaker_id": "", "text": "x", "next_node": "", "on_enter": "", "pages": []}
+	DataLoader.choices_by_node["tct_a"] = [{"choice_id": "tct_c", "node_id": "tct_a", "text": "싸운다", "condition": "", "show_mode": "",
+		"cost": "", "effects": "", "next_node": "EXIT", "type": "combat", "check": "enemy_test", "dc": 0, "mod": 0, "fail_effects": "", "fail_next": "EXIT"}]
+	await StoryRunner.start_dialogue("tct_a")
+	await StoryRunner.choose("tct_c")
+	check(fights.size() == fights_before and StoryRunner.ended, "전투 중 대화의 '싸운다' → 새 전투 없이 대화 끝")
+	DataLoader.nodes.erase("tct_a")
+	DataLoader.choices_by_node.erase("tct_a")
+	GameState.combat_enemy = ""
+	check(not StoryRunner.Expr.evaluate("combat:any", GameState), "전투가 끝나면 combat:any 거짓")
+
 
 func _fresh_to_d() -> void:
 	ending = ""

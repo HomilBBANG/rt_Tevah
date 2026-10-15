@@ -261,6 +261,56 @@
   "npc_id": "char_cat"
  },
  {
+  "node_id": "monster_test_start",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "monster_test_idle",
+  "on_enter": "",
+  "kind": "start",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [
+   {
+    "condition": "combat:any",
+    "next_node": "monster_test_combat"
+   }
+  ],
+  "text_speed": "",
+  "npc_id": "enemy_test"
+ },
+ {
+  "node_id": "monster_test_combat",
+  "episode_id": "",
+  "speaker_id": "enemy_test",
+  "text": "(테스트) 전투 중 몬스터 대사",
+  "next_node": "",
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "enemy_test"
+ },
+ {
+  "node_id": "monster_test_idle",
+  "episode_id": "",
+  "speaker_id": "enemy_test",
+  "text": "(테스트) 전투 밖 몬스터 대사",
+  "next_node": "EXIT",
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "text_speed": "",
+  "npc_id": "enemy_test"
+ },
+ {
   "node_id": "npc1_start",
   "episode_id": "",
   "speaker_id": "",

@@ -16,7 +16,8 @@
   },
   "walk_speed": 4.0,
   "run_speed": 6.0,
-  "is_player": true
+  "is_player": true,
+  "kind": "player"
  },
  {
   "char_id": "char_t2",
@@ -33,7 +34,8 @@
   },
   "walk_speed": 4.0,
   "run_speed": 6.0,
-  "is_player": true
+  "is_player": true,
+  "kind": "player"
  },
  {
   "char_id": "char_npc",
@@ -50,7 +52,8 @@
   },
   "walk_speed": 0.0,
   "run_speed": 0.0,
-  "is_player": false
+  "is_player": false,
+  "kind": "npc"
  },
  {
   "char_id": "char_npc2",
@@ -67,7 +70,8 @@
   },
   "walk_speed": 0.0,
   "run_speed": 0.0,
-  "is_player": false
+  "is_player": false,
+  "kind": "npc"
  },
  {
   "char_id": "char_cat",
@@ -84,7 +88,8 @@
   },
   "walk_speed": 0.0,
   "run_speed": 0.0,
-  "is_player": false
+  "is_player": false,
+  "kind": "npc"
  },
  {
   "char_id": "enemy_test",
@@ -101,6 +106,7 @@
   },
   "walk_speed": 2.0,
   "run_speed": 3.2,
-  "is_player": false
+  "is_player": false,
+  "kind": "monster"
  }
 ]

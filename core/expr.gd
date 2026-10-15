@@ -2,17 +2,17 @@ extends RefCounted
 ## 조건·효과 문법 파서. tools/xlsx_to_json.py 의 검사기와 같은 문법 — 한쪽을 바꾸면 다른 쪽도 맞출 것.
 ##
 ## 조건: has:id, has:id>=2, flag:x, wflag:x, stat:hp>=30, abil:strength>=3, surv:hunger<30, trait:x,
-##       cut:left_arm / cut:any (팔다리 절단), count:death>=1 / count:run>=2 (월드 기록) / count:talk==0 (이 대화를 전에 한 횟수, 첫 대화 = 0), status:bleeding (상태이상) / 연산자 ! & | ( )  (우선순위 ! > & > |)
+##       cut:left_arm / cut:any (팔다리 절단), count:death>=1 / count:run>=2 (월드 기록) / count:talk==0 (이 대화를 전에 한 횟수, 첫 대화 = 0), status:bleeding (상태이상), combat:any / combat:wolf (전투 중 — 상대) / 연산자 ! & | ( )  (우선순위 ! > & > |)
 ## 효과(; 구분): item:+id, item:-id, item:+id*2, stat:hp-10 / +10 / =10, setflag:x, clearflag:x,
 ##              setwflag:x, loot:spot, goto:node, abil:strength+1 / -1 / =3, surv:hunger+40, save,
-##              restore:left_arm / restore:all (잘린 팔다리 복구, §10 거래), status:+bleeding / status:-bleeding (상태이상), trait:+brave / trait:-brave (특성 얻기·잃기),
+##              restore:left_arm / restore:all (잘린 팔다리 복구, §10 거래), status:+bleeding / status:-bleeding (상태이상), endcombat:win / endcombat:flee (전투 중 대화로 전투 끝내기), trait:+brave / trait:-brave (특성 얻기·잃기),
 ##              move:map_id / move:map_id@arrive_id (맵 이동, 필드에서만)
 ##
 ## 문법 오류는 크래시하지 않는다: push_error 로 남기고 조건은 false, 효과는 그 항목만 건너뛴다.
 ##
 ## 컨텍스트(ctx)는 다음 메서드를 가진 객체: item_count(id)->int, get_stat(name)->int,
 ## get_ability(id)->int, get_survival(id)->float, has_flag(name)->bool, has_wflag(name)->bool, has_trait(name)->bool,
-## is_severed(part_id 또는 "any")->bool, get_count(name)->int, has_status(id)->bool
+## is_severed(part_id 또는 "any")->bool, get_count(name)->int, has_status(id)->bool, in_combat(enemy_id 또는 "any")->bool
 
 const STATS := ["hp", "sanity", "time"]
 const COUNTS := ["run", "death", "talk"]   # count: 조건 (월드 run_count·death_count, 대화 횟수)
@@ -104,7 +104,7 @@ static func parse_effects(text: String) -> Array:
 static func _init_regex() -> void:
 	if _atom_re != null:
 		return
-	_atom_re = RegEx.create_from_string("^(has|flag|wflag|stat|trait|abil|surv|cut|count|status):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\\d+(?:\\.\\d+)?))?")
+	_atom_re = RegEx.create_from_string("^(has|flag|wflag|stat|trait|abil|surv|cut|count|status|combat):([A-Za-z0-9_]+)(?:(>=|<=|==|>|<)(-?\\d+(?:\\.\\d+)?))?")
 	_item_re = RegEx.create_from_string("^item:([+-])([A-Za-z0-9_]+)(?:\\*(\\d+))?$")
 	_stat_re = RegEx.create_from_string("^stat:([A-Za-z0-9_]+)([+\\-=])(\\d+)$")
 	_abil_re = RegEx.create_from_string("^abil:([A-Za-z0-9_]+)([+\\-=])(\\d+)$")
@@ -112,7 +112,7 @@ static func _init_regex() -> void:
 	_status_re = RegEx.create_from_string("^status:([+-])([A-Za-z0-9_]+)$")
 	_trait_re = RegEx.create_from_string("^trait:([+-])([A-Za-z0-9_]+)$")
 	_move_re = RegEx.create_from_string("^move:([A-Za-z0-9_]+)(?:@([A-Za-z0-9_]+))?$")
-	_simple_re = RegEx.create_from_string("^(setflag|clearflag|setwflag|loot|goto|restore):([A-Za-z0-9_]+)$")
+	_simple_re = RegEx.create_from_string("^(setflag|clearflag|setwflag|loot|goto|restore|endcombat):([A-Za-z0-9_]+)$")
 
 
 static func _err(msg: String) -> void:
@@ -247,6 +247,7 @@ static func _eval(n: Dictionary, ctx: Object) -> bool:
 		"surv": return _compare(ctx.get_survival(a.id), a.op, a.num)
 		"cut": return ctx.is_severed(a.id)
 		"status": return ctx.has_status(a.id)
+		"combat": return ctx.in_combat(a.id)
 		"count": return _compare(ctx.get_count(a.id), a.op, a.num)
 	return false
 
