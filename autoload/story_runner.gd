@@ -411,6 +411,29 @@ func restore_state(s: Dictionary) -> void:
 
 
 ## 이름 + 주격 조사: 받침이 있으면 '이', 없으면 '가' (숫자도 읽는 소리로). 알 수 없으면 '(이)가'
+## 사망 화면 문구: DeathCauses 의 text, 비어 있으면 "{name}(으)로 인해 사망했습니다." ({enemy} = 전투 상대 이름)
+static func death_text(cause_id: String, enemy_name := "") -> String:
+	var c: Dictionary = DataLoader.death_causes.get(cause_id, DataLoader.death_causes.get("unknown", {}))
+	if c.is_empty():
+		return "사망했습니다."
+	var who := enemy_name if enemy_name != "" else "적"
+	var text := str(c.get("text", "")).replace("{enemy}", who)
+	if text != "":
+		return text
+	return "%s 인해 사망했습니다." % with_ro(str(c.get("name", cause_id)).replace("{enemy}", who))
+
+
+## 받침에 맞춰 "으로" / "로" (ㄹ 받침은 "로")
+static func with_ro(name: String) -> String:
+	if name == "":
+		return name
+	var c := name.unicode_at(name.length() - 1)
+	if c >= 0xAC00 and c <= 0xD7A3:
+		var jong := (c - 0xAC00) % 28
+		return name + ("로" if jong == 0 or jong == 8 else "으로")
+	return name + "(으)로"
+
+
 static func with_subject(name: String) -> String:
 	if name == "":
 		return name
@@ -474,6 +497,8 @@ func _apply_effects(effects: Array) -> String:
 				if GameState.set_status(e.id, e.op == "+"):
 					var nm: String = DataLoader.status_effects.get(e.id, {}).get("name", e.id)
 					message.emit(("%s 상태가 되었다." if e.op == "+" else "%s 이(가) 나았다.") % nm)
+			"die":
+				GameState.pending_death = e.id   # 필드: 대화가 끝나면 사망 화면 (DeathCauses 의 문구)
 			"endcombat":
 				combat_end = e.id   # 전투 중 대화가 끝나면 전투 화면이 읽는다 (win / flee)
 			"trait":

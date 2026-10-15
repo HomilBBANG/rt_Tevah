@@ -36,5 +36,6 @@
  "creation_start_points": 5,
  "combat_talk_uses_turn": 1,
  "tile_art_px": 16,
+ "revive_survival_floor": 10,
  "opening_dialogue": ""
 }

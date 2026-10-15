@@ -160,6 +160,8 @@ func _ready() -> void:
 	await _wait(0.2)
 	check(f.get_node("%DeathPanel").visible and f.get_node("%NewRunButton").text == "깨어난다", "부적으로 부활 → '깨어난다'")
 	check("부활 텍스트 1" in f.get_node("%DeathMessage").text, "부활 문구 표시")
+	check(f.get_node("%DeathMessage").text.begins_with("적 A (테스트)의 공격으로 인해 사망했습니다."),
+		"사망 원인 문구 (전투): %s" % f.get_node("%DeathMessage").text)
 	var clock_before := GameState.clock   # 사망 패널 동안 시간 멈춤
 	await _snap("revive")
 	f.get_node("%NewRunButton").pressed.emit()
@@ -187,6 +189,28 @@ func _ready() -> void:
 	check(GameState.run_count == 2 and f.map.map_id == "test_field" and not GameState.player_body.left_arm.broken
 		and GameState.inventory.is_empty(), "처음부터 → 2회차, 소지품·몸 새로")
 	check(f.player.position.distance_to(Vector2((rs[0] + 0.5) * f.tile, (rs[1] + 0.5) * f.tile)) < 1.0, "맵 한복판(S)에서 깨어남")
+
+	# 사망 원인: 생존 수치 0 (Survival death_cause) / 효과 die:
+	for c in [["hunger", "굶어 죽었습니다."], ["thirst", "탈수로 죽었습니다."]]:
+		for p in DataLoader.survival:
+			GameState.survival[p.param_id] = 50.0
+		GameState.survival[c[0]] = 0.0
+		await _wait(0.2)
+		check(f.get_node("%DeathPanel").visible and f.get_node("%DeathMessage").text == c[1],
+			"%s 0 → '%s' (%s)" % [c[0], c[1], f.get_node("%DeathMessage").text])
+		f.get_node("%NewRunButton").pressed.emit()
+		await _wait(0.2)
+	check(GameState.get_survival("hunger") > 0.0 and GameState.death_cause_now() == "", "새 회차: 바로 다시 죽지 않음")
+	GameState.survival["sleep"] = 0.0
+	await _wait(0.2)
+	check(not f.get_node("%DeathPanel").visible, "death_cause 가 빈 수치(수면)는 0 이어도 안 죽음")
+	GameState.survival["sleep"] = 50.0
+	await StoryRunner.run_effects("die:unknown")
+	await _wait(0.2)
+	check(f.get_node("%DeathPanel").visible and f.get_node("%DeathMessage").text == "알 수 없는 원인으로 인해 사망했습니다.",
+		"효과 die: → 비어 있는 text 는 '(으)로 인해 사망했습니다.' (%s)" % f.get_node("%DeathMessage").text)
+	f.get_node("%NewRunButton").pressed.emit()
+	await _wait(0.2)
 
 	# 대화 전투에서 지면 → 대화가 닫히고 사망 처리
 	await _talk_and_fight()

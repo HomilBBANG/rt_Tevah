@@ -24,6 +24,7 @@ var map_order: Array[String] = []
 var survival: Array = []   # 생존 파라미터 [{ param_id, name, start, max, decay_per_hour, warn }]
 var camp_actions: Array = []  # 베이스캠프 행동 (엑셀 행 순서)
 var revivals: Array = []   # 부활 규칙 (위에서부터 먼저 맞는 것)
+var death_causes := {}     # 사망 원인: cause_id -> { name, text } (content.xlsx DeathCauses)
 var config := {}           # key -> number
 
 
@@ -53,6 +54,7 @@ func load_all() -> void:
 	survival = []
 	camp_actions = []
 	revivals = []
+	death_causes.clear()
 
 	for ep in _read_list("episodes"):
 		episodes[ep.episode_id] = ep
@@ -108,6 +110,9 @@ func load_all() -> void:
 		camp_actions = _read_list("camp_actions")
 	if FileAccess.file_exists(DATA_DIR + "revivals.json"):
 		revivals = _read_list("revivals")
+	if FileAccess.file_exists(DATA_DIR + "death_causes.json"):
+		for c in _read_list("death_causes"):
+			death_causes[c.cause_id] = c
 	if FileAccess.file_exists(DATA_DIR + "maps.json"):
 		for m in _read_list("maps"):
 			maps[m.map_id] = m

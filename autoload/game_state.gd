@@ -43,6 +43,7 @@ var equipment := {}           # 장비: slot_id(EquipSlots) -> item_id. 장착�
 var field_state := {}         # map_id -> { "removed": [object_id], "done": [object_id] }
 var talk_counts := {}         # 대화 시작 node_id -> 그 대화를 시작한 횟수 (회차 저장에 들어감)
 var combat_enemy := ""        # 지금 싸우는 상대 enemy_id (전투 화면이 정함, 조건 combat:) — 저장 안 함
+var pending_death := ""       # 효과 die:cause_id 로 정해진 사망 — 필드가 대화가 끝난 뒤 처리. 저장 안 함
 var talk_now := 0             # 지금 대화를 전에 몇 번 했나 (조건 count:talk, 첫 대화 = 0)
 var arrive_at := ""           # 다음 맵 로드 때 도착할 도착 지점(arrive 물체) id (저장 안 함)
 var arrive_from := ""         # 어디로 들어왔나: 문·통로·이용 object_id 또는 "맵:방향"(가장자리). 도착 P 의 from 과 맞추어 도착
@@ -75,6 +76,7 @@ func reset_for_episode(ep: Dictionary) -> void:
 ## 탐험 회차 시작 (에피소드 없이). 스탯·인벤토리·플래그를 처음 상태로.
 ## TODO(기획 §11): 회차 구조·베이스캠프 저장이 들어오면 여기서 회차 초기화를 맡는다.
 func reset_run() -> void:
+	pending_death = ""
 	episode_id = ""
 	node_id = ""
 	stats = {}
@@ -172,6 +174,16 @@ func clock_text() -> String:
 # ---------------------------------------------------------------- 부활 (§11)
 ## 사망 순간 적용할 부활 규칙: Revivals 에서 condition 이 참인 첫 행. 없으면 {} (게임 처음부터).
 ## 영구 능력치 강화는 없다 — 부활은 '그 회차를 이어 가는 것'.
+## 지금 죽어야 하나 → 사망 원인 cause_id (아니면 ""). 효과 die: 가 먼저, 그다음 death_cause 가 있는 생존 수치가 0 인 것.
+func death_cause_now() -> String:
+	if pending_death != "":
+		return pending_death
+	for p in DataLoader.survival:
+		if str(p.get("death_cause", "")) != "" and get_survival(p.param_id) <= 0.0:
+			return p.death_cause
+	return ""
+
+
 func find_revival() -> Dictionary:
 	for r in DataLoader.revivals:
 		if Expr.evaluate(r.condition, self):
@@ -186,6 +198,13 @@ func restore_after_revival() -> void:
 		if p.vital:
 			p.hp = p.max_hp
 			p.broken = false
+	# 0 인 생존 수치 그대로면 깨자마자 다시 죽는다 → Config revive_survival_floor 까지 (임시값, TODO 기획)
+	var floor_v := float(DataLoader.config.get("revive_survival_floor", 10))
+	for p in DataLoader.survival:
+		if str(p.get("death_cause", "")) != "" and get_survival(p.param_id) < floor_v:
+			survival[p.param_id] = minf(floor_v, float(p.max))
+	survival_changed.emit()
+	pending_death = ""
 	current_map = DataLoader.get_config_str("basecamp_map", current_map)
 	wake_at_run_start = false
 

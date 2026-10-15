@@ -5,7 +5,7 @@ extends RefCounted
 ##       cut:left_arm / cut:any (팔다리 절단), count:death>=1 / count:run>=2 (월드 기록) / count:talk==0 (이 대화를 전에 한 횟수, 첫 대화 = 0), status:bleeding (상태이상), combat:any / combat:wolf (전투 중 — 상대) / 연산자 ! & | ( )  (우선순위 ! > & > |)
 ## 효과(; 구분): item:+id, item:-id, item:+id*2, stat:hp-10 / +10 / =10, setflag:x, clearflag:x,
 ##              setwflag:x, loot:spot, goto:node, abil:strength+1 / -1 / =3, surv:hunger+40, save,
-##              restore:left_arm / restore:all (잘린 팔다리 복구, §10 거래), status:+bleeding / status:-bleeding (상태이상), endcombat:win / endcombat:flee (전투 중 대화로 전투 끝내기), trait:+brave / trait:-brave (특성 얻기·잃기),
+##              restore:left_arm / restore:all (잘린 팔다리 복구, §10 거래), status:+bleeding / status:-bleeding (상태이상), endcombat:win / endcombat:flee (전투 중 대화로 전투 끝내기), die:starvation (사망, DeathCauses — 필드에서 대화가 끝나면), trait:+brave / trait:-brave (특성 얻기·잃기),
 ##              move:map_id / move:map_id@arrive_id (맵 이동, 필드에서만)
 ##
 ## 문법 오류는 크래시하지 않는다: push_error 로 남기고 조건은 false, 효과는 그 항목만 건너뛴다.
@@ -112,7 +112,7 @@ static func _init_regex() -> void:
 	_status_re = RegEx.create_from_string("^status:([+-])([A-Za-z0-9_]+)$")
 	_trait_re = RegEx.create_from_string("^trait:([+-])([A-Za-z0-9_]+)$")
 	_move_re = RegEx.create_from_string("^move:([A-Za-z0-9_]+)(?:@([A-Za-z0-9_]+))?$")
-	_simple_re = RegEx.create_from_string("^(setflag|clearflag|setwflag|loot|goto|restore|endcombat):([A-Za-z0-9_]+)$")
+	_simple_re = RegEx.create_from_string("^(setflag|clearflag|setwflag|loot|goto|restore|endcombat|die):([A-Za-z0-9_]+)$")
 
 
 static func _err(msg: String) -> void:

@@ -66,6 +66,7 @@ var _collecting := false         # StoryRunner 메시지를 모으는 중 (조�
 var _collected: PackedStringArray = []
 var _toast_t := 0.0
 var _death_revival := {}        # 사망 패널: 적용된 부활 규칙 (비면 처음부터)
+var _combat_enemy_name := ""     # 지금 싸우는 상대 이름 (사망 문구 {enemy})
 var _sleep_pick := {}            # 잠잘 시간 고르는 중: { action, hours }
 var _pending_travel := []          # 대화 중 move 효과 → 대화가 끝나면 [map_id, arrive]
 var _travel_lock := Vector2i(-999, -999)   # 도착한 칸: 한 번 벗어나기 전에는 통로·가장자리가 다시 작동하지 않음
@@ -382,6 +383,11 @@ func _physics_process(delta: float) -> void:
 		return
 	# 탐험 중에는 시간이 실시간으로 흐른다 (§4)
 	GameState.advance_time(delta * float(DataLoader.config.get("time_scale", 1)))
+	# 생존 수치 0(Survival death_cause)·효과 die: → 사망. 대화·메뉴 중이면 그것이 끝난 뒤 여기서
+	var cause := GameState.death_cause_now()
+	if cause != "":
+		_on_death(cause)
+		return
 	for e in enemies:
 		if e.grace == 0.0 and e.global_position.distance_to(player.global_position) < player.radius + e.radius:
 			_start_combat(e)
@@ -978,6 +984,7 @@ func _on_dialogue_combat(enemy_id: String) -> void:
 
 
 func _open_combat(enemy_id: String) -> void:
+	_combat_enemy_name = str(DataLoader.enemies.get(enemy_id, {}).get("name", ""))
 	%Prompt.visible = false
 	_combat_ui = CombatScene.instantiate()
 	_combat_ui.embedded = true
@@ -1001,7 +1008,7 @@ func _on_combat_finished(outcome: String) -> void:
 			StoryRunner.finish_combat("lose")
 			_dialogue_ui.queue_free()
 			_dialogue_ui = null
-			_on_death()
+			_on_death("combat", _combat_enemy_name)
 		return
 	match outcome:
 		"win":
@@ -1014,23 +1021,28 @@ func _on_combat_finished(outcome: String) -> void:
 			_combat_enemy.state = "return"
 			frozen = false
 		_:
-			_on_death()
+			_on_death("combat", _combat_enemy_name)
 	_combat_enemy = null
 
 
 ## 사망 (§11): 부활 수단(초월체·아이템)이 있으면 모두 유지한 채 베이스캠프에서 깨어나고, 없으면 게임 처음부터.
+## 사망 문구 = 원인(content.xlsx DeathCauses)의 text — "굶어 죽었습니다." / 비면 "{name}(으)로 인해 사망했습니다."
 ## TODO: 사망·부활 연출 (지금은 패널 하나)
-func _on_death() -> void:
+func _on_death(cause_id := "unknown", enemy_name := "") -> void:
 	frozen = true
+	GameState.pending_death = ""
+	var why := StoryRunner.death_text(cause_id, enemy_name)
 	var revival := GameState.find_revival()
 	if revival.is_empty():
 		SaveManager.end_run()
-		%DeathMessage.text = ""
+		%DeathMessage.text = why
 		%NewRunButton.text = "처음부터"
 		_death_revival = {}
 	else:
 		await _run_effects(revival.effects)   # 예: 부활 아이템 소모, 보호 플래그 해제
-		%DeathMessage.text = revival.text
+		%DeathMessage.text = why + ("
+
+" + revival.text if revival.text != "" else "")
 		%NewRunButton.text = "깨어난다"
 		_death_revival = revival
 	%DeathPanel.visible = true

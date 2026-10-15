@@ -5,7 +5,8 @@
   "start": 80.0,
   "max": 100.0,
   "decay_per_hour": 4.0,
-  "warn": 30.0
+  "warn": 30.0,
+  "death_cause": "starvation"
  },
  {
   "param_id": "thirst",
@@ -13,7 +14,8 @@
   "start": 80.0,
   "max": 100.0,
   "decay_per_hour": 6.0,
-  "warn": 30.0
+  "warn": 30.0,
+  "death_cause": "dehydration"
  },
  {
   "param_id": "sleep",
@@ -21,7 +23,8 @@
   "start": 90.0,
   "max": 100.0,
   "decay_per_hour": 5.0,
-  "warn": 25.0
+  "warn": 25.0,
+  "death_cause": ""
  },
  {
   "param_id": "hygiene",
@@ -29,7 +32,8 @@
   "start": 90.0,
   "max": 100.0,
   "decay_per_hour": 2.0,
-  "warn": 30.0
+  "warn": 30.0,
+  "death_cause": ""
  },
  {
   "param_id": "mental",
@@ -37,6 +41,7 @@
   "start": 100.0,
   "max": 100.0,
   "decay_per_hour": 1.0,
-  "warn": 30.0
+  "warn": 30.0,
+  "death_cause": ""
  }
 ]

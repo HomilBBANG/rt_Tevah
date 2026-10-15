@@ -139,8 +139,14 @@ func _ready() -> void:
 	var deaths := GameState.death_count
 	var runs := GameState.run_count
 	var rv := GameState.find_revival()
+	GameState.survival["hunger"] = 0.0
+	GameState.survival["sleep"] = 0.0
+	check(GameState.death_cause_now() == "starvation", "포만감 0 → 사망 원인 starvation")
 	await StoryRunner.run_effects(rv.effects)
 	SaveManager.revive_run()
+	var floor_v := float(DataLoader.config.get("revive_survival_floor", 10))
+	check(GameState.get_survival("hunger") == floor_v and GameState.get_survival("sleep") == 0.0 and GameState.death_cause_now() == "",
+		"부활: 사망 원인 수치만 revive_survival_floor 까지 (바로 다시 안 죽음)")
 	check(GameState.current_map == "basecamp" and not GameState.wake_at_run_start, "부활 → 베이스캠프(P)에서 깨어남")
 	check(GameState.item_count("charm") == 0 and GameState.item_count("water") == 1, "부적만 소모, 소지품 유지")
 	check(GameState.clock == clock_before and GameState.has_flag("showed_knife"), "시간·플래그 유지")

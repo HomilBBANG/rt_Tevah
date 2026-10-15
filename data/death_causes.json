@@ -1,0 +1,26 @@
+[
+ {
+  "cause_id": "starvation",
+  "name": "굶주림",
+  "text": "굶어 죽었습니다.",
+  "note": "Survival hunger 가 0"
+ },
+ {
+  "cause_id": "dehydration",
+  "name": "탈수",
+  "text": "탈수로 죽었습니다.",
+  "note": "Survival thirst 가 0"
+ },
+ {
+  "cause_id": "combat",
+  "name": "{enemy}의 공격",
+  "text": "",
+  "note": "전투에서 짐. text 를 비우면 '{name}(으)로 인해 사망했습니다.' ({enemy} = 상대 이름)"
+ },
+ {
+  "cause_id": "unknown",
+  "name": "알 수 없는 원인",
+  "text": "",
+  "note": "원인을 모를 때"
+ }
+]

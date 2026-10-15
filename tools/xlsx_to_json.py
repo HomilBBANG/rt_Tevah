@@ -104,11 +104,13 @@ SCHEMA = {
                     {"minutes": (int, 0)}),
     # ---- 부활 (기획서 §11): 사망 순간 위에서부터 condition 이 참인 첫 행으로 부활 → 모두 유지한 채 베이스캠프에서 깨어남
     "Revivals": ("revive_id", ["revive_id", "name", "condition", "effects", "text"], {}),
+    # ---- 사망 원인: 사망 화면에 text (비우면 "{name}(으)로 인해 사망했습니다."). {enemy} = 전투 상대 이름
+    "DeathCauses": ("cause_id", ["cause_id", "name", "text"], {}),
 }
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
 OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "StatusEffects", "Traits", "Tiles", "LightPresets", "DayNight", "Props",
-                   "Survival", "CampActions", "Revivals"}
+                   "Survival", "CampActions", "Revivals", "DeathCauses"}
 # 맵 물체: exit 문(E 로 열고 걸어 들어가면 이동) / passage 통로(밟으면 이동) / transit 이용(사다리 등, E 로 이동) /
 #         arrive 도착 지점 (이동할 때 arrive 로 고르면 P 대신 여기 도착)
 FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop"}   # prop = 오브젝트 그림
@@ -155,6 +157,9 @@ OPTIONAL = {
     "Props": ["foot_w", "foot_h", "solid", "casts_shadow", "note"],
     "DayNight": ["sun_color", "sun_energy", "note"],
     "StatusEffects": ["scope", "tick_mode", "tick_amount", "stack_rule", "dispel", "death_cause", "state", "note"],
+    # 생존: death_cause = 0 이 되면 그 원인(DeathCauses 의 cause_id)으로 사망. 비우면 0 이어도 죽지 않음
+    "Survival": ["death_cause"],
+    "DeathCauses": ["note"],
 }
 TRAIT_POLARITY = {"positive", "negative"}
 STATUS_SCOPES = {"", "part", "whole"}
@@ -277,7 +282,7 @@ EFFECT_RES = [
     ("stat", re.compile(r"^stat:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
     ("abil", re.compile(r"^abil:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
     ("surv", re.compile(r"^surv:([A-Za-z0-9_]+)([+\-=])(\d+)$")),
-    ("simple", re.compile(r"^(setflag|clearflag|setwflag|loot|goto|restore|endcombat):([A-Za-z0-9_]+)$")),
+    ("simple", re.compile(r"^(setflag|clearflag|setwflag|loot|goto|restore|endcombat|die):([A-Za-z0-9_]+)$")),   # die = 사망 (DeathCauses)
     ("save", re.compile(r"^save$")),   # 회차 저장 (베이스캠프 안에서만 동작)
     ("status", re.compile(r"^status:([+-])([A-Za-z0-9_]+)$")),   # 상태이상 걸기·풀기
     ("trait_fx", re.compile(r"^trait:([+-])([A-Za-z0-9_]+)$")),   # 특성 얻기·잃기 (사건·거래)
@@ -423,6 +428,7 @@ def validate(d, rep):
         rep.err(loc("Npcs", npcs[pid]), f"ID '{pid}' 가 Player 시트에도 있음 (플레이어·NPC ID 는 서로 달라야 함)")
     config, abils = index("Config"), index("Abilities")
     survs = index("Survival")
+    causes = index("DeathCauses")
     stats_fx = index("StatusEffects")
     traits = index("Traits")
     for t in d["Traits"]:
@@ -477,6 +483,8 @@ def validate(d, rep):
                 check_limb(where, rid, "all")
             elif kind == "status" and rid not in stats_fx:
                 rep.err(where, f"없는 상태이상 '{rid}' (status.xlsx StatusEffects)")
+            elif kind == "die" and rid not in causes:
+                rep.err(where, f"없는 사망 원인 '{rid}' (content.xlsx DeathCauses)")
             elif kind == "endcombat" and rid not in ("win", "flee"):
                 rep.err(where, f"endcombat 은 win(상대가 물러남) / flee(빠져나옴): '{rid}'")
             elif kind == "trait_fx" and rid not in traits:
@@ -624,6 +632,8 @@ def validate(d, rep):
             rep.err(w, "max 는 0보다 커야 함")
         if None not in (sv["start"], sv["max"]) and not (0 <= sv["start"] <= sv["max"]):
             rep.err(w, "start 는 0~max")
+        if sv["death_cause"] and sv["death_cause"] not in causes:
+            rep.err(w, f"death_cause 의 없는 사망 원인 '{sv['death_cause']}' (DeathCauses 시트)")
     for ca in d["CampActions"]:
         w = f"CampActions {ca['_row']}행 ({ca['action_id']})"
         if ca["kind"] not in CAMP_KINDS:
@@ -1543,6 +1553,7 @@ def export(d, maps):
         "survival": clean(d["Survival"]),
         "camp_actions": clean(d["CampActions"]),
         "revivals": clean(d["Revivals"]),
+        "death_causes": clean(d["DeathCauses"]),
         "endings": [dict(r, world_flags_set=split_list(r["world_flags_set"])) for r in clean(d["Endings"])],
         "config": dict({r["key"]: config_value(r["value"]) for r in d["Config"]}, opening_dialogue=d.get("_opening", "")),
     }
