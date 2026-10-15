@@ -30,7 +30,9 @@
   "points": -6,
   "category": "신체",
   "description": "모든 신체 부위 최대 체력 +10%",
-  "conflicts": [],
+  "conflicts": [
+   "frail_body"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -54,7 +56,9 @@
   "points": -5,
   "category": "신체",
   "description": "달리기 속도 +10%",
-  "conflicts": [],
+  "conflicts": [
+   "slow_mover"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -66,7 +70,9 @@
   "points": -6,
   "category": "전투",
   "description": "회피 액션의 허용 타이밍 범위 증가",
-  "conflicts": [],
+  "conflicts": [
+   "slow_reflexes"
+  ],
   "selectable": true,
   "state": "일부 확정",
   "note": "이름 확정, 수치 미정. 이동 속도가 아니라 회피 입력 허용 시간"
@@ -90,7 +96,9 @@
   "points": -5,
   "category": "신체",
   "description": "최대 소지 무게 증가",
-  "conflicts": [],
+  "conflicts": [
+   "weak_lifter"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -102,7 +110,9 @@
   "points": -4,
   "category": "생존",
   "description": "포만감 감소 속도 −20%",
-  "conflicts": [],
+  "conflicts": [
+   "big_eater"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -114,7 +124,9 @@
   "points": -4,
   "category": "생존",
   "description": "수분 감소 속도 −20%",
-  "conflicts": [],
+  "conflicts": [
+   "excess_sweating"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -126,7 +138,10 @@
   "points": -3,
   "category": "생존",
   "description": "수면 회복 효율 증가",
-  "conflicts": [],
+  "conflicts": [
+   "insomnia",
+   "light_sleep"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -138,7 +153,9 @@
   "points": -2,
   "category": "생존",
   "description": "위생 감소 속도 −20%",
-  "conflicts": [],
+  "conflicts": [
+   "excess_sweating"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -150,7 +167,9 @@
   "points": -5,
   "category": "정신",
   "description": "멘탈 감소량 −20%",
-  "conflicts": [],
+  "conflicts": [
+   "fragile_mind"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -162,7 +181,9 @@
   "points": -4,
   "category": "정신",
   "description": "괴물 조우 시 공포 상태이상 저항 확률 증가",
-  "conflicts": [],
+  "conflicts": [
+   "coward"
+  ],
   "selectable": true,
   "state": "일부 확정",
   "note": "명칭·효과 방향 확정, 확률 미정. 공포에만 (공황 장애 제외)"
@@ -186,7 +207,9 @@
   "points": -5,
   "category": "대화",
   "description": "설득 관련 d20 판정 +2",
-  "conflicts": [],
+  "conflicts": [
+   "social_misfit"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -198,7 +221,9 @@
   "points": -6,
   "category": "대화",
   "description": "대화 d20 대실패 위험 완화",
-  "conflicts": [],
+  "conflicts": [
+   "unlucky"
+  ],
   "selectable": false,
   "state": "후보",
   "note": "d20 대실패(1) 규칙과 충돌 — 예외 허용을 정하기 전까지 선택 불가"
@@ -270,7 +295,9 @@
   "points": 4,
   "category": "생존",
   "description": "포만감 감소 속도 +25%",
-  "conflicts": [],
+  "conflicts": [
+   "light_eater"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -282,7 +309,10 @@
   "points": 3,
   "category": "생존",
   "description": "수분·위생 감소 속도 증가",
-  "conflicts": [],
+  "conflicts": [
+   "water_saver",
+   "clean_body"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -294,7 +324,9 @@
   "points": 4,
   "category": "생존",
   "description": "수면 회복 효율 감소",
-  "conflicts": [],
+  "conflicts": [
+   "sound_sleeper"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -306,7 +338,9 @@
   "points": 2,
   "category": "생존",
   "description": "수면 중 방해받기 쉬움",
-  "conflicts": [],
+  "conflicts": [
+   "sound_sleeper"
+  ],
   "selectable": false,
   "state": "후보",
   "note": "콘텐츠 준비 전 선택 불가"
@@ -318,7 +352,9 @@
   "points": 6,
   "category": "신체",
   "description": "모든 신체 부위 최대 체력 −10%",
-  "conflicts": [],
+  "conflicts": [
+   "robust_body"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -330,7 +366,9 @@
   "points": 4,
   "category": "신체",
   "description": "최대 소지 무게 감소",
-  "conflicts": [],
+  "conflicts": [
+   "powerful"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -342,7 +380,9 @@
   "points": 6,
   "category": "전투",
   "description": "회피 액션 허용 시간 감소",
-  "conflicts": [],
+  "conflicts": [
+   "reflexes"
+  ],
   "selectable": true,
   "state": "후보",
   "note": "반사신경과 동시 선택 여부 미정"
@@ -354,7 +394,9 @@
   "points": 5,
   "category": "신체",
   "description": "걷기·달리기 속도 −10%",
-  "conflicts": [],
+  "conflicts": [
+   "athlete"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -402,7 +444,9 @@
   "points": 4,
   "category": "정신",
   "description": "괴물 조우 시 멘탈 추가 감소",
-  "conflicts": [],
+  "conflicts": [
+   "brave"
+  ],
   "selectable": true,
   "state": "후보",
   "note": "용감함과 동시 선택 여부 미정"
@@ -414,7 +458,9 @@
   "points": 5,
   "category": "정신",
   "description": "멘탈 감소량 +20%",
-  "conflicts": [],
+  "conflicts": [
+   "iron_mind"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -438,7 +484,9 @@
   "points": 4,
   "category": "대화",
   "description": "일부 설득·사교 d20 판정 −2",
-  "conflicts": [],
+  "conflicts": [
+   "persuasive"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""
@@ -474,7 +522,9 @@
   "points": 5,
   "category": "대화",
   "description": "대화 d20 대실패 위험 증가",
-  "conflicts": [],
+  "conflicts": [
+   "lucky"
+  ],
   "selectable": true,
   "state": "후보",
   "note": ""

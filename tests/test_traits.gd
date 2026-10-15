@@ -34,15 +34,14 @@ func _ready() -> void:
 	cc.toggle("heavy_smoker")
 	await get_tree().process_frame
 	check(not cc._start_btn.disabled, "다시 고르면 시작 가능")
-	# 충돌 규칙 (데이터의 conflicts 는 아직 비어 있어서 잠깐 넣어 본다)
-	DataLoader.traits.brave.conflicts = ["coward"]
+	# 상성 (Traits.conflicts): 용감함 ↔ 겁쟁이
+	check("coward" in DataLoader.traits.brave.conflicts and "brave" in DataLoader.traits.coward.conflicts, "데이터: 용감함 ↔ 겁쟁이 같이 못 고름")
 	cc.selected = []
 	check(cc.block_reason("coward") == "", "용감함을 안 골랐으면 겁쟁이 OK")
 	cc.toggle("brave")
 	check(cc.block_reason("coward").contains("같이 고를 수 없음"), "용감함을 고르면 겁쟁이 막힘: %s" % cc.block_reason("coward"))
 	cc.selected = ["coward"]
 	check(cc.block_reason("brave").contains("같이 고를 수 없음"), "반대쪽(겁쟁이 → 용감함)도 막힘")
-	DataLoader.traits.brave.conflicts = []
 	cc.selected = ["high_intellect", "heavy_smoker"]
 	# 생존 시작 = 캐릭터 만들기 + 첫 회차 (화면 이동은 테스트에서 하지 않음)
 	GameState.create_character(cc.selected.duplicate())
