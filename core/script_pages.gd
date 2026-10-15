@@ -4,12 +4,15 @@ extends RefCounted
 ## 노드의 `pages` 가 있으면 그 목록, 없으면 예전처럼 노드의 speaker_id·text 로 페이지 1개.
 ## 페이지: { page_id, display, speaker_id, text, speed, advance, auto_wait }
 ##   display   — narration(상황 묘사 상자) / bubble(말풍선, 화자 필요) / system(시스템 메시지 상자)
+##               / subtitle(자막 — 상자 없이 화면 아래 글자만, 영상 자막처럼. 화자는 있어도 되고 없어도 됨)
 ##   speed     — "" = 기본 (대화 파일 text_speed → Config text_speed_default) / instant / slow / normal / fast / 숫자(초당 글자 수)
 ##   advance   — input(입력 대기, 기본) / auto(다 나오고 auto_wait 초 뒤 자동 넘김)
 ##   text 안의 {w=0.5} = 그 자리에서 0.5초 멈춤. 빈 줄 = 문단, 줄바꿈 = 강제 줄바꿈, 나머지는 자동 줄바꿈.
 
-const DISPLAYS := ["narration", "bubble", "system"]
-const DISPLAY_LABEL := {"narration": "상황 묘사", "bubble": "말풍선", "system": "시스템 메시지"}
+const DISPLAYS := ["narration", "bubble", "system", "subtitle"]
+const DISPLAY_LABEL := {"narration": "상황 묘사", "bubble": "말풍선", "system": "시스템 메시지", "subtitle": "자막 (대화창 없이)"}
+## 화자를 쓰는 표시 (말풍선은 꼭, 자막은 골라도 되고 안 골라도 됨)
+const WITH_SPEAKER := ["bubble", "subtitle"]
 const SPEEDS := ["instant", "slow", "normal", "fast"]
 const SPEED_LABEL := {"": "기본", "instant": "즉시", "slow": "느림", "normal": "보통", "fast": "빠름"}
 ## Config 가 없을 때 쓰는 값 (초당 글자 수). TODO(기획 §10.3): 읽기 속도 기본값·구두점 지연 미정
@@ -37,7 +40,7 @@ static func normalize(p: Dictionary, index := 0) -> Dictionary:
 	return {
 		"page_id": str(p.get("page_id", "")) if str(p.get("page_id", "")) != "" else "p%d" % (index + 1),
 		"display": display,
-		"speaker_id": sp if display == "bubble" else "",
+		"speaker_id": sp if display in WITH_SPEAKER else "",
 		"text": str(p.get("text", "")),
 		"speed": str(p.get("speed", "")),
 		"advance": "auto" if str(p.get("advance", "")) == "auto" else "input",
@@ -48,7 +51,7 @@ static func normalize(p: Dictionary, index := 0) -> Dictionary:
 ## 기본값만 가진 페이지인가 (편집기가 예전 형식 — pages 없이 — 으로 저장해도 되는지)
 static func is_plain(p: Dictionary) -> bool:
 	return p.speed == "" and p.advance == "input" and not RegEx.create_from_string(PAUSE_RE).search(p.text) \
-		and (p.display == "bubble") == (p.speaker_id != "")
+		and p.display == ("bubble" if p.speaker_id != "" else "narration")   # 예전 형식은 말풍선·상황 묘사만 (시스템·자막은 pages 로)
 
 
 ## {w=0.5} 표시를 빼고, 멈출 자리를 돌려준다 → { text, pauses: [[글자 위치, 초], ...] }

@@ -15,7 +15,7 @@ extends Control
 const ChoiceButton = preload("res://ui/choice_button.gd")
 const ScriptPages = preload("res://core/script_pages.gd")
 const Direction = preload("res://core/direction.gd")
-const KIND_OF := {"narration": "situation", "bubble": "dialogue", "system": "system"}
+const KIND_OF := {"narration": "situation", "bubble": "dialogue", "system": "system", "subtitle": "subtitle"}
 
 ## 탐험 필드 위에 겹쳐 띄운 NPC 대화가 끝남 (embedded 일 때만)
 signal finished
@@ -61,6 +61,9 @@ var directing := false
 var cutscene := false           # 이 대화에서 연출 카드를 한 번이라도 돌렸나 (건너뛰기 버튼이 보임)
 var skipping := false           # 건너뛰는 중: 연출은 바로 끝난 모습으로, 대사는 저절로 넘김 → 선택지·대화 끝에서 멈춤
 var skip_btn: Button
+# 자막 (상자 없이 화면 아래 글자 — 영상 자막처럼)
+var subtitle: Label
+var subtitle_name: Label
 var _tweens: Array = []
 
 
@@ -91,6 +94,36 @@ func _ready() -> void:
 	fade.color = Color(0, 0, 0, 0)
 	add_child(fade)
 	move_child(fade, cg.get_index() + 1)
+	subtitle_name = Label.new()
+	subtitle_name.anchor_left = 0.1
+	subtitle_name.anchor_right = 0.9
+	subtitle_name.anchor_top = 0.74
+	subtitle_name.anchor_bottom = 0.78
+	subtitle_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle_name.add_theme_font_size_override("font_size", 28)
+	subtitle_name.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	subtitle_name.add_theme_constant_override("outline_size", 8)
+	subtitle_name.mouse_filter = MOUSE_FILTER_IGNORE
+	subtitle_name.visible = false
+	add_child(subtitle_name)
+	subtitle = Label.new()
+	subtitle.anchor_left = 0.1
+	subtitle.anchor_right = 0.9
+	subtitle.anchor_top = 0.78
+	subtitle.anchor_bottom = 0.9
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	subtitle.add_theme_font_size_override("font_size", 38)
+	subtitle.add_theme_color_override("font_color", Color(1, 1, 1))
+	subtitle.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	subtitle.add_theme_constant_override("outline_size", 12)
+	subtitle.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	subtitle.add_theme_constant_override("shadow_offset_x", 2)
+	subtitle.add_theme_constant_override("shadow_offset_y", 3)
+	subtitle.mouse_filter = MOUSE_FILTER_IGNORE
+	subtitle.visible = false
+	add_child(subtitle)
 	skip_btn = Button.new()
 	skip_btn.text = "건너뛰기 ▶▶"
 	skip_btn.tooltip_text = "컷신을 건너뜁니다 (Esc). 선택지가 나오면 멈춥니다"
@@ -263,7 +296,7 @@ func _on_direction(steps: Array) -> void:
 	_auto_left = -1.0
 	_type_label = null
 	_clear_choices()
-	for n in [%SituationBox, %SystemBox, %Bubble, %PrevBubble, %PortraitLeft, %PortraitRight, %DicePanel, %AdvanceHint]:
+	for n in [%SituationBox, %SystemBox, %Bubble, %PrevBubble, %PortraitLeft, %PortraitRight, %DicePanel, %AdvanceHint, subtitle, subtitle_name]:
 		n.visible = false
 	var dim: float = $Scene.color.a
 	if embedded:
@@ -363,6 +396,8 @@ func _show_page(p: Dictionary) -> void:
 		_page_done()
 		return
 	%SituationBox.visible = p.kind == "situation"
+	subtitle.visible = p.kind == "subtitle"
+	subtitle_name.visible = p.kind == "subtitle" and p.speaker_id != ""
 	%SystemBox.visible = p.kind == "system"
 	%DicePanel.visible = false
 	var is_dialogue: bool = p.kind == "dialogue"
@@ -378,11 +413,17 @@ func _show_page(p: Dictionary) -> void:
 			_slots = ["", ""]
 		"system":
 			%SystemText.text = p.text
+		"subtitle":
+			subtitle.text = p.text
+			subtitle_name.text = DataLoader.character_name(p.speaker_id)
+			var nc := DataLoader.character_color(p.speaker_id)
+			subtitle_name.add_theme_color_override("font_color", Color.html(nc) if Color.html_is_valid(nc) else Color("ffd27a"))
 		"dialogue":
 			_show_dialogue(p)
 	match p.kind:
 		"situation": _begin_typing(%SituationText, p)
 		"system": _begin_typing(%SystemText, p)
+		"subtitle": _begin_typing(subtitle, p)
 		"dialogue": _begin_typing(%Bubble.text_label(), p)
 		_: _page_done()
 

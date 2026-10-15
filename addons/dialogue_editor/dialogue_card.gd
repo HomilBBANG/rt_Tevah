@@ -17,7 +17,7 @@ signal page_requested(card: GraphNode, page: int)
 
 const ScriptPages = preload("res://core/script_pages.gd")
 const TYPE_LABEL := {"normal": "일반", "item": "아이템", "dice": "판정", "combat": "전투"}
-const DISPLAY_SHORT := {"narration": "묘사", "bubble": "", "system": "시스템"}
+const DISPLAY_SHORT := {"narration": "묘사", "bubble": "", "system": "시스템", "subtitle": "자막"}
 const PORT_COLOR := Color("8fb8ff")
 const FAIL_COLOR := Color("e46a6a")
 const WARN_COLOR := Color("ffb454")
@@ -280,7 +280,8 @@ func _speaker_summary(pages: Array) -> String:
 
 
 func _page_line(i: int, p: Dictionary) -> String:
-	var who: String = _speaker_name(p.speaker_id) if p.display == "bubble" else DISPLAY_SHORT[p.display]
+	var who: String = _speaker_name(p.speaker_id) if p.display == "bubble" else (
+		"자막 " + _speaker_name(p.speaker_id) if p.display == "subtitle" and p.speaker_id != "" else DISPLAY_SHORT[p.display])
 	var txt: String = ScriptPages.parse_text(p.text).text.replace("\n", " ⏎ ")
 	return "%s [%s] %s" % [NUMS[i] if i < NUMS.size() else str(i + 1), who, txt if txt != "" else "(비어 있음)"]
 

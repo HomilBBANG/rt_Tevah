@@ -26,6 +26,12 @@ func _ready() -> void:
 	var probs := ScriptPages.problems(bad)
 	check(probs.size() == 3, "문제: 화자 없는 말풍선·알 수 없는 {}·이상한 속도 (%s)" % [probs])
 	check(not ScriptPages.is_plain(ScriptPages.normalize({"text": "a{w=1}"})), "대기가 있으면 예전 형식으로 못 씀")
+	check(not ScriptPages.is_plain(ScriptPages.normalize({"display": "system", "text": "a"}))
+		and not ScriptPages.is_plain(ScriptPages.normalize({"display": "subtitle", "text": "a"})),
+		"시스템·자막 1페이지는 pages 로 저장 (예전 형식이면 상황 묘사로 바뀌던 것)")
+	var sub := ScriptPages.normalize({"display": "subtitle", "speaker_id": "char_cat", "text": "자막"})
+	check(sub.display == "subtitle" and sub.speaker_id == "char_cat" and ScriptPages.problems(ScriptPages.normalize({"display": "subtitle", "text": "x"})).is_empty(),
+		"자막: 화자 있어도 되고 없어도 됨")
 
 	# ---- 실제 대화 화면
 	DataLoader.nodes["tsp_a"] = {"node_id": "tsp_a", "speaker_id": "", "text": "", "next_node": "", "on_enter": "", "kind": "",
@@ -67,6 +73,25 @@ func _ready() -> void:
 	play._process(0.25)
 	check(play._page_i == 3 and play.get_node("%Choices").get_child_count() == 1, "0.2초 뒤 자동으로 4쪽, 마지막 쪽에 선택지")
 	play.queue_free()
+	await get_tree().process_frame
+
+	# 자막: 대화창 없이 화면 아래 글자만 (화자는 이름만 작게)
+	DataLoader.nodes["tsp_sub"] = {"node_id": "tsp_sub", "speaker_id": "", "text": "", "next_node": "EXIT", "on_enter": "", "kind": "",
+		"text_speed": "", "pages": [{"display": "subtitle", "text": "(테스트) 자막 한 줄", "speed": "instant"},
+			{"display": "subtitle", "speaker_id": "char_cat", "text": "(테스트) 이름 있는 자막", "speed": "instant"}]}
+	var ps: Control = DialogueScene.instantiate()
+	ps.embedded = true
+	add_child(ps)
+	ps.set_process(false)
+	await StoryRunner.start_dialogue("tsp_sub")
+	await get_tree().process_frame
+	check(ps.subtitle.visible and ps.subtitle.text == "(테스트) 자막 한 줄" and not ps.subtitle_name.visible
+		and not ps.get_node("%SituationBox").visible and not ps.get_node("%Bubble").visible and not ps.get_node("%SystemBox").visible,
+		"자막 페이지: 상자·말풍선 없이 글자만")
+	ps.advance()
+	check(ps.subtitle.text == "(테스트) 이름 있는 자막" and ps.subtitle_name.visible and ps.subtitle_name.text != "", "화자가 있으면 이름이 위에 작게")
+	ps.queue_free()
+	DataLoader.nodes.erase("tsp_sub")
 	await get_tree().process_frame
 
 	# 시작 페이지 (에디터 미리보기)

@@ -153,7 +153,7 @@ func _page_box(i: int) -> Control:
 	var panel := PanelContainer.new()
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.16, 0.18, 0.22)
-	sb.border_color = {"narration": Color("c9c9c9"), "bubble": Color("8fb8ff"), "system": Color("7a7a7a")}[p.display]
+	sb.border_color = {"narration": Color("c9c9c9"), "bubble": Color("8fb8ff"), "system": Color("7a7a7a"), "subtitle": Color("ffd27a")}[p.display]
 	sb.border_width_left = 4
 	sb.set_corner_radius_all(4)
 	sb.set_content_margin_all(8)
@@ -176,33 +176,35 @@ func _page_box(i: int) -> Control:
 	for d in ScriptPages.DISPLAYS:
 		disp.add_item(ScriptPages.DISPLAY_LABEL[d])
 	disp.select(ScriptPages.DISPLAYS.find(p.display))
-	disp.tooltip_text = "상황 묘사 = 밝은 상자 / 말풍선 = 화자의 대사 / 시스템 메시지 = 검은 상자"
+	disp.tooltip_text = "상황 묘사 = 밝은 상자 / 말풍선 = 화자의 대사 / 시스템 메시지 = 검은 상자 / 자막 = 상자 없이 화면 아래 글자만 (인트로·영상 자막)"
 	disp.item_selected.connect(func(k):
 		p.display = ScriptPages.DISPLAYS[k]
 		if p.display == "bubble" and p.speaker_id == "" and not speakers.is_empty():
 			p.speaker_id = speakers[0][0]
-		elif p.display != "bubble":
+		elif not p.display in ScriptPages.WITH_SPEAKER:
 			p.speaker_id = ""
 		_after_change("page_display", i))
 	row.add_child(disp)
 	# 화자 (말풍선일 때만)
-	if p.display == "bubble":
+	if p.display in ScriptPages.WITH_SPEAKER:
 		var sp := OptionButton.new()
 		sp.fit_to_longest_item = false
 		sp.custom_minimum_size.x = 170
 		sp.clip_text = true
 		var found := false
-		for k in speakers.size():
-			sp.add_item(speakers[k][1])
-			if speakers[k][0] == p.speaker_id:
+		# 자막은 화자 없이도 (이름 없이 글자만)
+		var people: Array = ([["", "(화자 없음)"]] if p.display == "subtitle" else []) + speakers
+		for k in people.size():
+			sp.add_item(people[k][1])
+			if people[k][0] == p.speaker_id:
 				sp.select(k)
 				found = true
 		if not found:
 			sp.add_item("(화자 고르기)" if p.speaker_id == "" else p.speaker_id + " (없음)")
 			sp.select(sp.item_count - 1)
 		sp.item_selected.connect(func(k):
-			if k < speakers.size():
-				p.speaker_id = speakers[k][0]
+			if k < people.size():
+				p.speaker_id = people[k][0]
 				_after_change("page_speaker", i))
 		row.add_child(sp)
 	# 속도

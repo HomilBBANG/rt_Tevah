@@ -44,7 +44,7 @@ AUDIO_DIRS = {"sound": ROOT / "audio" / "sfx", "music": ROOT / "audio" / "bgm"}
 FACE_DIRS = {"up", "down", "left", "right"}
 # start = 대화 시작 카드 (NPC 대화 파일마다 하나). routes 를 위에서부터 보고 조건이 맞는 첫 길로, 없으면 next_node(그 외).
 # 대본 페이지 (core/script_pages.gd 와 같은 규칙). 노드의 pages 가 없으면 speaker_id·text 로 페이지 1개.
-PAGE_DISPLAYS = {"narration", "bubble", "system"}
+PAGE_DISPLAYS = {"narration", "bubble", "system", "subtitle"}   # subtitle = 자막 (상자 없이 화면 아래)
 PAGE_SPEEDS = {"", "instant", "slow", "normal", "fast"}
 PAUSE_RE = re.compile(r"\{w=(\d+(?:\.\d+)?)\}")
 CHOICE_TYPES = {"", "normal", "item", "dice", "combat"}
@@ -967,7 +967,7 @@ def check_pages(w, n, chars, rep):
         disp = str(p.get("display", "") or "")
         sp = str(p.get("speaker_id", "") or "")
         if disp not in PAGE_DISPLAYS:
-            rep.err(pw, f"display 는 narration / bubble / system: '{disp}'")
+            rep.err(pw, f"display 는 narration / bubble / system / subtitle: '{disp}'")
         elif disp == "bubble" and not sp:
             rep.err(pw, "말풍선 페이지에 화자(speaker_id)가 없음")
         if sp and sp not in chars:

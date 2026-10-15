@@ -45,6 +45,13 @@
    "pos": [
     600,
     60
+   ],
+   "pages": [
+    {
+     "page_id": "p1",
+     "display": "subtitle",
+     "text": "(테스트) 오프닝 컷신 — Config opening_dialogue 를 비우면 나오지 않음"
+    }
    ]
   },
   {
