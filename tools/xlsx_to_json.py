@@ -35,7 +35,10 @@ OUT_DIR = ROOT / "data"
 
 STATS = {"hp", "sanity", "time"}
 SHOW_MODES = {"", "hide", "gray"}
-NODE_KINDS = {"", "line", "effect", "branch", "start"}
+NODE_KINDS = {"", "line", "effect", "branch", "start", "direct"}
+# direct = 🎬 연출 카드: steps [{do, ...}] 를 차례로 (core/direction.gd 와 같은 규칙)
+DIRECT_STEPS = {"image", "image_off", "fade", "shake", "wait", "walk", "camera", "vanish"}
+CUTSCENE_DIR = ROOT / "art" / "cutscenes"
 # start = 대화 시작 카드 (NPC 대화 파일마다 하나). routes 를 위에서부터 보고 조건이 맞는 첫 길로, 없으면 next_node(그 외).
 # 대본 페이지 (core/script_pages.gd 와 같은 규칙). 노드의 pages 가 없으면 speaker_id·text 로 페이지 1개.
 PAGE_DISPLAYS = {"narration", "bubble", "system"}
@@ -97,7 +100,7 @@ OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "Statu
                    "Survival", "CampActions", "Revivals"}
 # 맵 물체: exit 문(E 로 열고 걸어 들어가면 이동) / passage 통로(밟으면 이동) / transit 이용(사다리 등, E 로 이동) /
 #         arrive 도착 지점 (이동할 때 arrive 로 고르면 P 대신 여기 도착)
-FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive"}
+FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event"}   # event = 밟으면 대화(컷신)
 TRAVEL_TYPES = {"exit", "passage", "transit"}
 EDGE_DIRS = {"up", "down", "left", "right"}
 CAMP_KINDS = {"", "sleep"}   # sleep: 1시간 단위로 골라 자고, 자고 나면 저장 (effects 는 1시간마다)
@@ -682,7 +685,13 @@ def validate(d, rep):
         kind = n["kind"]
         if kind not in NODE_KINDS:
             rep.err(w, f"kind 는 line / effect / branch / start: '{kind}'")
-        if kind in ("effect", "branch", "start") and nid in choices_by_node:
+        if kind == "direct":
+            check_steps(w, n.get("steps") or [], d["FieldObjects"], rep)
+            if not n["next_node"]:
+                rep.err(w, "연출 카드에 '다음 →' 출구가 없음")
+        elif n.get("steps"):
+            rep.err(w, "steps 는 연출(kind=direct) 카드에서만")
+        if kind in ("effect", "branch", "start", "direct") and nid in choices_by_node:
             rep.err(w, "효과·조건 분기·대화 시작 카드에는 선택지를 달 수 없음")
         routes = n.get("routes") or []
         if kind == "start":
@@ -789,7 +798,7 @@ def validate(d, rep):
     roots = [[ep["start_node"], ep["timeout_node"]] +
              [g for g in item_gotos if g in nodes and nodes[g]["episode_id"] == ep["episode_id"]]
              for ep in d["Episodes"]]
-    npc_refs = {o["ref"] for o in d["FieldObjects"] if o.get("type") == "npc"}
+    npc_refs = {o["ref"] for o in d["FieldObjects"] if o.get("type") in ("npc", "event")}
     roots.append(list(npc_refs))
     # 대화 시작 카드는 맵에 아직 안 놓은 NPC 의 대화여도 검사가 통과하도록 뿌리로 (안 쓰이면 경고)
     roots.append([n["node_id"] for n in d["Nodes"] if n["kind"] == "start"])
@@ -904,7 +913,7 @@ def validate_combat(d, rep, pparts, enemies, eparts):
 def check_pages(w, n, chars, rep):
     """대본 페이지 검사. 오류: 표시 종류·화자·속도·넘김·{ } 표시. 경고: 빈 본문."""
     pages = n.get("pages") or []
-    if n.get("kind") in ("effect", "branch", "start"):
+    if n.get("kind") in ("effect", "branch", "start", "direct"):
         if pages:
             rep.err(w, "효과·조건 분기·대화 시작 카드에는 대본 페이지를 둘 수 없음")
         return
@@ -946,6 +955,43 @@ def check_pages(w, n, chars, rep):
             rep.err(pw, "알 수 없는 { } 표시 (대기는 {w=0.5} 꼴)")
         if not PAUSE_RE.sub("", text).strip():
             rep.warn(pw, "본문이 비어 있음")
+
+
+def check_steps(w, steps, field_objs, rep):
+    """연출 카드 단계 검사: 종류, 그림 파일, 숫자, 인물(player 또는 맵의 NPC object_id), 칸."""
+    people = {o.get("object_id") for o in field_objs if o.get("type") == "npc"}
+    if not steps:
+        rep.warn(w, "연출 카드에 단계가 없음")
+    for i, st in enumerate(steps):
+        sw = f"{w} 연출 {i + 1}"
+        if not isinstance(st, dict):
+            rep.err(sw, "단계 형식이 아님")
+            continue
+        do = str(st.get("do", ""))
+        if do not in DIRECT_STEPS:
+            rep.err(sw, f"알 수 없는 연출 '{do}' (가능: {', '.join(sorted(DIRECT_STEPS))})")
+            continue
+        for k in ("fade", "time", "speed", "power"):
+            if k in st and not (_is_number(st[k]) and float(st[k]) >= 0):
+                rep.err(sw, f"{k} 는 0 이상 숫자: '{st[k]}'")
+        if do == "image":
+            f = str(st.get("file", ""))
+            if not f:
+                rep.err(sw, "그림 파일을 고르지 않음")
+            elif not (CUTSCENE_DIR / f).exists():
+                rep.err(sw, f"그림 파일이 없음: art/cutscenes/{f}")
+        if do == "fade" and str(st.get("to", "black")) not in ("black", "white", "clear"):
+            rep.err(sw, f"fade 의 to 는 black / white / clear: '{st.get('to')}'")
+        if do in ("walk", "vanish") or (do == "camera" and st.get("who")):
+            who = str(st.get("who", ""))
+            if do == "vanish" and who == "player":
+                rep.err(sw, "플레이어는 숨길 수 없음")
+            elif who != "player" and who not in people:
+                rep.err(sw, f"인물(who)은 player 또는 맵의 NPC object_id: '{who}'")
+        if do == "walk" or (do == "camera" and not st.get("who")):
+            to = st.get("to")
+            if not (isinstance(to, list) and len(to) == 2 and all(isinstance(v, (int, float)) and v >= 0 for v in to)):
+                rep.err(sw, f"칸(to)은 [x, y]: '{to}'")
 
 
 def _is_number(v):
@@ -994,6 +1040,7 @@ def read_dialogues(d, rep):
             rec["episode_id"] = episode
             rec["pages"] = n.get("pages") if isinstance(n.get("pages"), list) else []
             rec["routes"] = n.get("routes") if isinstance(n.get("routes"), list) else []
+            rec["steps"] = n.get("steps") if isinstance(n.get("steps"), list) else []
             rec["text_speed"] = speed
             rec["npc_id"] = npc
             rec["_row"] = f"{f.name}"
@@ -1033,7 +1080,7 @@ def read_maps(rep):
             continue
         m["file"] = f.name
         m["tiles"] = [str(r) for r in m.get("tiles", [])]
-        m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len", "from", "default") else v for k, v in o.items()}
+        m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len", "from", "default", "once") else v for k, v in o.items()}
                         for o in m.get("objects", [])]
         maps[f.stem] = m
     for f in sorted(MAPS_DIR.glob("*.txt")):
@@ -1194,8 +1241,8 @@ def validate_field(d, maps, rep, enemies):
             elif t == "enemy" and not all(n["walk_speed"] > 0 and n["run_speed"] > 0
                                           for n in d["Npcs"] if n["npc_id"] == ref):
                 rep.err(w, f"맵의 적 '{ref}' 는 Npcs 의 walk_speed(순찰)·run_speed(추격)가 0보다 커야 함")
-            elif t == "npc" and (ref not in nodes or nodes[ref]["episode_id"] != ""):
-                rep.err(w, f"NPC 의 대화(ref)는 필드 대화 시작 노드: '{ref}'")
+            elif t in ("npc", "event") and (ref not in nodes or nodes[ref]["episode_id"] != ""):
+                rep.err(w, f"{'NPC' if t == 'npc' else '이벤트 칸'} 의 대화(ref)는 필드 대화 노드: '{ref}'")
             elif t in TRAVEL_TYPES and travel_error(maps, ref, o.get("arrive", "")):
                 rep.err(w, travel_error(maps, ref, o.get("arrive", "")))
             elif t == "investigate" and ref and ref not in spots:
@@ -1249,6 +1296,7 @@ def export_maps(d, maps):
             e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition", "arrive")}
             e["from"] = arrive_from(o)   # 도착 P: 이어지는 곳 (object_id / "맵:방향")
             e["default"] = bool(o.get("default"))   # 기본 도착 P
+            e["once"] = bool(o.get("once"))         # 이벤트 칸: 한 번만
             e.update(map_id=mid, x=int(o["x"]), y=int(o["y"]), patrol_dir=o.get("patrol_dir", ""),
                      patrol_len=int(o.get("patrol_len", 0) or 0),
                      schedule=[parse_time_range(r) for r in split_list(o.get("schedule", ""))])
@@ -1283,7 +1331,8 @@ def export(d, maps):
         "episodes": clean(d["Episodes"]),
         "nodes": [dict(n, pages=n.get("pages") or [], routes=[{"condition": _dlg_str(r.get("condition", "")), "next_node": _dlg_str(r.get("next_node", ""))}
                                                          for r in (n.get("routes") or []) if isinstance(r, dict)],
-                       text_speed=n.get("text_speed", ""), npc_id=n.get("npc_id", "")) for n in clean(d["Nodes"])],
+                       text_speed=n.get("text_speed", ""), npc_id=n.get("npc_id", ""), steps=n.get("steps") or [])
+                  for n in clean(d["Nodes"])],
         "choices": [choice(r) for r in clean(d["Choices"])],
         "items": [dict(r, dice_bonus=bonuses(r["dice_bonus"])) for r in clean(d["Items"])],
         "loot": clean(d["Loot"]),

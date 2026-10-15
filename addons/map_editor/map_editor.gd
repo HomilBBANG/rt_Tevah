@@ -16,7 +16,7 @@ const TOOL_GROUPS := [
 	["", [["select", "선택"]]],
 	["칠하기", [["wall", "벽"], ["floor", "바닥"], ["void", "빈 공간"]]],
 	["위치", [["arrive", "도착 P"], ["run_start", "시작 S"]]],
-	["물체", [["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"]]],
+	["물체", [["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["event", "이벤트"]]],
 	["이동", [["exit", "문"], ["passage", "통로"], ["transit", "이용"]]],
 	["", [["erase", "지우개"]]],
 ]
@@ -31,6 +31,7 @@ const TOOL_TIPS := {
 	"investigate": "조사 지점: 놓은 뒤 오른쪽 칸에서 얻는 것(Loot)·조사 문구",
 	"npc": "NPC: 놓은 뒤 오른쪽 칸에서 대화(시작 노드)·나타나는 시간대",
 	"camp": "베이스캠프 거점 (식사·물·씻기·잠 메뉴, 엑셀 CampActions)",
+	"event": "이벤트 칸: 밟으면 대화(컷신) 시작. 게임에서는 안 보임. 오른쪽 칸에서 대화·한 번만·나타나는 조건",
 	"exit": "문: E 로 열고, 열린 문으로 걸어 들어가면 이동. 오른쪽 칸에서 이동할 맵",
 	"passage": "통로: 밟으면 바로 이동 (계단·길·동굴 입구)",
 	"transit": "이용: E 를 눌러야 이동 (사다리·엘리베이터 등). 이름이 안내에 나옴",
@@ -64,10 +65,10 @@ const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
 
 [b]5. 반영[/b]  [b]저장[/b] → [b]변환·검사[/b] (오류가 있으면 아래에 결과 칸이 열림) → [b]▶ 테스트 플레이[/b] (진짜 저장은 건드리지 않음)
 
-[b]지도 표시[/b]  [color=#3fae5f]● P[/color] 도착 P (★ 기본) · [color=#b89a2a]S[/color] 회차 시작 · [color=#d05050]● 적[/color] · [color=#e8c35a]● 조[/color] 조사 · [color=#5a8fd0]● N[/color] NPC · [color=#5fae6a]● 거[/color] 거점 · [color=#a07850]● 문[/color] · [color=#6fa8dc]● 통[/color] 통로 · [color=#c8a060]● 이[/color] 이용 · 맵 바깥 푸른 띠 = 가장자리 이동
+[b]지도 표시[/b]  [color=#3fae5f]● P[/color] 도착 P (★ 기본) · [color=#b89a2a]S[/color] 회차 시작 · [color=#d05050]● 적[/color] · [color=#e8c35a]● 조[/color] 조사 · [color=#5a8fd0]● N[/color] NPC · [color=#5fae6a]● 거[/color] 거점 · [color=#c070d0]● !![/color] 이벤트 (밟으면 컷신) · [color=#a07850]● 문[/color] · [color=#6fa8dc]● 통[/color] 통로 · [color=#c8a060]● 이[/color] 이용 · 맵 바깥 푸른 띠 = 가장자리 이동
 """
 const TYPE_NAME :={"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구(문)",
-	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P"}
+	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P", "event": "이벤트 칸"}
 const EDGES := [["up", "위"], ["down", "아래"], ["left", "왼쪽"], ["right", "오른쪽"]]
 
 var dir := MAP_DIR                   # 테스트에서 바꿔 쓴다
@@ -523,6 +524,21 @@ func _edit_object(o: Dictionary) -> void:
 			var sp := _spin("순찰 칸 수", int(o.get("patrol_len", 0)), 0, 100)
 			sp.tooltip_text = "그 칸 수만큼 왕복"
 			sp.value_changed.connect(func(v): set_field(o, "patrol_len", int(v)))
+		"event":
+			_section("이벤트 (밟으면 시작)")
+			_option("대화 (컷신)", dialogue_starts, o.get("ref", ""), func(v): set_field(o, "ref", v))
+			var once := CheckBox.new()
+			once.text = "한 번만 (한 번 본 뒤에는 다시 밟아도 안 나옴)"
+			once.button_pressed = o.get("once", false)
+			once.toggled.connect(func(on):
+				if on:
+					set_field(o, "once", true)
+				else:
+					checkpoint()
+					o.erase("once")
+					dirty = true)
+			inspector.add_child(once)
+			_hint("게임에서는 보이지 않습니다. 대화에 🎬 연출 카드를 넣으면 컷신이 됩니다 (그동안 플레이어는 못 움직임).")
 		"npc":
 			_section("NPC")
 			_option("대화", dialogue_starts, o.get("ref", ""), func(v): set_field(o, "ref", v))
@@ -887,7 +903,7 @@ func _build_left_panel() -> Control:
 	grid.columns = 2
 	filt_box.add_child(grid)
 	for f in [["tiles", "타일"], ["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"],
-			["travel", "문·통로·이용"], ["arrive", "도착 P"], ["sight", "순찰"], ["names", "이름표"], ["links", "연결"]]:
+			["travel", "문·통로·이용"], ["arrive", "도착 P"], ["event", "이벤트"], ["sight", "순찰"], ["names", "이름표"], ["links", "연결"]]:
 		var cb := CheckBox.new()
 		cb.text = f[1]
 		cb.button_pressed = true

@@ -9,6 +9,10 @@ extends Node2D
 ## - 맵 칸: '#' 벽, '.' 바닥, ' ' 빈 공간(검은색, 지나갈 수 없음).
 ## - 저장은 베이스캠프에서만: 잠을 자면 저장되고, 고양이가 와 있으면 고양이에게도 저장할 수 있다(대화 효과 save).
 ## - NPC 는 FieldObjects.schedule 의 시간대에만 나타난다 (예: 고양이의 하루 루틴). 시계가 흐르면 바로 반영.
+##   나타나는 조건(condition)도 플래그·소지품이 바뀌면 바로 다시 본다 (컷신 중에 플래그를 켜서 NPC 를 등장시키기).
+## - 이벤트 칸(event): 밟으면 대화(컷신) 시작. once = 한 번만 (조사한 곳처럼 회차 상태에 기록).
+## - 🎬 연출 카드의 필드 단계(walk·camera·vanish·shake)는 여기서 실행 (StoryRunner.field_director = _direct_step).
+##   대화 중이므로 플레이어는 조작할 수 없다.
 ## 회차 상태(시계·생존·몸·처치한 적·조사한 곳·소지품)는 GameState 에 있고, 베이스캠프에서만 저장된다.
 ##
 ## TODO(기획 미확정): 생존 파라미터가 낮을 때의 효과(§5), 탐험 중 종료 처리(§13.2 — 지금은 마지막 저장에서 이어짐),
@@ -27,6 +31,7 @@ const EnemyScript = preload("res://scenes/field/field_enemy.gd")
 const WALL_LAYER := 1
 const ACTOR_LAYER := 2
 const NPC_LAYER := 4
+const Direction = preload("res://core/direction.gd")
 const DOOR_LAYER := 8            # 닫힌 문: 플레이어·적 모두 통과 못 하고, 적의 시야도 막는다 (field_enemy._can_see)
 const INTERACT_RANGE := 1.1      # 칸
 const TOAST_TIME := 3.0
@@ -37,6 +42,9 @@ static var next_map_id := ""
 var map := {}
 var tile := 48.0
 var frozen := false
+var events: Array = []          # 이벤트 칸 [{kind:"event", data, pos, tile, done}] — 화면에 안 보임
+var _last_tile := Vector2i(-999, -999)   # 이벤트 칸은 '들어설 때' 한 번
+var _cam_target: Vector2i = Vector2i(-1, -1)
 var player: CharacterBody2D
 var enemies: Array = []
 var spots: Array = []            # 상호작용 지점 [{ kind: "spot"/"camp"/"exit", data, pos, done }]
@@ -74,6 +82,9 @@ func _ready() -> void:
 	GameState.survival_changed.connect(_update_hud)
 	GameState.clock_changed.connect(_update_hud)
 	GameState.clock_changed.connect(_refresh_presence)
+	GameState.flags_changed.connect(_refresh_presence)
+	GameState.inventory_changed.connect(_refresh_presence)
+	StoryRunner.field_director = _direct_step
 	GameState.inventory_changed.connect(_update_hud)
 	GameState.body_changed.connect(_update_hud)
 	%TitleButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
@@ -93,6 +104,8 @@ func _exit_tree() -> void:
 			[StoryRunner.travel_requested, _on_travel_requested]]:
 		if pair[0].is_connected(pair[1]):
 			pair[0].disconnect(pair[1])
+	if StoryRunner.field_director == Callable(self, "_direct_step"):
+		StoryRunner.field_director = Callable()
 
 
 # ---------------------------------------------------------------- 맵 만들기
@@ -105,6 +118,7 @@ func load_map(map_id: String) -> void:
 	enemies.clear()
 	spots.clear()
 	npcs.clear()
+	events.clear()
 	_near_spot = {}
 	%Prompt.visible = false
 	map = DataLoader.maps.get(map_id, {})
@@ -182,6 +196,7 @@ func _build_actors() -> void:
 	player.position = _tile_center(spawn[0], spawn[1])
 	_add_circle_shape(player, player.radius)
 	var cam := Camera2D.new()
+	cam.name = "Camera2D"   # 연출(_camera)이 찾는 이름
 	# 위아래 검은 띠(화면의 10.6%)에 맵 가장자리가 가려지지 않게 그만큼 더 움직이게 둔다
 	var bar := int(get_viewport_rect().size.y * 0.106)
 	cam.limit_left = 0
@@ -196,8 +211,9 @@ func _build_actors() -> void:
 
 	var dirs := {"up": Vector2.UP, "down": Vector2.DOWN, "left": Vector2.LEFT, "right": Vector2.RIGHT}
 	for o in map.objects:
-		# 조건이 맞을 때만 나타나는 물체 (시간대는 schedule 로 따로 — _refresh_presence)
-		if o.get("condition", "") != "" and not Expr.evaluate(o.condition, GameState):
+		# 조건이 맞을 때만 나타나는 물체 (시간대는 schedule 로 따로 — _refresh_presence).
+		# NPC 는 만들어 두고 _refresh_presence 가 조건을 다시 본다, 이벤트는 밟을 때 본다
+		if not o.type in ["npc", "event"] and o.get("condition", "") != "" and not Expr.evaluate(o.condition, GameState):
 			continue
 		var pos := _tile_center(o.x, o.y)
 		match o.type:
@@ -239,7 +255,10 @@ func _build_actors() -> void:
 				n.position = pos
 				_add_circle_shape(n, n.radius)
 				%World.add_child(n)
-				npcs.append({"kind": "npc", "data": o, "pos": pos, "node": n, "active": true})
+				npcs.append({"kind": "npc", "data": o, "pos": pos, "node": n, "active": true, "vanished": false})
+			"event":
+				events.append({"kind": "event", "data": o, "pos": pos, "tile": Vector2i(int(o.x), int(o.y)),
+					"done": GameState.field_has(map.map_id, "done", o.object_id)})
 	_refresh_presence()
 
 
@@ -247,7 +266,9 @@ func _build_actors() -> void:
 func _refresh_presence() -> void:
 	var minute := GameState.minute_of_day()
 	for n in npcs:
-		var here := in_schedule(n.data.get("schedule", []), minute)
+		var cond: String = n.data.get("condition", "")
+		var here: bool = in_schedule(n.data.get("schedule", []), minute) and not n.vanished \
+			and (cond == "" or Expr.evaluate(cond, GameState))
 		if here != n.active:
 			n.active = here
 			n.node.visible = here
@@ -332,7 +353,27 @@ func _physics_process(delta: float) -> void:
 		if not edge.is_empty():
 			travel(edge.ref, edge.get("arrive", ""), "%s:%s" % [map.map_id, edge.dir])
 			return
+	if here != _last_tile:
+		_last_tile = here
+		if _try_event(here):
+			return
 	_update_near_spot()
+
+
+## 이벤트 칸을 밟음: 조건이 맞고 (한 번만이면 아직 안 했으면) 그 대화(컷신)를 시작
+func _try_event(t: Vector2i) -> bool:
+	for e in events:
+		if e.tile != t or (e.data.get("once", false) and e.done):
+			continue
+		var cond: String = e.data.get("condition", "")
+		if cond != "" and not Expr.evaluate(cond, GameState):
+			continue
+		if e.data.get("once", false):
+			e.done = true
+			GameState.field_mark(map.map_id, "done", e.data.object_id)
+		_start_dialogue(e)
+		return true
+	return false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -686,6 +727,7 @@ func _start_dialogue(npc: Dictionary) -> void:
 func _on_dialogue_finished() -> void:
 	_dialogue_ui.queue_free()
 	_dialogue_ui = null
+	_camera_follow()   # 컷신에서 옮긴 카메라는 대화가 끝나면 플레이어에게
 	StoryRunner.enter_field()
 	frozen = false
 	_update_hud()
@@ -693,6 +735,118 @@ func _on_dialogue_finished() -> void:
 		var t := _pending_travel
 		_pending_travel = []
 		travel(t[0], t[1])
+
+
+# ---------------------------------------------------------------- 🎬 연출 (필드 단계)
+## StoryRunner.field_director: 연출 카드의 필드 단계를 실행한다 (core/direction.gd)
+func _direct_step(s: Dictionary) -> void:
+	match s.get("do", ""):
+		"walk":
+			var who := _actor(str(s.get("who", "")))
+			if who == null:
+				push_warning("[연출] 이 맵에 없는 인물: %s" % s.get("who", ""))
+				return
+			var to: Array = s.get("to", [0, 0])
+			var tw := _walk(who, Vector2i(int(to[0]), int(to[1])), float(s.get("speed", 3.0)))
+			if tw and s.get("wait", true):
+				await tw.finished
+		"camera":
+			var cam := _camera()
+			var who := str(s.get("who", ""))
+			var time := float(s.get("time", 1.0))
+			if who == "player":
+				_camera_follow()
+				return
+			var target: Vector2
+			var actor := _actor(who) if who != "" else null
+			if actor:
+				target = actor.global_position
+			else:
+				var to: Array = s.get("to", [0, 0])
+				target = _tile_center(int(to[0]), int(to[1]))
+			if not cam.top_level:
+				var at := cam.get_screen_center_position()
+				cam.top_level = true
+				cam.global_position = at
+			if time <= 0.0:
+				cam.global_position = target
+			else:
+				var tw := create_tween()
+				tw.tween_property(cam, "global_position", target, time).set_trans(Tween.TRANS_SINE)
+				await tw.finished
+		"vanish":
+			for n in npcs:
+				if n.data.object_id == s.get("who", ""):
+					n.vanished = true
+			_refresh_presence()
+		"shake":
+			var cam := _camera()
+			var t := 0.0
+			var time := float(s.get("time", 0.4))
+			while t < time:
+				cam.offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * tile * 0.12 * float(s.get("power", 1.0))
+				await get_tree().process_frame
+				t += get_process_delta_time()
+			cam.offset = Vector2.ZERO
+
+
+## 연출 대상: "player" 또는 이 맵의 NPC object_id
+func _actor(who: String) -> Node2D:
+	if who == "player":
+		return player
+	for n in npcs:
+		if n.data.object_id == who:
+			return n.node
+	return null
+
+
+## who 를 칸 to 까지 걷게 한다 (벽을 돌아가는 길 찾기). 다 걸으면 끝나는 Tween 을 돌려준다
+func _walk(who: Node2D, to: Vector2i, speed: float) -> Tween:
+	var grid := AStarGrid2D.new()
+	grid.region = Rect2i(0, 0, int(map.width), int(map.height))
+	grid.cell_size = Vector2(tile, tile)
+	grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
+	grid.update()
+	for y in map.tiles.size():
+		var row: String = map.tiles[y]
+		for x in row.length():
+			if _is_solid(row[x]):
+				grid.set_point_solid(Vector2i(x, y))
+	var from := Vector2i(floori(who.global_position.x / tile), floori(who.global_position.y / tile))
+	var path: Array = []
+	if grid.region.has_point(from) and grid.region.has_point(to) and not grid.is_point_solid(to):
+		path = grid.get_id_path(from, to)
+	if path.is_empty():
+		path = [from, to]   # 길이 없으면 곧장
+	var tw := create_tween()
+	var at := who.position
+	for p in path.slice(1):
+		var dest := _tile_center(p.x, p.y)
+		tw.tween_property(who, "position", dest, at.distance_to(dest) / maxf(0.1, speed * tile))
+		at = dest
+	if path.size() <= 1:
+		tw.tween_interval(0.0)
+	tw.finished.connect(func():
+		if is_instance_valid(who):
+			for n in npcs:
+				if n.node == who:
+					n.pos = who.position   # 대화·상호작용 위치도 옮긴 자리로
+			if who == player:
+				_last_tile = Vector2i(floori(player.global_position.x / tile), floori(player.global_position.y / tile)))
+	return tw
+
+
+func _camera() -> Camera2D:
+	return player.get_node_or_null("Camera2D") if player else null
+
+
+## 카메라가 다시 플레이어를 따라간다
+func _camera_follow() -> void:
+	var cam := _camera()
+	if cam and cam.top_level:
+		cam.top_level = false
+		cam.position = Vector2.ZERO
+		cam.offset = Vector2.ZERO
 
 
 # ---------------------------------------------------------------- 전투

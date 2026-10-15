@@ -12,7 +12,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "t1_a",
@@ -27,7 +28,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "t1_b",
@@ -42,7 +44,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "t1_c",
@@ -57,7 +60,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "t1_d",
@@ -72,7 +76,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "t1_timeout",
@@ -87,7 +92,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "t2_a",
@@ -102,7 +108,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "t2_timeout",
@@ -117,7 +124,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "t2_npc1",
@@ -132,7 +140,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "t2_npc2",
@@ -147,7 +156,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "t1_e",
@@ -162,7 +172,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "t1_dice_ok",
@@ -177,7 +188,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "t1_dice_fail",
@@ -192,7 +204,8 @@
   "pages": [],
   "routes": [],
   "text_speed": "",
-  "npc_id": ""
+  "npc_id": "",
+  "steps": []
  },
  {
   "node_id": "cat_start",
@@ -215,6 +228,7 @@
     "next_node": "cat_1"
    }
   ],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_cat"
  },
@@ -242,6 +256,7 @@
    }
   ],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_cat"
  },
@@ -257,6 +272,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_cat"
  },
@@ -277,6 +293,7 @@
     "next_node": "monster_test_combat"
    }
   ],
+  "steps": [],
   "text_speed": "",
   "npc_id": "enemy_test"
  },
@@ -292,6 +309,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "enemy_test"
  },
@@ -307,6 +325,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "enemy_test"
  },
@@ -322,6 +341,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc"
  },
@@ -337,6 +357,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc"
  },
@@ -352,6 +373,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc"
  },
@@ -367,6 +389,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc"
  },
@@ -382,6 +405,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -397,6 +421,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -412,6 +437,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -427,6 +453,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -442,6 +469,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -457,6 +485,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -472,6 +501,7 @@
   "fail_next": "fd_npc2_no",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -487,6 +517,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -502,6 +533,7 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
   "text_speed": "",
   "npc_id": "char_npc2"
  }

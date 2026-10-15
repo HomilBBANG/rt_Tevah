@@ -14,6 +14,7 @@ extends Control
 
 const ChoiceButton = preload("res://ui/choice_button.gd")
 const ScriptPages = preload("res://core/script_pages.gd")
+const Direction = preload("res://core/direction.gd")
 const KIND_OF := {"narration": "situation", "bubble": "dialogue", "system": "system"}
 
 ## 탐험 필드 위에 겹쳐 띄운 NPC 대화가 끝남 (embedded 일 때만)
@@ -53,6 +54,10 @@ var _type_cps := 0.0
 var _type_pauses: Array = []    # [[글자 위치, 초], ...] 남은 대기
 var _type_wait := 0.0
 var _auto_left := -1.0          # 자동 넘김까지 남은 초 (-1 = 없음)
+# 🎬 연출 (core/direction.gd): 그림 칸·페이드 칸은 배경 바로 위, 대사 상자 아래 (검은 화면·그림 위에 글을 띄울 수 있게)
+var cg: TextureRect
+var fade: ColorRect
+var directing := false
 
 
 func _ready() -> void:
@@ -66,6 +71,22 @@ func _ready() -> void:
 	_link(StoryRunner.ending_reached, _on_ending)
 	_link(StoryRunner.dialogue_ended, _on_dialogue_ended)
 	_link(StoryRunner.inventory_full, %Inventory.open_discard)
+	_link(StoryRunner.direction_requested, _on_direction)
+	cg = TextureRect.new()
+	cg.set_anchors_preset(PRESET_FULL_RECT)
+	cg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	cg.mouse_filter = MOUSE_FILTER_IGNORE
+	cg.modulate.a = 0.0
+	cg.visible = false
+	add_child(cg)
+	move_child(cg, $Scene.get_index() + 1)
+	fade = ColorRect.new()
+	fade.set_anchors_preset(PRESET_FULL_RECT)
+	fade.mouse_filter = MOUSE_FILTER_IGNORE
+	fade.color = Color(0, 0, 0, 0)
+	add_child(fade)
+	move_child(fade, cg.get_index() + 1)
 	_link(GameState.stats_changed, _update_status)
 	_link(GameState.inventory_changed, _update_status)
 	%InventoryButton.pressed.connect(%Inventory.open_browse)
@@ -113,6 +134,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## 다음 페이지로. 마지막 페이지이고 선택지 없는 노드면 스토리를 진행.
 func advance() -> void:
+	if directing:
+		return   # 연출 중에는 넘기지 않는다
 	_auto_left = -1.0
 	if _type_label != null:
 		_finish_typing()   # 나오는 중 → 이 페이지 전체 표시
@@ -190,6 +213,75 @@ func _start_pages() -> void:
 	start_page = 0
 	if not _pages.is_empty():
 		_next_page()
+
+
+# ---------------------------------------------------------------- 🎬 연출
+## 연출 카드: 대사 상자를 숨기고 단계를 차례로 실행한 뒤 StoryRunner 에 알린다
+func _on_direction(steps: Array) -> void:
+	directing = true
+	_auto_left = -1.0
+	_type_label = null
+	_clear_choices()
+	for n in [%SituationBox, %SystemBox, %Bubble, %PrevBubble, %PortraitLeft, %PortraitRight, %DicePanel, %AdvanceHint]:
+		n.visible = false
+	var dim: float = $Scene.color.a
+	if embedded:
+		$Scene.color.a = 0.0   # 필드 위 연출: 뒤의 맵이 그대로 보이게
+	for s in steps:
+		await _do_step(Direction.normalize(s))
+	if embedded:
+		$Scene.color.a = dim
+	directing = false
+	StoryRunner.direction_finished()
+
+
+func _do_step(s: Dictionary) -> void:
+	match s.do:
+		"image":
+			var tex := Direction.load_image(str(s.file))
+			if tex == null:
+				push_warning("[연출] 그림을 찾을 수 없음: %s" % s.file)
+				return
+			cg.texture = tex
+			cg.visible = true
+			await _tween(cg, "modulate:a", 1.0, float(s.fade))
+		"image_off":
+			await _tween(cg, "modulate:a", 0.0, float(s.fade))
+			cg.visible = false
+		"fade":
+			if s.to != "clear":
+				var c := Color.WHITE if s.to == "white" else Color.BLACK
+				fade.color = Color(c.r, c.g, c.b, fade.color.a)
+			await _tween(fade, "color:a", 0.0 if s.to == "clear" else 1.0, float(s.time))
+		"shake":
+			if StoryRunner.field_director.is_valid():
+				StoryRunner.field_director.call(s)   # 맵(카메라)도 같이 — 기다리지 않음
+			await _shake(float(s.power), float(s.time))
+		"wait":
+			await get_tree().create_timer(maxf(0.0, float(s.time))).timeout
+		_:
+			# 필드 단계 (walk·camera·vanish): 탐험 화면이 있을 때만 (미리보기에서는 건너뜀)
+			if StoryRunner.field_director.is_valid():
+				await StoryRunner.field_director.call(s)
+
+
+func _tween(obj: Object, prop: String, value: Variant, time: float) -> void:
+	if time <= 0.0:
+		obj.set_indexed(NodePath(prop), value)
+		return
+	var tw := create_tween()
+	tw.tween_property(obj, prop, value, time)
+	await tw.finished
+
+
+func _shake(power: float, time: float) -> void:
+	var base := position
+	var t := 0.0
+	while t < time:
+		position = base + Vector2(randf_range(-1, 1), randf_range(-1, 1)) * 12.0 * power
+		await get_tree().process_frame
+		t += get_process_delta_time()
+	position = base
 
 
 # ---------------------------------------------------------------- 그리기

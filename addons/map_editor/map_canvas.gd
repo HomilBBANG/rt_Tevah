@@ -14,19 +14,19 @@ signal stroke_started             # 한 번의 누름(칠하기·옮기기)이 �
 signal request(action: String)    # 단축키
 signal activated(obj: Dictionary) # 더블클릭
 
-const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive"]
+const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event"]
 const TRAVEL_TYPES := ["exit", "passage", "transit"]
 const COLORS := {
 	"enemy": Color("d05050"), "investigate": Color("e8c35a"), "npc": Color("5a8fd0"),
 	"camp": Color("5fae6a"), "exit": Color("a07850"),
-	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"),
+	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"), "event": Color("c070d0"),
 }
-const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P"}
+const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P", "event": "!!"}
 const EDGE_NAME := {"up": "위", "down": "아래", "left": "왼쪽", "right": "오른쪽"}
 const DIR := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 ## 표시 필터 묶음: 물체 종류 → 필터 이름
 const FILTER_OF := {"enemy": "enemy", "investigate": "investigate", "npc": "npc", "camp": "camp",
-	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive"}
+	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive", "event": "event"}
 const PAINT_TOOLS := ["wall", "floor", "void"]
 
 var map := {}                 # { map_id, tiles: [String], start, run_start, objects: [...], edges }
@@ -42,7 +42,7 @@ var region := Rect2i()        # 영역 선택 (칸). size 0 = 없음
 var id_maker: Callable        # func(type) -> String
 var require_default := false  # 베이스캠프: ★ 기본 P 가 꼭 있어야 함 (첫 P 는 자동 기본, 기본 P 는 못 지움)
 ## 표시 필터 (false = 숨김, 숨긴 물체는 고를 수도 없음)
-var filters := {"tiles": true, "enemy": true, "investigate": true, "npc": true, "camp": true, "travel": true,
+var filters := {"tiles": true, "enemy": true, "investigate": true, "npc": true, "camp": true, "travel": true, "event": true,
 	"arrive": true, "sight": true, "names": true, "links": true}
 ## 연결 표시: object_id → [글자, 맞으면 true] (편집기가 채움). 가장자리는 "edge:방향"
 var link_labels := {}
@@ -456,6 +456,10 @@ func _draw() -> void:
 		draw_rect(Rect2(pan + Vector2(pr.position) * s, Vector2(pr.size) * s), pcol)
 	if in_bounds(_hover):
 		draw_rect(Rect2(pan + Vector2(_hover) * s, Vector2(s, s)), Color(1, 1, 1, 0.5), false, 2.0)
+		# 칸 좌표 (대화 에디터 🎬 연출의 '걷게 하기'·'카메라' 칸 x·y 에 쓴다)
+		var at := pan + (Vector2(_hover) + Vector2(0.5, 1.0)) * s + Vector2(0, 11)
+		draw_rect(Rect2(at - Vector2(24, 9), Vector2(48, 18)), Color(0, 0, 0, 0.7))
+		_label("%d, %d" % [_hover.x, _hover.y], at, Color(1, 1, 1, 0.9), 13)
 
 
 ## 자세히 보여 줄 물체: 고른 것 + 마우스가 올라간 것

@@ -318,6 +318,20 @@ func _run() -> void:
 	GameState.combat_enemy = ""
 	check(not StoryRunner.Expr.evaluate("combat:any", GameState), "전투가 끝나면 combat:any 거짓")
 
+	# ---------- 🎬 연출 카드 (kind=direct): 화면에 단계를 맡기고 끝나면 next_node
+	DataLoader.nodes["tdir"] = {"node_id": "tdir", "kind": "direct", "speaker_id": "", "text": "", "on_enter": "", "pages": [],
+		"next_node": "fd_npc1_a", "steps": [{"do": "image", "file": "test_cg.png", "fade": 0}, {"do": "wait", "time": 0}]}
+	var got := []
+	StoryRunner.direction_override = func(steps):
+		got.append(steps)
+		await get_tree().process_frame
+	await StoryRunner.start_dialogue("tdir")
+	check(got.size() == 1 and got[0].size() == 2 and got[0][0].do == "image" and node_id == "fd_npc1_a", "연출 카드: 단계 2개를 화면에 맡긴 뒤 다음 카드 (%s)" % node_id)
+	StoryRunner.direction_override = Callable()
+	await StoryRunner.start_dialogue("tdir")   # 받을 화면이 없으면 건너뜀 (멈추지 않음)
+	check(node_id == "fd_npc1_a" and not StoryRunner.busy, "받을 화면이 없으면 연출은 건너뛰고 진행")
+	DataLoader.nodes.erase("tdir")
+
 
 func _fresh_to_d() -> void:
 	ending = ""

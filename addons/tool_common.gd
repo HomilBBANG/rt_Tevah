@@ -87,7 +87,7 @@ static func add_help_window(owner: Control, bar: HBoxContainer, title: String, b
 ## items·survival·abilities·parts·loot·nodes: [[id, 보이는 이름]], flags·wflags·traits: [이름] (이미 쓰이는 것)
 static func load_lookups() -> Dictionary:
 	var lk := {"items": [], "survival": [], "abilities": [], "parts": [], "loot": [], "nodes": [], "endings": [], "statuses": [], "dests": [],
-		"flags": [], "wflags": [], "traits": [], "trait_list": [], "enemies": []}
+		"flags": [], "wflags": [], "traits": [], "trait_list": [], "enemies": [], "people": []}
 	for i in read_json("res://data/items.json", []):
 		lk.items.append([i.item_id, "%s (%s)" % [i.name, i.item_id]])
 	for e in read_json("res://data/enemies.json", []):
@@ -133,6 +133,9 @@ static func load_lookups() -> Dictionary:
 		texts.append_array([c.get("condition", ""), c.get("effects", ""), c.get("fail_effects", "")])
 	for m in read_json("res://data/maps.json", []):
 		lk.dests.append([m.map_id, "%s — 기본 도착(P)" % m.map_id])
+		for o in m.get("objects", []):
+			if o.get("type", "") == "npc":   # 연출 카드의 인물 (걷게 하기·카메라·숨기기)
+				lk.people.append([o.object_id, "%s · %s" % [m.map_id, o.get("name", "") if o.get("name", "") != "" else o.object_id]])
 		for o in m.get("objects", []):
 			texts.append(o.get("condition", ""))
 			if o.get("type", "") == "arrive":

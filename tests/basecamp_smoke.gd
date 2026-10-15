@@ -31,6 +31,12 @@ func _ready() -> void:
 	_press("interact")
 	await _wait(0.3)
 	var dlg: Node = f._dialogue_ui
+	# 고양이 대화 첫 카드가 여러 페이지면 선택지가 나올 때까지 넘긴다
+	for i in 6:
+		if _find_button(dlg, "쓰다듬는다 (저장)").is_inside_tree():
+			break
+		dlg.advance()
+		await _wait(0.1)
 	await _snap("cat")
 	_find_button(dlg, "쓰다듬는다 (저장)").pressed.emit()
 	await _wait(0.2)

@@ -12,6 +12,7 @@ extends VBoxContainer
 const Card = preload("res://addons/dialogue_editor/dialogue_card.gd")
 const FuncCard = preload("res://addons/dialogue_editor/func_card.gd")
 const StartCard = preload("res://addons/dialogue_editor/start_card.gd")
+const DirectCard = preload("res://addons/dialogue_editor/direct_card.gd")
 const ScriptPanel = preload("res://addons/dialogue_editor/script_panel.gd")
 const ScriptPages = preload("res://core/script_pages.gd")
 const ExprRows = preload("res://addons/expr_rows.gd")
@@ -22,9 +23,10 @@ const ADD_MENU := [
 	["line", "📝 대본 블록 — 대사·상황 묘사·시스템 메시지 (여러 페이지)"],
 	["branch", "◇ 조건 분기 — 조건에 따라 길이 갈림"],
 	["effect", "⚙ 효과 — 아이템·플래그·생존 수치 등을 바꿈"],
+	["direct", "🎬 연출 — 그림 띄우기·페이드·흔들기, 필드에서 걷기·카메라 (컷신)"],
 	["ending", "■ 엔딩 — 1단계 에피소드 대화의 끝"],
 ]
-const PALETTE := [["start", "▶ 대화 시작"], ["line", "📝 대본 블록"], ["branch", "◇ 조건 분기"], ["effect", "⚙ 효과"], ["ending", "■ 엔딩"]]
+const PALETTE := [["start", "▶ 대화 시작"], ["line", "📝 대본 블록"], ["branch", "◇ 조건 분기"], ["effect", "⚙ 효과"], ["direct", "🎬 연출"], ["ending", "■ 엔딩"]]
 
 const DIALOGUE_DIR := "res://tools/dialogues/"
 const EXIT_NAME := "__EXIT__"
@@ -280,6 +282,13 @@ const HELP_TEXT := """[b]대화 탭 쓰는 법[/b] — 대본은 아래 칸에�
 
 [b]4. 기능 카드[/b] — ◇ 조건 분기(맞으면 / [color=#e46a6a]아니면[/color]) · ⚙ 효과(아이템·플래그·생존 수치·상태이상·팔다리 복구·저장·맵 이동 …)
   · 조건·효과는 [b]＋ 조건 추가 / ＋ 효과 추가[/b]로 목록에서 고릅니다 (글자로 쓸 필요 없음).
+
+[b]4-1. 🎬 연출 (컷신)[/b] — 카드 안 [b]＋ 연출 추가[/b]로 단계를 넣고, 위에서부터 차례로 실행합니다 (그동안 대사 상자는 숨고 플레이어는 못 움직임).
+  · 그림 컷신: [b]그림 띄우기[/b] (art/cutscenes/ 에 넣은 그림, 화면 가득) → 대본 블록(그림 위에 대사) → … → [b]그림 내리기[/b]. 페이드·흔들기·기다리기도.
+  · 인게임 컷신: [b]걷게 하기[/b](플레이어·맵의 NPC → 칸 x·y, 벽은 돌아감) · [b]카메라 옮기기[/b] · [b]NPC 숨기기[/b] — 탐험 필드에서만 (미리보기에서는 건너뜀).
+    칸 x·y 는 맵 탭에서 마우스를 올리면 보입니다. '다 걸을 때까지 기다림'을 끄면 여럿이 같이 걷습니다.
+  · 시작: 맵 탭의 [b]이벤트[/b] 칸을 밟으면 (한 번만·나타나는 조건 가능), 또는 NPC 대화 중에.
+  · NPC 를 컷신 도중 등장시키려면: NPC 에 '나타나는 조건 = 플래그'를 걸고, 효과 카드로 그 플래그를 켜면 바로 나타납니다.
 
 [b]5. 고치기[/b] (그래프를 한 번 누른 뒤)
   · Ctrl+Z 실행 취소 · Ctrl+Y 다시 실행 · Ctrl+C/V 복사·붙여넣기 · Ctrl+D 복제 · Delete 지우기 · F 고른 카드 가운데로 · Ctrl+S 저장
@@ -595,8 +604,9 @@ func _build_graph() -> void:
 
 func _make_card(data: Dictionary, node_choices: Array, pos: Vector2) -> GraphNode:
 	var kind: String = data.get("kind", "")
-	var card: GraphNode = StartCard.new() if kind == "start" else (FuncCard.new() if kind in ["effect", "branch"] else Card.new())
-	if card is FuncCard or card is StartCard:
+	var card: GraphNode = StartCard.new() if kind == "start" else (DirectCard.new() if kind == "direct" else
+		(FuncCard.new() if kind in ["effect", "branch"] else Card.new()))
+	if card is FuncCard or card is StartCard or card is DirectCard:
 		card.lookups = lookups
 	card.choice_id_maker = _new_choice_id
 	card.target_exists = _target_exists
@@ -633,9 +643,11 @@ func add_card(pos: Vector2) -> GraphNode:
 	return card
 
 
-## 기능 카드 (kind: effect / branch)
+## 기능 카드 (kind: effect / branch / direct)
 func add_func_card(kind: String, pos: Vector2) -> GraphNode:
 	var data := {"node_id": _new_node_id(), "kind": kind, "speaker_id": "", "text": "", "next_node": "", "on_enter": ""}
+	if kind == "direct":
+		data.steps = []
 	if kind == "branch":
 		data.condition = ""
 		data.fail_next = ""
@@ -668,7 +680,7 @@ func _on_connect_empty(from: StringName, from_port: int, release: Vector2) -> vo
 		return
 	var pos := _graph_pos(release)
 	var pm := PopupMenu.new()
-	var kinds := [["line", "📝 새 대본 블록"], ["branch", "◇ 새 조건 분기"], ["effect", "⚙ 새 효과"]]
+	var kinds := [["line", "📝 새 대본 블록"], ["branch", "◇ 새 조건 분기"], ["effect", "⚙ 새 효과"], ["direct", "🎬 새 연출"]]
 	if dialogue.get("episode_id", "") == "":
 		kinds.append(["exit", "대화 끝 (EXIT)"])
 	for i in kinds.size():
@@ -987,6 +999,19 @@ func _edit_node(card: GraphNode) -> void:
 	_box_mode = "node"
 	_clear_inspector()
 	var d: Dictionary = card.data
+	if card is DirectCard:
+		_title("🎬 연출")
+		_section("기본")
+		_hint("카드 안에서 '＋ 연출 추가'로 단계를 넣습니다. 위에서부터 차례로 실행하고 다 끝나면 '다음 →'.
+· 그림 띄우기: art/cutscenes/ 에 넣은 그림 (화면 가득, 그 위에 대사 상자가 뜸)
+· 페이드: 검게·하얗게 덮기 / 걷기
+· 걷게 하기·카메라·NPC 숨기기: 탐험 필드에서만 (미리보기에서는 건너뜀)
+연출 중에는 대사 상자가 숨고 플레이어는 움직일 수 없습니다.")
+		_section("결과")
+		_target("다음 갈 곳", d, "next_node", card)
+		_section("고급", false)
+		_line("카드 ID", d.node_id, func(v): _rename_node(card, v))
+		return
 	if card is StartCard:
 		_title("▶ 대화 시작")
 		_section("기본")
@@ -1438,7 +1463,7 @@ func _target(label: String, d: Dictionary, key: String, card: GraphNode) -> void
 		here[id] = true
 		if c is StartCard:
 			continue   # 대화 시작 카드로는 이을 수 없음 (들어오는 점 없음)
-		var what: String = ("(조건 분기)" if c.data.kind == "branch" else "(효과 카드)") if c is FuncCard else c.summary().left(18)
+		var what: String = "(연출)" if c is DirectCard else (("(조건 분기)" if c.data.kind == "branch" else "(효과 카드)") if c is FuncCard else c.summary().left(18))
 		opts.append([id, "이 대화: %s — %s" % [id, what]])
 	for n in lookups.get("nodes", []):
 		if not here.has(n[0]) and n[1] == episode:

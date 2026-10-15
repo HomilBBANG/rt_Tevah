@@ -32,6 +32,14 @@ signal combat_requested(enemy_id: String)
 signal travel_requested(map_id: String, arrive: String)
 ## 전투 중 대화의 효과 endcombat: 로 정해진 끝 ("win" / "flee", 없으면 "")
 var combat_end := ""
+## 🎬 연출 카드 (core/direction.gd): 보이는 대화 화면이 단계를 실행하고 direction_finished() 를 부른다
+signal direction_requested(steps: Array)
+signal _direction_done
+## 필드 단계(walk·camera·vanish)를 실행할 곳 — 탐험 화면이 정한다. func(step: Dictionary) (await 가능)
+var field_director: Callable
+## 테스트용: 정해 두면 화면 대신 이것을 부른다. func(steps: Array)
+var direction_override: Callable
+var _direction_pending := false
 signal _combat_done(outcome: String)
 signal _discard_chosen(slot: int)
 
@@ -299,6 +307,12 @@ func _goto(target: String) -> void:
 		elif kind == "effect":
 			# 효과 카드: on_enter 만 실행하고 화면에 보이지 않은 채 다음으로
 			target = node.next_node
+		elif kind == "direct":
+			# 연출 카드: 그림·페이드·걷기·카메라 … 를 끝까지 보여 준 뒤 다음으로
+			await _direct(node.get("steps", []))
+			if ended:
+				return
+			target = node.next_node
 		elif kind == "start":
 			# 대화 시작 카드: 길을 위에서부터 보고 조건이 맞는 첫 길로, 없으면 '그 외' (next_node)
 			target = node.next_node
@@ -361,6 +375,26 @@ func _show_current() -> void:
 			entry.combat = {"enemy_id": c.check, "enemy_name": DataLoader.enemies.get(c.check, {}).get("name", c.check)}
 		entries.append(entry)
 	choices_shown.emit(entries)
+
+
+## 연출 단계 실행을 화면에 맡기고 끝날 때까지 기다린다 (받을 화면이 없으면 건너뜀)
+func _direct(steps: Array) -> void:
+	if steps.is_empty():
+		return
+	if direction_override.is_valid():
+		await direction_override.call(steps)
+		return
+	if direction_requested.get_connections().is_empty():
+		return
+	_direction_pending = true
+	direction_requested.emit(steps)
+	if _direction_pending:
+		await _direction_done
+
+
+func direction_finished() -> void:
+	_direction_pending = false
+	_direction_done.emit()
 
 
 ## 전투 중 대화처럼 하던 대화 위에 잠깐 다른 대화를 할 때: 지금 진행 상태를 저장 / 되돌림
