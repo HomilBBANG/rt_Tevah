@@ -2,7 +2,7 @@ extends Control
 ## 플레이 화면. 게임 로직 없음: StoryRunner·GameState 시그널을 그리고 입력만 돌려준다.
 ##
 ## 한 번의 행동 결과를 "페이지" 순서로 보여준다 (클릭/Space 로 넘김):
-##   dice      — 주사위 판정 연출 (굴리는 중에 클릭하면 바로 결과)
+##   dice      — 주사위 판정 연출 (굴리는 중에 클릭하면 바로 결과). 지금 화면(말풍선·초상화) 위 가운데에 겹쳐 뜬다
 ##   system    — 획득·버림 등 시스템 메시지 (검은 상자, 가운데 정렬)
 ##   situation — 화자 없는 노드 (밝은 상자)
 ##   dialogue  — 화자 있는 노드 (초상화 + 말풍선, 직전 대사는 회색으로 위에)
@@ -186,9 +186,17 @@ func _show_page(p: Dictionary) -> void:
 	_clear_choices()
 	_type_label = null
 	_auto_left = -1.0
+	if p.kind == "dice":
+		# 주사위는 뒤의 대화를 지우지 않고 위에 겹친다 (사용자 시안)
+		%DicePanel.visible = true
+		%DicePanel.play(p.result)
+		# 선택지와 겹치지 않게 숨겼던 지난 대사도 다시 (시안: 회색 지난 말풍선 + 지금 말풍선)
+		%PrevBubble.visible = %Bubble.visible and not _prev_line.is_empty()
+		_page_done()
+		return
 	%SituationBox.visible = p.kind == "situation"
 	%SystemBox.visible = p.kind == "system"
-	%DicePanel.visible = p.kind == "dice"
+	%DicePanel.visible = false
 	var is_dialogue: bool = p.kind == "dialogue"
 	%Bubble.visible = is_dialogue
 	%PrevBubble.visible = false
@@ -202,8 +210,6 @@ func _show_page(p: Dictionary) -> void:
 			_slots = ["", ""]
 		"system":
 			%SystemText.text = p.text
-		"dice":
-			%DicePanel.play(p.result)
 		"dialogue":
 			_show_dialogue(p)
 	match p.kind:
