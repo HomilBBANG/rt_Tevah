@@ -37,6 +37,8 @@ OUT_DIR = ROOT / "data"
 STATS = {"hp", "sanity", "time"}
 SHOW_MODES = {"", "hide", "gray"}
 NODE_KINDS = {"", "line", "effect", "branch", "start", "direct"}
+# 시작 카드의 자동 시작 (trigger.when): 로고 / 타이틀 이전 / 타이틀 이후 / 새 게임 시작 후 / 방 진입 후
+TRIGGER_WHENS = {"logo", "before_title", "after_title", "new_game", "map_enter"}
 # direct = 🎬 연출 카드: steps [{do, ...}] 를 차례로 (core/direction.gd 와 같은 규칙)
 DIRECT_STEPS = {"image", "image_off", "fade", "shake", "wait", "sound", "music", "music_off", "walk", "camera", "vanish", "face"}
 CUTSCENE_DIR = ROOT / "art" / "cutscenes"
@@ -713,6 +715,15 @@ def validate(d, rep):
         if kind in ("effect", "branch", "start", "direct") and nid in choices_by_node:
             rep.err(w, "효과·조건 분기·대화 시작 카드에는 선택지를 달 수 없음")
         routes = n.get("routes") or []
+        trig = n.get("trigger") or {}
+        if trig and kind != "start":
+            rep.err(w, "자동 시작(trigger)은 대화 시작 카드에서만")
+        elif trig:
+            when = str(trig.get("when", ""))
+            if when not in TRIGGER_WHENS:
+                rep.err(w, f"자동 시작 시점은 {' / '.join(sorted(TRIGGER_WHENS))}: '{when}'")
+            if when == "map_enter" and str(trig.get("map", "")) not in d.get("_maps", {}):
+                rep.err(w, f"방 진입 자동 시작: 없는 맵 '{trig.get('map', '')}'")
         if kind == "start":
             if ep != "":
                 rep.err(w, "대화 시작 카드는 NPC(필드) 대화에서만")
@@ -834,7 +845,7 @@ def validate(d, rep):
     # 대화 시작 카드는 맵에 아직 안 놓은 NPC 의 대화여도 검사가 통과하도록 뿌리로 (안 쓰이면 경고)
     roots.append([n["node_id"] for n in d["Nodes"] if n["kind"] == "start"])
     for n in d["Nodes"]:
-        if n["kind"] == "start" and n["node_id"] not in npc_refs and n["node_id"] != opening:
+        if n["kind"] == "start" and n["node_id"] not in npc_refs and n["node_id"] != opening and not n.get("trigger"):
             rep.warn(f"{loc('Nodes', n)} ({n['node_id']})", "어느 맵의 NPC 에도 연결되지 않은 대화 시작 카드")
     for root in roots:
         q = deque(x for x in root if x in nodes)
@@ -1074,8 +1085,6 @@ def read_dialogues(d, rep):
         # 대화 에디터의 '게임 오프닝으로 쓰기' 체크 → 시작 카드(없으면 첫 카드)
         if dlg.get("opening") and dlg.get("nodes"):
             d.setdefault("_openings", []).append((f.name, starts[0] if starts else str(dlg["nodes"][0].get("node_id", ""))))
-        if len(starts) > 1:
-            rep.err(f"대화 {f.name}", f"대화 시작 카드가 {len(starts)}개 (하나만): {', '.join(map(str, starts))}")
         if npc and not starts:
             rep.warn(f"대화 {f.name}", "NPC 대화에 대화 시작 카드가 없음")
         for n in dlg.get("nodes", []):
@@ -1084,6 +1093,7 @@ def read_dialogues(d, rep):
             rec["pages"] = n.get("pages") if isinstance(n.get("pages"), list) else []
             rec["routes"] = n.get("routes") if isinstance(n.get("routes"), list) else []
             rec["steps"] = n.get("steps") if isinstance(n.get("steps"), list) else []
+            rec["trigger"] = n.get("trigger") if isinstance(n.get("trigger"), dict) else {}
             rec["text_speed"] = speed
             rec["npc_id"] = npc
             rec["_row"] = f"{f.name}"
@@ -1477,7 +1487,9 @@ def export(d, maps):
         "episodes": clean(d["Episodes"]),
         "nodes": [dict(n, pages=n.get("pages") or [], routes=[{"condition": _dlg_str(r.get("condition", "")), "next_node": _dlg_str(r.get("next_node", ""))}
                                                          for r in (n.get("routes") or []) if isinstance(r, dict)],
-                       text_speed=n.get("text_speed", ""), npc_id=n.get("npc_id", ""), steps=n.get("steps") or [])
+                       text_speed=n.get("text_speed", ""), npc_id=n.get("npc_id", ""), steps=n.get("steps") or [],
+                       trigger={"when": str(n["trigger"].get("when", "")), "map": str(n["trigger"].get("map", "")),
+                                "once": bool(n["trigger"].get("once", False))} if n.get("trigger") else {})
                   for n in clean(d["Nodes"])],
         "choices": [choice(r) for r in clean(d["Choices"])],
         "items": [dict(r, dice_bonus=bonuses(r["dice_bonus"])) for r in clean(d["Items"])],

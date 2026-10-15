@@ -34,6 +34,7 @@ const NPC_LAYER := 4
 const Direction = preload("res://core/direction.gd")
 const MapRenderer = preload("res://core/map_renderer.gd")
 const VisualData = preload("res://core/visual_data.gd")
+const Triggers = preload("res://core/cutscene_triggers.gd")
 const DOOR_LAYER := 8            # 닫힌 문: 플레이어·적 모두 통과 못 하고, 적의 시야도 막는다 (field_enemy._can_see)
 const INTERACT_RANGE := 1.1      # 칸
 const TOAST_TIME := 3.0
@@ -49,6 +50,7 @@ var _last_tile := Vector2i(-999, -999)   # 이벤트 칸은 '들어설 때' 한 
 var _cam_target: Vector2i = Vector2i(-1, -1)
 var _active_tweens: Array = []
 var renderer: Node2D             # core/map_renderer.gd — 픽셀아트 타일·조명·그림자 (보이는 모습만)
+var _cutscenes: Array = []       # 차례를 기다리는 자동 시작 컷신 (시작 노드) — 새 게임 시작 후, 방 진입 후
 var held_light: PointLight2D     # 손에 든 아이템의 빛 (Items.light, 예: 손전등) — 플레이어를 따라가며 바라보는 쪽을 비춤   # 연출 중인 걷기·카메라 (건너뛰기 때 바로 끝냄)
 var player: CharacterBody2D
 var enemies: Array = []
@@ -104,12 +106,17 @@ func _ready() -> void:
 	%Equipment.visibility_changed.connect(func(): _set_frozen_by_overlay())
 	GameState.equipment_changed.connect(_update_hud)
 	load_map(GameState.current_map)
-	# 새 게임(캐릭터 생성 직후) 오프닝 컷신: Config opening_dialogue 의 대화를 한 번
+	# 새 게임(캐릭터 생성 직후): 자동 시작 '새 게임 시작 후' (+ 예전 방식 Config opening_dialogue) — 방 진입 컷신보다 먼저
 	if GameState.opening_pending:
 		GameState.opening_pending = false
+		var first := []
 		var opening := DataLoader.get_config_str("opening_dialogue", "")
 		if opening != "" and DataLoader.nodes.has(opening):
-			_start_dialogue.call_deferred({"data": {"ref": opening}})
+			first.append(opening)
+		for id in Triggers.take("new_game"):
+			if not id in first:
+				first.append(id)
+		_cutscenes = first + _cutscenes
 
 
 func _exit_tree() -> void:
@@ -155,6 +162,9 @@ func load_map(map_id: String) -> void:
 	renderer.build(map, tile)
 	renderer.build_props(%World)   # 오브젝트 그림은 인물과 같은 Y 정렬 노드에 (발 위치로 앞뒤)
 	_update_held_light()
+	# 자동 시작 '방 진입 후' (이 맵): 지금 대화가 끝나면 차례로
+	_cutscenes.append_array(Triggers.take("map_enter", map_id))
+	_play_cutscenes.call_deferred()
 	%MapView.draw_tiles = false   # 바닥·벽은 renderer 가 그림
 	%MapView.tiles = map.tiles
 	%MapView.tile = tile
@@ -771,6 +781,18 @@ func _on_dialogue_finished() -> void:
 		var t := _pending_travel
 		_pending_travel = []
 		travel(t[0], t[1])
+	_play_cutscenes.call_deferred()
+
+
+## 기다리는 자동 시작 컷신을 하나씩 (다른 대화·전투 중이면 그게 끝난 뒤)
+func _play_cutscenes() -> void:
+	if _dialogue_ui != null or _combat_ui != null or _cutscenes.is_empty() or map.is_empty():
+		return
+	var id: String = _cutscenes.pop_front()
+	if DataLoader.nodes.has(id):
+		_start_dialogue({"data": {"ref": id}})
+	else:
+		_play_cutscenes()
 
 
 # ---------------------------------------------------------------- 🎬 연출 (필드 단계)

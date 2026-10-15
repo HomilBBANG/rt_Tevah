@@ -36,5 +36,5 @@
  "creation_start_points": 5,
  "combat_talk_uses_turn": 1,
  "tile_art_px": 16,
- "opening_dialogue": "opening_in"
+ "opening_dialogue": ""
 }

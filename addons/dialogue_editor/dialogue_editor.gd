@@ -262,7 +262,9 @@ const HELP_TEXT := """[b]대화 탭 쓰는 법[/b] — 대본은 아래 칸에�
 [b]0. NPC 대화[/b] — 대화 하나 = NPC 하나. [b]새 대화[/b]에서 NPC 를 고르면 [b]▶ 대화 시작[/b] 카드와 첫 대사 카드가 생깁니다.
   · [b]▶ 대화 시작[/b]: 말을 걸면 여기서 시작 (화면에 안 보임). [b]＋ 조건 길 추가[/b]로 길을 만들고, 위에서부터 조건이 맞는 첫 길로 갑니다. 하나도 안 맞으면 [b]그 외 →[/b].
     예) 길 1: 대화 횟수 == 0 → 첫 만남 · 길 2: 플래그 met_boss → 보스 이야기 · 그 외 → 반복 대사.  ↑ ↓ 로 길 순서(먼저 볼 것)를 바꿉니다.
-  · 맵 탭에서 NPC 의 '대화'에 [b]▶ NPC 대화[/b]를 고르면 연결됩니다. 대화 시작 카드는 대화마다 하나.
+  · 맵 탭에서 NPC 의 '대화'에 [b]▶ NPC 대화[/b]를 고르면 연결됩니다. 시작 카드는 한 대화에 여러 개 둘 수 있습니다.
+  · 시작 카드의 [b]🎬 자동 시작[/b] 토글: 말을 걸지 않아도 그 시점에 시작 — [b]로고[/b](켜자마자) · [b]타이틀 이전[/b] · [b]타이틀 이후[/b](새 게임·이어하기를 누르면) ·
+    [b]새 게임 시작 후[/b](캐릭터 생성 직후) · [b]방 진입 후[/b](고른 맵에 들어올 때). '한 번만': 처음 켤 때만 / 방 진입은 그 회차에 한 번.
 
 [b]1. 대본 쓰기[/b] — 📝 대본 블록 카드를 고르면 아래 대본 칸에 페이지가 나옵니다.
   · 한 블록에 페이지를 여러 개: [b]＋ 페이지[/b] (본문에서 Ctrl+Enter = 그 아래에 새 페이지)
@@ -292,7 +294,7 @@ const HELP_TEXT := """[b]대화 탭 쓰는 법[/b] — 대본은 아래 칸에�
   · 소리: [b]🔊 효과음[/b] (audio/sfx/) · [b]🎵 배경음 틀기[/b] (audio/bgm/, 반복 — 대화가 끝나도 계속) · [b]배경음 끄기[/b]. ▶ 로 들어 보기.
   · [b]↻ 바라보기[/b]: 인물이 볼 방향 (걸으면 가는 쪽을 저절로 봄). NPC 의 처음 방향은 맵 탭에서.
   · 게임에서 컷신 중에는 오른쪽 위 [b]건너뛰기 ▶▶[/b] (Esc): 바로 끝난 모습으로, 대사는 넘기고 선택지에서 멈춤.
-  · 오프닝: 엑셀 Config [b]opening_dialogue[/b] 에 첫 노드 → 새 게임(캐릭터 생성 직후) 한 번.
+  · 인트로·오프닝·로고: NPC 없는 새 대화 → 시작 카드의 🎬 자동 시작에서 시점을 고름. 대사는 표시 '자막'으로 하면 영상 자막처럼.
 
 [b]5. 고치기[/b] (그래프를 한 번 누른 뒤)
   · Ctrl+Z 실행 취소 · Ctrl+Y 다시 실행 · Ctrl+C/V 복사·붙여넣기 · Ctrl+D 복제 · Delete 지우기 · F 고른 카드 가운데로 · Ctrl+S 저장
@@ -342,9 +344,12 @@ func _refresh_file_list_marks() -> void:
 	for i in files.item_count:
 		var n := files.get_item_text(i)
 		var who := _npc_of_file(n)
-		var is_opening: bool = dialogue.get("opening", false) if n == current else bool(_read_json(dir + n + ".json", {}).get("opening", false))
+		var dd: Dictionary = dialogue if n == current else _read_json(dir + n + ".json", {})
+		if n == current:
+			dd = _collect().merged({"opening": dialogue.get("opening", false)})
+		var is_opening: bool = dd.get("opening", false) or dd.get("nodes", []).any(func(nd): return nd is Dictionary and nd.get("trigger") is Dictionary and str(nd.trigger.get("when", "")) != "")
 		var row := file_list.add_item(("● " if n == current and dirty else ("▶ " if n == current else "")) + n
-			+ ("   — " + who if who != "" else "") + ("   🎬 오프닝" if is_opening else ""))
+			+ ("   — " + who if who != "" else "") + ("   🎬 자동 시작" if is_opening else ""))
 		file_list.set_item_metadata(row, n)
 	_save_btn.text = "저장 ●" if dirty else "저장"
 
@@ -721,15 +726,13 @@ func _add_kind(kind: String, pos: Vector2) -> void:
 		return
 	match kind:
 		"start":
-			var have := _start_card()
-			if have:
-				_select(have)
-				center_on(have)
-				_status("대화 시작 카드는 대화마다 하나입니다 — 이미 있는 카드로 갔습니다")
-				return
-			var data := {"node_id": dialogue.get("dialogue_id", "dlg") + "_start", "kind": "start", "routes": [], "speaker_id": "", "text": "", "next_node": "", "on_enter": ""}
+			# 시작 카드는 여러 개 가능 (NPC 용 + 자동 시작 컷신 용 …)
+			var base: String = dialogue.get("dialogue_id", "dlg") + "_start"
+			var data := {"node_id": base, "kind": "start", "routes": [], "speaker_id": "", "text": "", "next_node": "", "on_enter": ""}
+			var n := 2
 			while graph.get_node_or_null(NodePath(data.node_id)) != null:
-				data.node_id += "_"
+				data.node_id = "%s%d" % [base, n]
+				n += 1
 			var sc := _make_card(data, [], pos)
 			_sync_connections()
 			_touch()
@@ -914,7 +917,7 @@ func _graph_keys(e: InputEvent) -> void:
 
 # ---------------------------------------------------------------- 복사·붙여넣기·복제
 func copy_selected() -> void:
-	var sel := _selected_cards().filter(func(c): return not c is StartCard)   # 대화 시작 카드는 대화마다 하나
+	var sel := _selected_cards()
 	if sel.is_empty():
 		return
 	_clipboard = []
@@ -1032,22 +1035,19 @@ func _edit_node(card: GraphNode) -> void:
 			_touch()
 			_refresh_file_list_marks())
 		_hint("맵 탭에서 NPC 를 놓고 '대화'에 이 카드(%s)를 고르면 연결됩니다. 이벤트 칸(밟으면 시작)에도 고를 수 있습니다." % d.node_id)
-		var op := CheckBox.new()
-		op.text = "🎬 게임 오프닝으로 쓰기 (새 게임 직후 한 번)"
-		op.tooltip_text = "체크하면 캐릭터 생성 직후 이 대화가 나옵니다 (오프닝은 대화 하나만).
-엑셀 Config opening_dialogue 에 값이 있으면 그쪽이 먼저입니다"
-		op.button_pressed = dialogue.get("opening", false)
-		op.toggled.connect(func(on):
-			if on:
-				dialogue.opening = true
-				var others := _opening_files().filter(func(f): return f != dialogue.get("dialogue_id", ""))
-				if not others.is_empty():
-					_status("⚠ 다른 대화도 오프닝으로 체크돼 있음: %s — 하나만 남기세요" % ", ".join(others))
-			else:
+		_hint("말을 걸지 않고 저절로 시작하게 하려면 카드 안의 '🎬 자동 시작' 토글 → 로고 / 타이틀 이전 / 타이틀 이후 / 새 게임 시작 후 / 방 진입 후. 시작 카드는 한 대화에 여러 개 둘 수 있습니다.")
+		if dialogue.get("opening", false):
+			_note("⚠ 예전 방식 '게임 오프닝' 체크가 이 대화에 켜져 있습니다 (새 게임 시작 후).", Color("ffb454"))
+			var mv := Button.new()
+			mv.text = "이 카드의 '자동 시작 — 새 게임 시작 후'로 옮기기"
+			mv.pressed.connect(func():
 				dialogue.erase("opening")
-			_touch()
-			_refresh_file_list_marks())
-		_box.add_child(op)
+				d.trigger = {"when": "new_game", "map": "", "once": true}
+				card.rebuild()
+				_touch()
+				_refresh_file_list_marks()
+				_edit_node(card))
+			_box.add_child(mv)
 		_section("결과")
 		_target("그 외 갈 곳", d, "next_node", card)
 		_section("고급", false)
@@ -1520,6 +1520,15 @@ func _title(t: String) -> void:
 	l.text = t
 	l.add_theme_font_size_override("font_size", 18)
 	inspector.add_child(l)
+
+
+## 눈에 띄는 안내 (경고 등)
+func _note(t: String, col: Color) -> void:
+	var l := Label.new()
+	l.text = t
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.add_theme_color_override("font_color", col)
+	_box.add_child(l)
 
 
 func _hint(t: String) -> void:

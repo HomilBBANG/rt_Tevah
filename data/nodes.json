@@ -13,7 +13,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "t1_a",
@@ -29,7 +30,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "t1_b",
@@ -45,7 +47,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "t1_c",
@@ -61,7 +64,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "t1_d",
@@ -77,7 +81,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "t1_timeout",
@@ -93,7 +98,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "t2_a",
@@ -109,7 +115,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "t2_timeout",
@@ -125,7 +132,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "t2_npc1",
@@ -141,7 +149,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "t2_npc2",
@@ -157,7 +166,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "t1_e",
@@ -173,7 +183,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "t1_dice_ok",
@@ -189,7 +200,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "t1_dice_fail",
@@ -205,7 +217,8 @@
   "routes": [],
   "text_speed": "",
   "npc_id": "",
-  "steps": []
+  "steps": [],
+  "trigger": {}
  },
  {
   "node_id": "cat_start",
@@ -229,6 +242,7 @@
    }
   ],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_cat"
  },
@@ -257,6 +271,7 @@
   ],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_cat"
  },
@@ -273,6 +288,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_cat"
  },
@@ -294,6 +310,7 @@
    }
   ],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "enemy_test"
  },
@@ -310,6 +327,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "enemy_test"
  },
@@ -326,6 +344,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "enemy_test"
  },
@@ -342,6 +361,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc"
  },
@@ -358,6 +378,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc"
  },
@@ -374,6 +395,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc"
  },
@@ -390,6 +412,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc"
  },
@@ -406,6 +429,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -422,6 +446,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -438,6 +463,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -454,6 +480,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -470,6 +497,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -486,6 +514,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -502,6 +531,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -518,6 +548,7 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc2"
  },
@@ -534,8 +565,30 @@
   "pages": [],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc2"
+ },
+ {
+  "node_id": "opening_start",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "opening_in",
+  "on_enter": "",
+  "kind": "start",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "steps": [],
+  "trigger": {
+   "when": "new_game",
+   "map": "",
+   "once": true
+  },
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "opening_in",
@@ -570,6 +623,7 @@
     "time": 0.5
    }
   ],
+  "trigger": {},
   "text_speed": "",
   "npc_id": ""
  },
@@ -583,9 +637,16 @@
   "kind": "",
   "condition": "",
   "fail_next": "",
-  "pages": [],
+  "pages": [
+   {
+    "page_id": "p1",
+    "display": "subtitle",
+    "text": "(테스트) 오프닝 컷신 — Config opening_dialogue 를 비우면 나오지 않음"
+   }
+  ],
   "routes": [],
   "steps": [],
+  "trigger": {},
   "text_speed": "",
   "npc_id": ""
  },
@@ -617,6 +678,7 @@
     "time": 0.8
    }
   ],
+  "trigger": {},
   "text_speed": "",
   "npc_id": ""
  }

@@ -3,6 +3,8 @@ extends Control
 
 const FIELD := "res://scenes/field/field.tscn"
 const CREATION := "res://scenes/character_creation.tscn"
+const CutscenePlayer = preload("res://scenes/cutscene_player.gd")
+const Triggers = preload("res://core/cutscene_triggers.gd")
 const SlotPicker = preload("res://ui/save_slot_picker.gd")
 
 
@@ -15,7 +17,7 @@ func _ready() -> void:
 		%NewRunButton.text = "새 회차"
 		%NewRunButton.pressed.connect(func():
 			SaveManager.begin_run()
-			get_tree().change_scene_to_file(FIELD))
+			_after_title(FIELD))
 		var again := Button.new()
 		again.name = "NewGameButton"
 		again.text = "새 게임 (캐릭터 다시 만들기)"
@@ -23,7 +25,7 @@ func _ready() -> void:
 		%NewRunButton.add_sibling(again)
 	else:
 		%NewRunButton.text = "새 게임"
-		%NewRunButton.pressed.connect(func(): get_tree().change_scene_to_file(CREATION))
+		%NewRunButton.pressed.connect(func(): _after_title(CREATION))
 	%ContinueButton.pressed.connect(_continue)
 	%StartButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/episode_select.tscn"))
 	%CombatButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/combat.tscn"))
@@ -39,7 +41,7 @@ func _continue() -> void:
 	var slot: int = await picker.chosen
 	picker.queue_free()
 	if slot > 0 and SaveManager.load_run(slot):
-		get_tree().change_scene_to_file(FIELD)
+		_after_title(FIELD)
 	else:
 		%ContinueButton.grab_focus()
 
@@ -55,7 +57,12 @@ func _ask_new_game() -> void:
 	dlg.cancel_button_text = "취소"
 	dlg.confirmed.connect(func():
 		SaveManager.new_game()
-		get_tree().change_scene_to_file(CREATION))
+		_after_title(CREATION))
 	dlg.canceled.connect(dlg.queue_free)
 	add_child(dlg)
 	dlg.popup_centered()
+
+
+## 타이틀을 떠날 때: 자동 시작 컷신 '타이틀 이후' 를 보여 준 뒤 scene 으로 (없으면 바로)
+func _after_title(scene: String) -> void:
+	CutscenePlayer.play_then(get_tree(), Triggers.take("after_title"), scene)

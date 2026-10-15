@@ -73,6 +73,8 @@ func _ready() -> void:
 	# ---- 오프닝 컷신: 캐릭터 생성 직후 필드가 열리면 Config opening_dialogue 를 한 번
 	var keep_open: Variant = DataLoader.config.get("opening_dialogue", "")
 	DataLoader.config["opening_dialogue"] = "tcut_img"
+	var keep_triggers: Dictionary = DataLoader.triggers
+	DataLoader.triggers = {}   # 실제 데이터의 자동 시작(테스트 오프닝 등)은 빼고
 	GameState.opening_pending = true
 	FieldScript.next_map_id = "tcut_map"
 	f = load("res://scenes/field/field.tscn").instantiate()
@@ -83,6 +85,7 @@ func _ready() -> void:
 	await _until(func(): return f._dialogue_ui == null, 3.0)
 	check(f._dialogue_ui == null and not f.frozen, "오프닝을 건너뛰면 바로 조작 가능")
 	DataLoader.config["opening_dialogue"] = keep_open
+	DataLoader.triggers = keep_triggers
 	f.queue_free()
 	_cleanup()
 	print("[cutscene_smoke] 실패 %d" % _fail)

@@ -275,7 +275,8 @@ func _ready() -> void:
 	check(st.data.routes[0].next_node == first.data.node_id and st.data.next_node == again.data.node_id, "길 1 → 첫 카드, 그 외 → 반복 카드")
 	var n_cards: int = ed._cards().size()
 	ed._add_kind("start", Vector2.ZERO)
-	check(ed._cards().size() == n_cards, "대화 시작 카드는 하나만 (두 번째는 안 만듦)")
+	check(ed._cards().size() == n_cards + 1 and ed.graph.get_node_or_null("t_cat_start2") != null, "시작 카드는 여러 개 가능 (두 번째 t_cat_start2)")
+	ed.undo()
 	ed.save()
 	var tf: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "t_cat.json"))
 	var sn: Dictionary = tf.nodes.filter(func(n): return n.node_id == "t_cat_start")[0]
@@ -297,14 +298,28 @@ func _ready() -> void:
 	var ost: GraphNode = ed.graph.get_node("t_open_start")
 	var ofirst: GraphNode = ed.graph.get_node(ost.data.next_node)
 	check(not ed.dialogue.has("npc_id") and ofirst.data.pages[0].display == "narration", "NPC 없음 → 첫 카드는 상황 묘사")
-	ed._select(ost)
+	# 시작 카드의 '🎬 자동 시작' 토글 → 시점 고르기 (방 진입은 맵도)
+	var tog: CheckButton = ost.find_children("*", "CheckButton", true, false)[0]
+	tog.button_pressed = true
 	await _frames(1)
-	var op_cb: CheckBox = ed.inspector.find_children("*", "CheckBox", true, false).filter(func(c): return "오프닝" in c.text)[0]
-	op_cb.button_pressed = true
+	ost = ed.graph.get_node("t_open_start")
+	check(ost.data.trigger.when == "new_game" and ost.title.begins_with("🎬"), "자동 시작 켜기 → 기본 '새 게임 시작 후'")
+	var when_opt: OptionButton = ost.find_children("*", "OptionButton", true, false)[0]
+	when_opt.select(4)
+	when_opt.item_selected.emit(4)
+	await _frames(1)
+	ost = ed.graph.get_node("t_open_start")
+	check(ost.data.trigger.when == "map_enter" and ost.find_children("*", "OptionButton", true, false).size() == 2, "'방 진입 후' → 맵 고르기가 나옴")
+	ost.data.trigger.map = "basecamp"
+	# 시작 카드 여러 개 (자동 시작 + 말 걸 때)
+	ed._add_kind("start", Vector2(40, 400))
+	check(ed._cards().filter(func(c): return c is StartCard).size() == 2, "시작 카드를 하나 더 (여러 개 가능)")
 	ed.save()
 	var of: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "t_open.json"))
-	check(of.get("opening", false) and ed._opening_files() == ["t_open"], "오프닝 체크 → 파일에 opening: true")
-	check(ed.file_list.get_item_text(ed.files.selected).contains("🎬 오프닝"), "대화 목록에 🎬 오프닝 표시")
+	var trig_nodes: Array = of.nodes.filter(func(n): return n.has("trigger"))
+	check(trig_nodes.size() == 1 and trig_nodes[0].trigger.when == "map_enter" and trig_nodes[0].trigger.map == "basecamp"
+		and of.nodes.filter(func(n): return n.get("kind", "") == "start").size() == 2, "저장: 자동 시작(방 진입·basecamp) + 시작 카드 2개")
+	check(ed.file_list.get_item_text(ed.files.selected).contains("🎬 자동 시작"), "대화 목록에 🎬 자동 시작 표시")
 	await _snap("opening_check")
 	ed.open_dialogue("t_cat")
 	await _frames(2)

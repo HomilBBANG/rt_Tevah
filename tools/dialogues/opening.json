@@ -1,8 +1,25 @@
 {
  "dialogue_id": "opening",
- "opening": true,
  "episode_id": "",
  "nodes": [
+  {
+   "node_id": "opening_start",
+   "kind": "start",
+   "routes": [],
+   "trigger": {
+    "when": "new_game",
+    "map": "",
+    "once": true
+   },
+   "speaker_id": "",
+   "text": "",
+   "next_node": "opening_in",
+   "on_enter": "",
+   "pos": [
+    -480,
+    60
+   ]
+  },
   {
    "node_id": "opening_in",
    "kind": "direct",
