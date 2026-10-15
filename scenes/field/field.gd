@@ -32,6 +32,7 @@ const WALL_LAYER := 1
 const ACTOR_LAYER := 2
 const NPC_LAYER := 4
 const Direction = preload("res://core/direction.gd")
+const MapRenderer = preload("res://core/map_renderer.gd")
 const DOOR_LAYER := 8            # 닫힌 문: 플레이어·적 모두 통과 못 하고, 적의 시야도 막는다 (field_enemy._can_see)
 const INTERACT_RANGE := 1.1      # 칸
 const TOAST_TIME := 3.0
@@ -45,7 +46,8 @@ var frozen := false
 var events: Array = []          # 이벤트 칸 [{kind:"event", data, pos, tile, done}] — 화면에 안 보임
 var _last_tile := Vector2i(-999, -999)   # 이벤트 칸은 '들어설 때' 한 번
 var _cam_target: Vector2i = Vector2i(-1, -1)
-var _active_tweens: Array = []   # 연출 중인 걷기·카메라 (건너뛰기 때 바로 끝냄)
+var _active_tweens: Array = []
+var renderer: Node2D             # core/map_renderer.gd — 픽셀아트 타일·조명·그림자 (보이는 모습만)   # 연출 중인 걷기·카메라 (건너뛰기 때 바로 끝냄)
 var player: CharacterBody2D
 var enemies: Array = []
 var spots: Array = []            # 상호작용 지점 [{ kind: "spot"/"camp"/"exit", data, pos, done }]
@@ -83,6 +85,7 @@ func _ready() -> void:
 	GameState.survival_changed.connect(_update_hud)
 	GameState.clock_changed.connect(_update_hud)
 	GameState.clock_changed.connect(_refresh_presence)
+	GameState.clock_changed.connect(func(): if renderer: renderer.set_time(GameState.minute_of_day()))   # 시계가 멈추면 빛도 멈춤
 	GameState.flags_changed.connect(_refresh_presence)
 	GameState.inventory_changed.connect(_refresh_presence)
 	StoryRunner.field_director = _direct_step
@@ -138,6 +141,15 @@ func load_map(map_id: String) -> void:
 	tile = float(DataLoader.config.get("field_tile", 48))
 	_build_walls()
 	_build_actors()
+	# 그림·조명: 맨 아래에 (그 위에 조사·문 표시, 인물)
+	if renderer == null:
+		renderer = MapRenderer.new()
+		renderer.name = "MapRenderer"
+		add_child(renderer)
+		move_child(renderer, 0)
+	renderer.minutes = GameState.minute_of_day()
+	renderer.build(map, tile)
+	%MapView.draw_tiles = false   # 바닥·벽은 renderer 가 그림
 	%MapView.tiles = map.tiles
 	%MapView.tile = tile
 	%MapView.spots = spots
@@ -319,6 +331,8 @@ func toggle_door(s: Dictionary) -> void:
 		return
 	s.open = not s.open
 	s.body.collision_layer = 0 if s.open else DOOR_LAYER
+	if renderer:
+		renderer.set_door_open(s.data.object_id, s.open)   # 열린 문으로 빛이 지나감
 	%MapView.queue_redraw()
 	_near_spot = {}   # 안내 문구 다시 쓰기
 

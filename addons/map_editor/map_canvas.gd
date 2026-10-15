@@ -14,24 +14,29 @@ signal stroke_started             # 한 번의 누름(칠하기·옮기기)이 �
 signal request(action: String)    # 단축키
 signal activated(obj: Dictionary) # 더블클릭
 
-const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event"]
+const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light"]
+const VisualData = preload("res://core/visual_data.gd")
 const TRAVEL_TYPES := ["exit", "passage", "transit"]
 const COLORS := {
 	"enemy": Color("d05050"), "investigate": Color("e8c35a"), "npc": Color("5a8fd0"),
 	"camp": Color("5fae6a"), "exit": Color("a07850"),
-	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"), "event": Color("c070d0"),
+	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"), "event": Color("c070d0"), "light": Color("f5d76e"),
 }
-const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P", "event": "!!"}
+const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P", "event": "!!", "light": "빛"}
 const EDGE_NAME := {"up": "위", "down": "아래", "left": "왼쪽", "right": "오른쪽"}
 const DIR := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 ## 표시 필터 묶음: 물체 종류 → 필터 이름
 const FILTER_OF := {"enemy": "enemy", "investigate": "investigate", "npc": "npc", "camp": "camp",
-	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive", "event": "event"}
-const PAINT_TOOLS := ["wall", "floor", "void"]
+	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive", "event": "event", "light": "light"}
+const PAINT_TOOLS := ["wall", "floor", "void", "tile", "tile_erase"]   # 끌어서 칠하는 도구 (tile = 그래픽 층)
 
 var map := {}                 # { map_id, tiles: [String], start, run_start, objects: [...], edges }
 var tool := "select"
-var rect_mode := false        # 벽·바닥·빈 공간을 사각형으로 채우기
+var rect_mode := false        # 벽·바닥·빈 공간·타일을 사각형으로 채우기
+var tile_key := ""            # 타일 붓: 칠할 타일 (graphics.xlsx Tiles)
+var tile_layer := "floor"     # 타일 붓·지우개가 칠하는 그래픽 층 (floor / detail / wall)
+var graphics := false         # 뒤에 픽셀아트 그림(core/map_renderer)이 보이는 중 → 바닥·벽 색칠은 하지 않고 칸 선만
+var light_defaults := {}      # 광원을 놓을 때 복사할 값 (프리셋)
 var cell := 32.0
 var zoom := 1.0
 var pan := Vector2(24, 24)
@@ -42,7 +47,8 @@ var region := Rect2i()        # 영역 선택 (칸). size 0 = 없음
 var id_maker: Callable        # func(type) -> String
 var require_default := false  # 베이스캠프: ★ 기본 P 가 꼭 있어야 함 (첫 P 는 자동 기본, 기본 P 는 못 지움)
 ## 표시 필터 (false = 숨김, 숨긴 물체는 고를 수도 없음)
-var filters := {"tiles": true, "enemy": true, "investigate": true, "npc": true, "camp": true, "travel": true, "event": true,
+var filters := {"tiles": true, "enemy": true, "investigate": true, "npc": true, "camp": true, "travel": true, "event": true, "light": true,
+	"graphics": true, "lighting": true, "light_range": true, "occluders": false, "logic": false,
 	"arrive": true, "sight": true, "names": true, "links": true}
 ## 연결 표시: object_id → [글자, 맞으면 true] (편집기가 채움). 가장자리는 "edge:방향"
 var link_labels := {}
@@ -135,6 +141,8 @@ func apply_tool(t: Vector2i, first := true) -> void:
 	match tool:
 		"wall", "void", "floor":
 			_paint(t, {"wall": "#", "void": " ", "floor": "."}[tool])
+		"tile", "tile_erase":
+			_paint_tile(t, tool == "tile_erase")
 		"start", "run_start":
 			if is_floor(t) and first:
 				map[tool] = [t.x, t.y]
@@ -164,6 +172,8 @@ func apply_tool(t: Vector2i, first := true) -> void:
 					"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}
 				if tool == "arrive" and require_default and default_p().is_empty():
 					o.default = true   # 베이스캠프의 첫 도착 P = 기본
+				if tool == "light":
+					o.merge(light_defaults.duplicate(true), true)   # 프리셋 값 복사 (광원마다 따로 고칠 수 있음)
 				map.objects.append(o)
 				select(o)
 				changed.emit()
@@ -177,8 +187,40 @@ func _paint(t: Vector2i, ch: String) -> void:
 	set_tile(t, ch)
 
 
+## 그래픽 층 칠하기 (보이는 모습만 — 벽·바닥 판정은 그대로). map.visual.layers[층]["x,y"] = tile_key
+func _paint_tile(t: Vector2i, erase: bool) -> void:
+	if not erase and tile_key == "":
+		return
+	if not map.get("visual") is Dictionary:
+		map.visual = {}
+	if not map.visual.get("layers") is Dictionary:
+		map.visual.layers = {}
+	var layers: Dictionary = map.visual.layers
+	if not layers.get(tile_layer) is Dictionary:
+		layers[tile_layer] = {}
+	var cells: Dictionary = layers[tile_layer]
+	var k := "%d,%d" % [t.x, t.y]
+	if erase:
+		if not cells.has(k):
+			return
+		cells.erase(k)
+		if cells.is_empty():
+			layers.erase(tile_layer)
+	else:
+		if cells.get(k, "") == tile_key:
+			return
+		cells[k] = tile_key
+	changed.emit()
+
+
 ## 사각형 채우기 (지금 칠하기 도구로)
 func fill_rect(r: Rect2i) -> void:
+	if tool in ["tile", "tile_erase"]:
+		for y in range(r.position.y, r.end.y):
+			for x in range(r.position.x, r.end.x):
+				_paint_tile(Vector2i(x, y), tool == "tile_erase")
+		queue_redraw()
+		return
 	var ch: String = {"wall": "#", "void": " ", "floor": "."}.get(tool, ".")
 	for y in range(r.position.y, r.end.y):
 		for x in range(r.position.x, r.end.x):
@@ -331,12 +373,13 @@ func _release(t: Vector2i) -> void:
 
 ## 고른 물체들을 원래 자리 + d 로 (모두 바닥이고 다른 물체가 없을 때만)
 func _move_selection(d: Vector2i) -> void:
-	for o in selection:
+	var moving := selection.filter(func(o): return _move_from.has(o))   # 끄는 중에 고른 것이 바뀌어도 처음 고른 것만
+	for o in moving:
 		var to: Vector2i = _move_from[o] + d
 		var there := object_at(to)
 		if not is_floor(to) or (not there.is_empty() and not there in selection):
 			return
-	for o in selection:
+	for o in moving:
 		o.x = _move_from[o].x + d.x
 		o.y = _move_from[o].y + d.y
 	changed.emit()
@@ -363,7 +406,8 @@ func _key(k: InputEventKey) -> void:
 
 # ---------------------------------------------------------------- 그리기
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.1, 0.1, 0.12))
+	if not graphics:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.1, 0.1, 0.12))
 	if map.is_empty():
 		draw_string(_font, Vector2(24, 40), "맵을 열거나 '새 맵'을 만드세요.", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 1, 0.6))
 		return
@@ -374,11 +418,35 @@ func _draw() -> void:
 		var row := String(tiles[y])
 		for x in row.length():
 			var r := Rect2(pan + Vector2(x, y) * s, Vector2(s, s))
+			if graphics:
+				# 뒤에 픽셀아트 그림이 보임: 칸 선, '벽 판정' 을 켜면 벽(지나갈 수 없음)·빈 공간 표시
+				if filters.logic and row[x] != ".":
+					draw_rect(r, Color(1, 0.2, 0.2, 0.28) if row[x] == "#" else Color(0.4, 0.4, 1, 0.28))
+				draw_rect(r, Color(1, 1, 1, 0.06), false, 1.0)
+				continue
 			var col := Color.BLACK if row[x] == " " else (Color("16171d") if row[x] == "#" else Color("3a3e4a"))
 			if dim and row[x] != " ":
 				col = Color("202228")   # 타일 숨김: 벽·바닥 구분을 흐리게
 			draw_rect(r, col)
 			draw_rect(r, Color(1, 1, 1, 0.05), false, 1.0)
+	# 그림자 차단 윤곽: 빛을 막는 벽 타일·문 (그래픽 데이터 기준)
+	if filters.occluders:
+		for y in tiles.size():
+			for x in String(tiles[y]).length():
+				var wk: String = VisualData.cell_keys(map, x, y).wall
+				if wk != "" and VisualData.tiles().get(wk, {}).get("casts_shadow", false):
+					draw_rect(Rect2(pan + Vector2(x, y) * s, Vector2(s, s)).grow(-2), Color(1, 0.85, 0.2, 0.8), false, 2.0)
+		for o in map.get("objects", []):
+			if o.type == "exit":
+				draw_rect(Rect2(pan + Vector2(o.x, o.y) * s, Vector2(s, s)).grow(-4), Color(1, 0.6, 0.1, 0.9), false, 3.0)
+	# 광원 범위
+	if filters.light and filters.light_range:
+		for o in map.get("objects", []):
+			if o.type == "light":
+				var lc := Color.html(str(o.get("color", "#ffffff"))) if Color.html_is_valid(str(o.get("color", ""))) else Color.WHITE
+				var c := pan + (Vector2(o.x, o.y) + Vector2(0.5, 0.5)) * s
+				draw_circle(c, float(o.get("radius", 4.0)) * s, Color(lc.r, lc.g, lc.b, 0.08))
+				draw_arc(c, float(o.get("radius", 4.0)) * s, 0, TAU, 48, Color(lc.r, lc.g, lc.b, 0.6 if o.get("enabled", true) else 0.25), 1.5, true)
 	# 가장자리 이동 (edges): 맵 바깥쪽에 띠 + 이동할 맵 이름 (잘못되면 빨강)
 	var h := tiles.size()
 	var w := 0

@@ -12,9 +12,17 @@ const WALL_EDGE := Color("3c3f4a")
 var tiles: Array = []
 var tile := 48.0
 var spots: Array = []     # [{ kind, pos: Vector2, done: bool }]
+## false = 바닥·벽·검은 바탕은 그리지 않음 (core/map_renderer.gd 가 픽셀아트로 그림). 조사·문 표시만
+var draw_tiles := true
 
 
 func _draw() -> void:
+	if draw_tiles:
+		_draw_tiles()
+	_draw_spots()
+
+
+func _draw_tiles() -> void:
 	# 맵 바깥도 검게 (카메라가 맵 가장자리보다 조금 더 보여 줌)
 	var w := 0
 	for r in tiles:
@@ -31,6 +39,9 @@ func _draw() -> void:
 				draw_rect(r, WALL_EDGE, false, 2.0)
 			else:
 				draw_rect(r, FLOOR if (x + y) % 2 == 0 else FLOOR_ALT)
+
+
+func _draw_spots() -> void:
 	for s in spots:
 		var c: Vector2 = s.pos
 		match s.kind:

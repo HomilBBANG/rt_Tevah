@@ -250,6 +250,83 @@ func _ready() -> void:
 	ed.filter_boxes.npc.button_pressed = true
 	ed.open_map("test_field")
 
+	# ---- 그래픽 (픽셀아트 타일 · 광원 · 환경 · 시간 미리보기) — 논리 칸은 그대로
+	var c: Control = ed.canvas
+	var fl := Vector2i(-1, -1)
+	for y in ed.map.tiles.size():
+		var col := String(ed.map.tiles[y]).find(".")
+		if col >= 0 and ed.canvas.object_at(Vector2i(col, y)).is_empty():
+			fl = Vector2i(col, y)
+			break
+	var tiles_before: Array = ed.map.tiles.duplicate()
+	ed.set_tool("tile")
+	c.tile_layer = "floor"
+	c.tile_key = "floor_grass"
+	c.stroke_started.emit()
+	c.apply_tool(fl)
+	check(ed.map.visual.layers.floor.get("%d,%d" % [fl.x, fl.y]) == "floor_grass" and ed.map.tiles == tiles_before,
+		"타일 붓: 바닥 층에 잔디 (벽·바닥 판정은 그대로)")
+	c.tool = "tile"
+	c.stroke_started.emit()
+	c.fill_rect(Rect2i(fl, Vector2i(2, 1)))
+	c.tile_layer = "detail"
+	c.tile_key = "decal_blood"
+	c.stroke_started.emit()
+	c.apply_tool(fl)
+	await _frames(2)
+	var rnd: Node2D = ed.renderer
+	check(rnd.layers.floor.get_cell_source_id(fl) >= 0 and rnd.layers.detail.get_cell_source_id(fl) >= 0
+		and rnd.layers.floor.get_cell_atlas_coords(fl) == Vector2i(1, 0), "에디터 그림(같은 렌더러)에 바로 반영: 잔디 + 핏자국")
+	ed.set_tool("tile_erase")
+	c.stroke_started.emit()
+	c.apply_tool(fl)
+	check(not ed.map.visual.layers.has("detail"), "타일 지우개: 장식 층에서 지움")
+	ed.undo()
+	check(ed.map.visual.layers.get("detail", {}).has("%d,%d" % [fl.x, fl.y]), "실행 취소로 그래픽도 돌아옴")
+	# 광원: 프리셋 값 복사
+	var fl2 := fl + Vector2i(0, 1) if ed.map.tiles[fl.y + 1][fl.x] == "." else fl + Vector2i(1, 0)
+	ed.set_tool("light")
+	c.stroke_started.emit()
+	c.apply_tool(fl2)
+	var lamp: Dictionary = c.selected
+	check(lamp.get("type") == "light" and lamp.preset == "warm_bulb" and lamp.color == "#FFD4A0" and float(lamp.radius) == 4.0,
+		"광원 놓기: 프리셋(따뜻한 전구) 값 복사")
+	lamp.radius = 6.0
+	ed._gfx_dirty = true
+	await _frames(2)
+	check(rnd.lights.size() == 1 and is_equal_approx(rnd.lights[0].texture_scale, 6.0 * 80.0 * 2.0 / 256.0), "광원마다 범위 고치기 → 그림에 반영")
+	ed.map.environment = {"profile": "indoor"}
+	var clock_before: float = GameState.clock
+	ed.set_preview_time(0)
+	ed._gfx_dirty = true
+	await _frames(2)
+	check(rnd.profile() == "indoor" and rnd._modulate.color.v < 0.5 and GameState.clock == clock_before, "환경 실내 + 시간 미리보기 00:00 (게임 시각은 그대로)")
+	ed.map.environment = {"profile": "outdoor"}
+	ed._gfx_dirty = true
+	await _frames(2)
+	ed.canvas.center_on(fl)
+	await _frames(2)
+	await _snap("graphics_night")
+	ed.set_preview_time(720)
+	# 저장 → 다시 열기, 무손실 (이벤트 once·NPC face 같은 칸도 남음)
+	var npc_o: Dictionary = ed.map.objects.filter(func(o): return o.type == "npc")[0]
+	npc_o.face = "left"
+	ed.map.objects.append({"object_id": "t_evt", "type": "event", "x": fl.x, "y": fl.y + 1, "ref": "", "name": "", "text": "", "patrol_dir": "",
+		"patrol_len": 0, "condition": "", "schedule": "", "once": true, "custom_key": "keep me"})
+	ed.save()
+	var gf: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_field.json"))
+	var ev: Array = gf.objects.filter(func(o): return o.object_id == "t_evt")
+	check(gf.visual.layers.floor.size() == 2 and gf.environment.profile == "outdoor"
+		and gf.objects.any(func(o): return o.type == "light" and o.radius == 6.0)
+		and ev.size() == 1 and ev[0].once and ev[0].custom_key == "keep me"
+		and gf.objects.any(func(o): return o.object_id == npc_o.object_id and o.face == "left"),
+		"저장: 그래픽 층·광원·환경 + 모르는 칸도 그대로 (이벤트 once·NPC face — 전에 빠지던 것)")
+	ed.open_map("test_travel")
+	ed.open_map("test_field")
+	await _frames(2)
+	check(ed.map.visual.layers.floor.size() == 2 and ed.map.objects.any(func(o): return o.type == "light"), "다시 열어도 그대로")
+	ed.set_tool("select")
+
 	# 새 맵 · 크기 바꾸기
 	check(ed.new_map("t_new", 12, 8), "새 맵 만들기")
 	check(ed.map.tiles.size() == 8 and String(ed.map.tiles[0]) == "############" and ed.map.start == [6, 4], "새 맵: 테두리 벽, P 가운데")

@@ -25,6 +25,7 @@ SHEETS_DIR = ROOT / "tools" / "sheets"
 SHEET_FILES = {
     "Player": "player.xlsx", "PlayerParts": "player.xlsx", "EquipSlots": "player.xlsx", "Traits": "player.xlsx",
     "StatusEffects": "status.xlsx",
+    "Tiles": "graphics.xlsx", "LightPresets": "graphics.xlsx", "DayNight": "graphics.xlsx",
     "Npcs": "npc.xlsx", "NpcParts": "npc.xlsx", "NpcAttacks": "npc.xlsx",
     "Items": "item.xlsx", "Loot": "item.xlsx",
 }
@@ -76,6 +77,10 @@ SCHEMA = {
     "Abilities": ("ability_id", ["ability_id", "name"], {}),
     # 상태이상: 효과 status:+id / status:-id, 조건 status:id. description = 장비창 능력치 탭에서 마우스를 올리면 뜨는 설명
     "StatusEffects": ("status_id", ["status_id", "name", "description"], {}),
+    # 그래픽 (기획 tevah_pixelart_2d_lighting_map_editor_spec_v1.0): 픽셀아트 타일, 광원 프리셋, 시간대 환경광
+    "Tiles": ("tile_key", ["tile_key", "name", "layer", "file"], {"atlas_x": (int, 0), "atlas_y": (int, 0)}),
+    "LightPresets": ("preset_id", ["preset_id", "name", "color", "energy", "radius"], {"energy": (float, None), "radius": (float, None)}),
+    "DayNight": ("profile_id", ["profile_id", "hour", "ambient"], {"hour": (float, None), "sun_energy": (float, 0.0)}),
     # 특성 (캐릭터 생성·사건·거래). points: 긍정은 소비(음수), 부정은 획득(양수)
     "Traits": ("trait_id", ["trait_id", "name", "polarity", "points"], {"points": (int, 0)}),
     # ---- 전투 (기획서 §7–9)
@@ -98,18 +103,21 @@ SCHEMA = {
 }
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
-OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "StatusEffects", "Traits",
+OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "StatusEffects", "Traits", "Tiles", "LightPresets", "DayNight",
                    "Survival", "CampActions", "Revivals"}
 # 맵 물체: exit 문(E 로 열고 걸어 들어가면 이동) / passage 통로(밟으면 이동) / transit 이용(사다리 등, E 로 이동) /
 #         arrive 도착 지점 (이동할 때 arrive 로 고르면 P 대신 여기 도착)
-FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event"}   # event = 밟으면 대화(컷신)
+FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light"}   # light = 광원 (그래픽만)
+TILE_LAYERS = {"floor", "detail", "wall"}   # 그래픽 층: 바닥 / 바닥 장식 / 벽 외형
+TILES_DIR = ROOT / "art" / "tiles"
+LIGHT_NUMS = ("energy", "radius")   # event = 밟으면 대화(컷신)
 TRAVEL_TYPES = {"exit", "passage", "transit"}
 EDGE_DIRS = {"up", "down", "left", "right"}
 CAMP_KINDS = {"", "sleep"}   # sleep: 1시간 단위로 골라 자고, 자고 나면 저장 (effects 는 1시간마다)
 PATROL_DIRS = {"": (0, 0), "up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
 MAP_TILES = {"#", ".", " "}   # 벽 / 바닥 / 빈 공간(검은색, 지나갈 수 없음)
 # ID 중복 검사를 여러 열 조합으로 하는 시트
-DUP_KEYS = {"NpcParts": ("npc_id", "part_id")}
+DUP_KEYS = {"NpcParts": ("npc_id", "part_id"), "DayNight": ("profile_id", "hour")}
 DODGE_KEYS = {"W", "A", "S", "D"}
 ATTACK_PATTERNS = {"normal", "quick", "combo", "feint"}
 TRUE_WORDS = {"y", "yes", "true", "1", "o", "v"}
@@ -135,6 +143,9 @@ OPTIONAL = {
     # 특성: category 화면 분류, conflicts 같이 못 고르는 trait_id(쉼표), selectable 1 = 생성 화면에서 고름, state 기획 상태
     "Traits": ["category", "description", "conflicts", "selectable", "state", "note"],
     # 상태이상: scope part(부위)/whole(전체), tick_mode·tick_amount 시간마다 효과(미정이면 빈칸), death_cause 사망 원인
+    "Tiles": ["atlas_x", "atlas_y", "casts_shadow", "note"],
+    "LightPresets": ["shadow", "note"],
+    "DayNight": ["sun_color", "sun_energy", "note"],
     "StatusEffects": ["scope", "tick_mode", "tick_amount", "stack_rule", "dispel", "death_cause", "state", "note"],
 }
 TRAIT_POLARITY = {"positive", "negative"}
@@ -1106,7 +1117,7 @@ def read_maps(rep):
             continue
         m["file"] = f.name
         m["tiles"] = [str(r) for r in m.get("tiles", [])]
-        m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len", "from", "default", "once") else v for k, v in o.items()}
+        m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len", "from", "default", "once", "energy", "radius", "shadow", "enabled") else v for k, v in o.items()}
                         for o in m.get("objects", [])]
         maps[f.stem] = m
     for f in sorted(MAPS_DIR.glob("*.txt")):
@@ -1160,6 +1171,84 @@ def travel_error(maps, ref, arrive):
     if arrive and arrive not in arrive_ids(maps[ref]):
         return f"도착 지점 '{arrive}' 는 맵 {ref} 의 도착 지점(arrive)이 아님"
     return ""
+
+
+def validate_graphics(d, maps, rep):
+    """그래픽 시트와 맵의 그래픽(visual)·환경(environment)·광원(light 물체). 맵 그림이 틀려도 맵은 열리도록 대부분 경고."""
+    tiles = {t["tile_key"]: t for t in d["Tiles"]}
+    for t in d["Tiles"]:
+        w = loc("Tiles", t)
+        if t["layer"] not in TILE_LAYERS:
+            rep.err(w, f"layer 는 floor / detail / wall: '{t['layer']}'")
+        if not (TILES_DIR / t["file"]).exists():
+            rep.err(w, f"그림 파일이 없음: art/tiles/{t['file']}")
+        if t["atlas_x"] < 0 or t["atlas_y"] < 0:
+            rep.err(w, "atlas_x·atlas_y 는 0 이상")
+    if d["Tiles"]:
+        for need, layer in (("floor_default", "floor"), ("wall_default", "wall")):
+            if need not in tiles:
+                rep.err("Tiles", f"'{need}' 가 없음 (그래픽을 안 칠한 칸에 쓰임)")
+            elif tiles[need]["layer"] != layer:
+                rep.err("Tiles", f"'{need}' 의 layer 는 {layer}")
+    presets = {r["preset_id"] for r in d["LightPresets"]}
+    for r in d["LightPresets"]:
+        w = loc("LightPresets", r)
+        if not COLOR_RE.match(r["color"]):
+            rep.err(w, f"color 는 #RRGGBB: '{r['color']}'")
+        if r["energy"] is not None and r["energy"] < 0 or r["radius"] is not None and r["radius"] <= 0:
+            rep.err(w, "energy 는 0 이상, radius 는 0보다 커야 함")
+    profiles = {}
+    for r in d["DayNight"]:
+        w = loc("DayNight", r)
+        profiles.setdefault(r["profile_id"], []).append(r)
+        if r["hour"] is not None and not 0 <= r["hour"] <= 24:
+            rep.err(w, "hour 는 0 ~ 24")
+        for col in ("ambient", "sun_color"):
+            if r[col] and not COLOR_RE.match(r[col]):
+                rep.err(w, f"{col} 는 #RRGGBB: '{r[col]}'")
+    if d["DayNight"] and "outdoor" not in profiles:
+        rep.err("DayNight", "'outdoor' 프로필이 없음 (환경을 안 고른 맵의 기본)")
+    d["_profiles"] = profiles
+    for mid, m in maps.items():
+        wm = f"맵 {m['file']}"
+        env = (m.get("environment") or {}).get("profile", "")
+        if env and profiles and env not in profiles:
+            rep.warn(wm, f"없는 환경 프로필 '{env}' (graphics.xlsx DayNight) — outdoor 로 보임")
+        layers = (m.get("visual") or {}).get("layers") or {}
+        h = len(m["tiles"])
+        wdt = max((len(r) for r in m["tiles"]), default=0)
+        for layer, cells in layers.items():
+            if layer not in TILE_LAYERS or not isinstance(cells, dict):
+                rep.warn(wm, f"알 수 없는 그래픽 층 '{layer}'")
+                continue
+            bad = sorted({k for k in cells.values() if k not in tiles})
+            if bad and tiles:
+                rep.warn(wm, f"그래픽 '{layer}' 층에 없는 타일 {', '.join(bad)} (기본 타일로 보임)")
+            wrong = sorted({k for k in cells.values() if k in tiles and tiles[k]["layer"] != layer})
+            if wrong:
+                rep.warn(wm, f"그래픽 '{layer}' 층에 다른 층 타일 {', '.join(wrong)}")
+            out = [c for c in cells if not _cell_in(c, wdt, h)]
+            if out:
+                rep.warn(wm, f"그래픽 '{layer}' 층에 맵 밖 칸 {len(out)}개 (무시됨)")
+        for o in m["objects"]:
+            if o.get("type") != "light":
+                continue
+            w = f"{wm} 광원 {o.get('object_id', '')}"
+            if o.get("preset") and presets and o["preset"] not in presets:
+                rep.warn(w, f"없는 광원 프리셋 '{o['preset']}' (값은 광원에 저장된 것 사용)")
+            if o.get("color") and not COLOR_RE.match(str(o["color"])):
+                rep.err(w, f"color 는 #RRGGBB: '{o['color']}'")
+            for k in LIGHT_NUMS:
+                if k in o and not (_is_number(o[k]) and float(o[k]) >= 0):
+                    rep.err(w, f"{k} 는 0 이상 숫자: '{o[k]}'")
+
+
+def _cell_in(key, w, h):
+    try:
+        x, y = (int(v) for v in str(key).split(","))
+    except ValueError:
+        return False
+    return 0 <= x < w and 0 <= y < h
 
 
 def validate_field(d, maps, rep, enemies):
@@ -1325,6 +1414,10 @@ def export_maps(d, maps):
             e["from"] = arrive_from(o)   # 도착 P: 이어지는 곳 (object_id / "맵:방향")
             e["default"] = bool(o.get("default"))   # 기본 도착 P
             e["once"] = bool(o.get("once"))         # 이벤트 칸: 한 번만
+            if o.get("type") == "light":            # 광원: 놓을 때 프리셋에서 복사한 값 (광원마다 고칠 수 있음)
+                e.update(preset=o.get("preset", ""), color=o.get("color", "") or "#FFFFFF",
+                         energy=float(o.get("energy", 1.0)), radius=float(o.get("radius", 4.0)),
+                         shadow=bool(o.get("shadow", True)), enabled=bool(o.get("enabled", True)))
             e.update(map_id=mid, x=int(o["x"]), y=int(o["y"]), patrol_dir=o.get("patrol_dir", ""),
                      patrol_len=int(o.get("patrol_len", 0) or 0),
                      schedule=[parse_time_range(r) for r in split_list(o.get("schedule", ""))])
@@ -1333,7 +1426,9 @@ def export_maps(d, maps):
         edges = {k: {"ref": v.get("ref", ""), "arrive": v.get("arrive", "")}
                  for k, v in (m.get("edges") or {}).items() if v and v.get("ref")}
         out.append({"map_id": mid, "width": width, "height": len(tiles), "tiles": tiles, "start": start,
-                    "run_start": m.get("run_start") or start, "objects": objects, "edges": edges})
+                    "run_start": m.get("run_start") or start, "objects": objects, "edges": edges,
+                    "visual": {"layers": {k: v for k, v in ((m.get("visual") or {}).get("layers") or {}).items() if k in TILE_LAYERS}},
+                    "environment": {"profile": (m.get("environment") or {}).get("profile", "") or "outdoor"}})
     return out
 
 
@@ -1371,6 +1466,15 @@ def export(d, maps):
         "equip_slots": clean(d["EquipSlots"]),
         "status_effects": [dict(r, scope=r["scope"] or "whole", tick_amount=float(r["tick_amount"]) if r["tick_amount"] else None)
                            for r in clean(d["StatusEffects"])],
+        # 그래픽: 타일(tile_key → 그림·칸), 광원 프리셋, 시간대 환경광 {profile: [[시, 환경색, 햇빛색, 햇빛 세기], ...]}
+        "graphics": {
+            "tiles": [dict(t, casts_shadow=is_true(t["casts_shadow"])) for t in clean(d["Tiles"])],
+            "light_presets": [dict(r, shadow=is_true(r["shadow"]) if r["shadow"] else True) for r in clean(d["LightPresets"])],
+            "day_night": {pid: [[r["hour"], r["ambient"], r["sun_color"] or "#000000", r["sun_energy"] or 0.0]
+                                for r in sorted(rows, key=lambda r: r["hour"])]
+                          for pid, rows in d.get("_profiles", {}).items()},
+            "tile_art_px": int(next((r["value"] for r in d["Config"] if r["key"] == "tile_art_px"), 16) or 16),
+        },
         "traits": [dict(r, conflicts=split_list(r["conflicts"]), selectable=is_true(r["selectable"]) if r["selectable"] else True)
                    for r in clean(d["Traits"])],
         "player_parts": [dict(r, key=r["key"].upper(), vital=is_true(r["vital"])) for r in clean(d["PlayerParts"])],
@@ -1443,6 +1547,7 @@ def _run(path, say):
     data["FieldObjects"] = field_objects(maps)
     validate(data, rep)
     validate_field(data, maps, rep, data.get("_enemy_ids", set()))
+    validate_graphics(data, maps, rep)
     if rep.errors:
         say(f"오류 {len(rep.errors)}개 — JSON을 쓰지 않았습니다.")
         for e in rep.errors:

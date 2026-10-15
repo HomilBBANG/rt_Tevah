@@ -107,7 +107,13 @@
     "schedule": []
    }
   ],
-  "edges": {}
+  "edges": {},
+  "visual": {
+   "layers": {}
+  },
+  "environment": {
+   "profile": "outdoor"
+  }
  },
  {
   "map_id": "test_arrive",
@@ -187,7 +193,13 @@
     "schedule": []
    }
   ],
-  "edges": {}
+  "edges": {},
+  "visual": {
+   "layers": {}
+  },
+  "environment": {
+   "profile": "outdoor"
+  }
  },
  {
   "map_id": "test_field",
@@ -389,7 +401,13 @@
     "schedule": []
    }
   ],
-  "edges": {}
+  "edges": {},
+  "visual": {
+   "layers": {}
+  },
+  "environment": {
+   "profile": "outdoor"
+  }
  },
  {
   "map_id": "test_travel",
@@ -498,6 +516,12 @@
     "ref": "basecamp",
     "arrive": ""
    }
+  },
+  "visual": {
+   "layers": {}
+  },
+  "environment": {
+   "profile": "outdoor"
   }
  }
 ]

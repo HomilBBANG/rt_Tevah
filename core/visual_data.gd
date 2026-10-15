@@ -1,0 +1,141 @@
+@tool
+extends RefCounted
+## 그래픽 데이터 (data/graphics.json ← tools/sheets/graphics.xlsx). 게임(필드)과 맵 에디터가 같이 쓴다 — 에디터에서도 돌도록 @tool·static.
+##   타일: tile_key → {name, layer(floor/detail/wall), file(art/tiles/), atlas_x, atlas_y, casts_shadow}
+##   광원 프리셋, 시간대 환경광 day_night {profile: [[시, 환경색, 햇빛색, 햇빛 세기], ...]}
+## 맵의 그래픽은 논리(벽 # / 바닥 . / 빈 공간 공백)와 따로: map.visual.layers {floor|detail|wall: {"x,y": tile_key}}
+## 칠하지 않은 칸은 바닥 = floor_default, 벽 = wall_default.
+
+const DATA_PATH := "res://data/graphics.json"
+const TILES_DIR := "res://art/tiles/"
+const LAYERS := ["floor", "detail", "wall"]
+const LAYER_NAME := {"floor": "바닥", "detail": "바닥 장식", "wall": "벽 외형"}
+
+static var _data := {}
+static var _tiles := {}
+static var _tex := {}         # file → Texture2D
+
+
+## 다시 읽기 (변환 뒤 에디터에서)
+static func reload() -> void:
+	_data = {}
+	_tiles = {}
+	_tex = {}
+
+
+static func data() -> Dictionary:
+	if _data.is_empty():
+		var v = JSON.parse_string(FileAccess.get_file_as_string(DATA_PATH)) if FileAccess.file_exists(DATA_PATH) else null
+		_data = v if v is Dictionary else {"tiles": [], "light_presets": [], "day_night": {}, "tile_art_px": 16}
+		_tiles = {}
+		for t in _data.get("tiles", []):
+			_tiles[t.tile_key] = t
+	return _data
+
+
+static func tiles() -> Dictionary:
+	data()
+	return _tiles
+
+
+static func art_px() -> int:
+	return int(data().get("tile_art_px", 16))
+
+
+static func presets() -> Array:
+	return data().get("light_presets", [])
+
+
+static func preset(id: String) -> Dictionary:
+	for p in presets():
+		if p.preset_id == id:
+			return p
+	return {}
+
+
+static func profiles() -> Array:
+	return data().get("day_night", {}).keys()
+
+
+## 그림 파일 (가져오기된 리소스가 있으면 그것, 없으면 파일을 직접 읽음 — 처음 넣은 그림·테스트)
+static func texture(file: String) -> Texture2D:
+	if _tex.has(file):
+		return _tex[file]
+	var path := TILES_DIR + file
+	var tex: Texture2D = null
+	if ResourceLoader.exists(path):
+		tex = load(path)
+	else:
+		var img := Image.load_from_file(ProjectSettings.globalize_path(path))
+		if img and not img.is_empty():
+			tex = ImageTexture.create_from_image(img)
+	if tex == null:
+		push_warning("[그래픽] 타일 그림을 찾을 수 없음: %s" % path)
+	_tex[file] = tex
+	return tex
+
+
+## 타일 한 칸의 그림 영역 → [Texture2D, Rect2] (없으면 [])
+static func tile_region(key: String) -> Array:
+	var t: Dictionary = tiles().get(key, {})
+	if t.is_empty():
+		return []
+	var tex := texture(str(t.file))
+	if tex == null:
+		return []
+	var px := art_px()
+	return [tex, Rect2(int(t.get("atlas_x", 0)) * px, int(t.get("atlas_y", 0)) * px, px, px)]
+
+
+## 칸 (x, y) 에 보일 타일: {floor, detail, wall} (없으면 ""). 칠한 타일이 없거나 틀리면 기본 타일
+static func cell_keys(map: Dictionary, x: int, y: int) -> Dictionary:
+	var out := {"floor": "", "detail": "", "wall": ""}
+	var rows: Array = map.get("tiles", [])
+	if y < 0 or y >= rows.size() or x < 0 or x >= String(rows[y]).length():
+		return out
+	var ch := String(rows[y])[x]
+	if ch == " ":
+		return out   # 빈 공간: 검게
+	var layers: Dictionary = (map.get("visual", {}) if map.get("visual") is Dictionary else {}).get("layers", {})
+	var k := "%d,%d" % [x, y]
+	var t := tiles()
+	for layer in LAYERS:
+		var cells = layers.get(layer, {})
+		var key: String = str(cells.get(k, "")) if cells is Dictionary else ""
+		if key != "" and t.has(key):
+			out[layer] = key
+	if ch == "#":
+		out.floor = ""
+		if out.wall == "":
+			out.wall = "wall_default" if t.has("wall_default") else ""
+	elif out.floor == "":
+		out.floor = "floor_default" if t.has("floor_default") else ""
+	return out
+
+
+## 시간대 환경광: profile 의 시각(분)별 색을 부드럽게 섞음 → {ambient, sun, sun_energy}
+static func ambient(profile: String, minutes: float) -> Dictionary:
+	var dn: Dictionary = data().get("day_night", {})
+	var rows: Array = dn.get(profile, dn.get("outdoor", []))
+	if rows.is_empty():
+		return {"ambient": Color.WHITE, "sun": Color.BLACK, "sun_energy": 0.0}
+	var h := fposmod(minutes / 60.0, 24.0)
+	var n := rows.size()
+	# 시각들은 하루를 도는 고리: i → i+1 구간, 마지막 → 처음 구간은 자정을 넘는다
+	for i in n:
+		var a: Array = rows[i]
+		var b: Array = rows[(i + 1) % n]
+		var ah := float(a[0])
+		var bh := float(b[0]) + (24.0 if i == n - 1 else 0.0)
+		var hh := h + 24.0 if i == n - 1 and h < ah else h
+		if hh >= ah and hh <= bh:
+			var t := (hh - ah) / (bh - ah) if bh > ah else 0.0
+			var ra := _row(a)
+			var rb := _row(b)
+			return {"ambient": ra.ambient.lerp(rb.ambient, t), "sun": ra.sun.lerp(rb.sun, t),
+				"sun_energy": lerpf(ra.sun_energy, rb.sun_energy, t)}
+	return _row(rows[0])
+
+
+static func _row(r: Array) -> Dictionary:
+	return {"ambient": Color.html(str(r[1])), "sun": Color.html(str(r[2])), "sun_energy": float(r[3])}

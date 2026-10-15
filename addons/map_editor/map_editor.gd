@@ -8,6 +8,8 @@ extends VBoxContainer
 const Canvas = preload("res://addons/map_editor/map_canvas.gd")
 const ToolCommon = preload("res://addons/tool_common.gd")
 const ExprRows = preload("res://addons/expr_rows.gd")
+const MapRenderer = preload("res://core/map_renderer.gd")
+const VisualData = preload("res://core/visual_data.gd")
 
 const MAP_DIR := "res://tools/maps/"
 const PLAYTEST_FILE := "user://map_playtest.json"
@@ -18,6 +20,7 @@ const TOOL_GROUPS := [
 	["위치", [["arrive", "도착 P"], ["run_start", "시작 S"]]],
 	["물체", [["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["event", "이벤트"]]],
 	["이동", [["exit", "문"], ["passage", "통로"], ["transit", "이용"]]],
+	["그래픽", [["tile", "타일 붓"], ["tile_erase", "타일 지우개"], ["light", "광원"]]],
 	["", [["erase", "지우개"]]],
 ]
 const TOOL_TIPS := {
@@ -36,6 +39,9 @@ const TOOL_TIPS := {
 	"passage": "통로: 밟으면 바로 이동 (계단·길·동굴 입구)",
 	"transit": "이용: E 를 눌러야 이동 (사다리·엘리베이터 등). 이름이 안내에 나옴",
 	"erase": "지우개: 클릭한 물체(또는 S)를 지움. 벽은 바닥으로 칠해서 지움",
+	"tile": "타일 붓: 왼쪽 '타일 팔레트'에서 층·타일을 고르고 끌어서 칠함 (보이는 모습만 — 벽·바닥 판정은 그대로). □ 사각형·Shift 로 채우기",
+	"tile_erase": "타일 지우개: 지금 층의 칠한 타일을 지움 (그 칸은 기본 타일로 보임)",
+	"light": "광원: 클릭한 칸에 놓기 (오른쪽 칸에서 프리셋·색·밝기·범위·그림자). 고르면 끌어서 옮기기, Ctrl+C/V 복제",
 }
 const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
 
@@ -65,10 +71,19 @@ const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
 
 [b]5. 반영[/b]  [b]저장[/b] → [b]변환·검사[/b] (오류가 있으면 아래에 결과 칸이 열림) → [b]▶ 테스트 플레이[/b] (진짜 저장은 건드리지 않음)
 
+[b]5. 그래픽 (픽셀아트 · 조명)[/b] — 보이는 모습만. 지나갈 수 있는지(벽 #·바닥 .)는 위 '칠하기'가 정합니다.
+  · [b]타일 붓[/b]: 왼쪽 [b]타일 팔레트[/b]에서 층(바닥 / 바닥 장식 / 벽 외형)과 타일을 고르고 끌어서 칠함. □ 사각형·Shift 로 채우기. [b]타일 지우개[/b] = 지금 층에서 지움.
+    안 칠한 칸은 기본 바닥·기본 벽으로 보입니다. 새 타일은 그림을 art/tiles/ 에 넣고 엑셀 graphics.xlsx 'Tiles' 에 한 줄 → 변환·검사.
+  · [b]광원[/b]: 칸을 클릭해 놓고, 오른쪽 칸에서 프리셋(전구·형광등·촛불·가로등·손전등)·색·밝기·범위(칸)·벽 그림자·켜짐. 끌어서 옮기기, Ctrl+C/V.
+  · [b]환경[/b]: 아무것도 안 고르고 맵 설정에서 실외(낮·밤 변화) / 실내 / 지하. 색·밝기는 graphics.xlsx 'DayNight'.
+  · [b]시간 미리보기[/b] (위 줄 06 · 12 · 18 · 00 · 슬라이더): 에디터에서만 그 시각의 조명으로 봄 — 게임 시각·저장은 그대로.
+  · 그림자: 벽 타일(그림자 Y)과 닫힌 문이 빛을 막음. 게임에서 문을 열면 빛이 지나감.
+  · 표시(왼쪽 아래): 그래픽 · 조명 · 광원 · 광원 범위 · 그림자 차단(윤곽) · 벽 판정(지나갈 수 없는 칸을 붉게)
+
 [b]지도 표시[/b]  [color=#3fae5f]● P[/color] 도착 P (★ 기본) · [color=#b89a2a]S[/color] 회차 시작 · [color=#d05050]● 적[/color] · [color=#e8c35a]● 조[/color] 조사 · [color=#5a8fd0]● N[/color] NPC · [color=#5fae6a]● 거[/color] 거점 · [color=#c070d0]● !![/color] 이벤트 (밟으면 컷신) · [color=#a07850]● 문[/color] · [color=#6fa8dc]● 통[/color] 통로 · [color=#c8a060]● 이[/color] 이용 · 맵 바깥 푸른 띠 = 가장자리 이동
 """
 const TYPE_NAME :={"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구(문)",
-	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P", "event": "이벤트 칸"}
+	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P", "event": "이벤트 칸", "light": "광원"}
 const EDGES := [["up", "위"], ["down", "아래"], ["left", "왼쪽"], ["right", "오른쪽"]]
 
 var dir := MAP_DIR                   # 테스트에서 바꿔 쓴다
@@ -103,6 +118,16 @@ var map_list: ItemList
 var search: LineEdit
 var results: ItemList
 var filter_boxes := {}
+# ---- 그래픽 (core/map_renderer.gd — 게임과 같은 렌더러를 맵 뒤에 띄움)
+var renderer: Node2D
+var gfx_view: SubViewportContainer
+var tile_px := 80.0                  # 게임 한 칸 (Config field_tile)
+var preview_minutes := 720.0         # 시간 미리보기 (게임 시각·저장과 무관)
+var palette: ItemList
+var palette_layer: OptionButton
+var palette_search: LineEdit
+var time_label: Label
+var _gfx_dirty := true
 
 
 func _init() -> void:
@@ -182,6 +207,35 @@ func _init() -> void:
 			rect.tooltip_text = "켜면 벽·바닥·빈 공간을 끌어서 사각형으로 채움 (Shift 를 누른 채 끌어도 됨)"
 			rect.toggled.connect(func(on): canvas.rect_mode = on)
 			tools.add_child(rect)
+	# 시간 미리보기 (위 줄, 상태 글자 앞)
+	var time_box := HBoxContainer.new()
+	bar.add_child(time_box)
+	bar.move_child(time_box, status.get_index())
+	var light_cap := Label.new()
+	light_cap.text = "시간 미리보기"
+	light_cap.modulate = Color(1, 1, 1, 0.45)
+	light_cap.tooltip_text = "에디터에서만 조명을 이 시각으로 봅니다 (게임 시각·저장은 그대로)"
+	time_box.add_child(light_cap)
+	for hh in [6, 12, 18, 0]:
+		var hb := Button.new()
+		hb.text = "%02d" % hh
+		hb.flat = true
+		hb.tooltip_text = "%02d:00 으로 보기" % hh
+		hb.pressed.connect(func(): set_preview_time(hh * 60.0))
+		time_box.add_child(hb)
+	var slider := HSlider.new()
+	slider.min_value = 0
+	slider.max_value = 1439
+	slider.step = 10
+	slider.value = preview_minutes
+	slider.custom_minimum_size.x = 140
+	slider.size_flags_vertical = SIZE_SHRINK_CENTER
+	slider.value_changed.connect(func(v): set_preview_time(v))
+	slider.name = "TimeSlider"
+	time_box.add_child(slider)
+	time_label = Label.new()
+	time_label.text = "12:00"
+	time_box.add_child(time_label)
 	# ---- 왼쪽 칸 │ 맵 │ 오른쪽 칸
 	var outer := HSplitContainer.new()
 	outer.size_flags_vertical = SIZE_EXPAND_FILL
@@ -205,7 +259,25 @@ func _init() -> void:
 		_last_ck = "")
 	canvas.request.connect(_on_canvas_request)
 	canvas.activated.connect(follow_link)
-	split.add_child(canvas)
+	canvas.changed.connect(func(): _gfx_dirty = true)
+	# 맵 칸 = [게임과 같은 그림·조명 (SubViewport)] 위에 [편집 선·물체 표시 (canvas)]
+	var stage := Control.new()
+	stage.size_flags_horizontal = SIZE_EXPAND_FILL
+	stage.clip_contents = true
+	split.add_child(stage)
+	gfx_view = SubViewportContainer.new()
+	gfx_view.stretch = true
+	gfx_view.mouse_filter = MOUSE_FILTER_IGNORE
+	gfx_view.set_anchors_preset(PRESET_FULL_RECT)
+	stage.add_child(gfx_view)
+	var vp := SubViewport.new()
+	vp.handle_input_locally = false
+	vp.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
+	gfx_view.add_child(vp)
+	renderer = MapRenderer.new()
+	vp.add_child(renderer)
+	canvas.set_anchors_preset(PRESET_FULL_RECT)
+	stage.add_child(canvas)
 	var side := ScrollContainer.new()
 	side.custom_minimum_size.x = 340
 	side.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED   # 긴 글자는 칸 폭에 맞춰 줄임
@@ -305,6 +377,7 @@ func open_map(id: String) -> void:
 	path = p
 	canvas.require_default = id == basecamp_id
 	canvas.set_map(map)
+	_gfx_dirty = true
 	dirty = false
 	_undo.clear()
 	_redo.clear()
@@ -357,21 +430,27 @@ func save() -> void:
 		map.start = [int(dp.x), int(dp.y)]   # 기본 P 자리 = start (게임·변환기가 읽음)
 	elif not ps.is_empty():
 		map.start = [int(ps[0].x), int(ps[0].y)]   # 기본 P 가 없으면 첫 P (테스트 플레이 시작 자리)
+	# 무손실 저장: 맵·물체의 모든 칸을 그대로 쓴다 (에디터가 모르는 칸도). 빈 기본값만 빼서 예전 맵 파일이 그대로 유지되게
 	var out := {"map_id": map.map_id, "tiles": map.tiles, "start": map.get("start"), "run_start": map.get("run_start"),
 		"objects": []}
-	# 새로 생긴 항목(가장자리 edges, 도착 지점 arrive)은 쓸 때만 파일에 적는다 (예전 맵 파일이 그대로 유지되게)
-	if not map.get("edges", {}).is_empty():
-		out.edges = map.edges
+	for k in map:
+		if not k in out and k != "objects":
+			out[k] = map[k]
+	if out.get("edges", {}).is_empty():
+		out.erase("edges")
+	if out.get("visual") is Dictionary and out.visual.get("layers", {}).is_empty() and out.visual.size() <= 1:
+		out.erase("visual")
 	for o in map.objects:
 		var e := {}
 		for k in ["object_id", "type", "x", "y", "ref", "name", "text", "patrol_dir", "patrol_len", "condition", "schedule"]:
 			e[k] = o.get(k, "" if k not in ["x", "y", "patrol_len"] else 0)
-		if o.get("arrive", "") != "" or o.has("arrive"):
-			e.arrive = o.get("arrive", "")
-		if not o.get("from", []).is_empty():
-			e.from = o.from
-		if o.get("default", false):
-			e.default = true
+		for k in o:
+			if not e.has(k):
+				e[k] = o[k]
+		if e.get("from", []).is_empty():
+			e.erase("from")
+		if not e.get("default", false):
+			e.erase("default")
 		out.objects.append(e)
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
@@ -471,6 +550,18 @@ func _edit_map() -> void:
 	row.add_child(hs)
 	row.add_child(apply)
 	inspector.add_child(row)
+	_section("환경 (조명)")
+	var env: String = map.get("environment", {}).get("profile", "outdoor") if map.get("environment") is Dictionary else "outdoor"
+	var profs := [["outdoor", "실외 — 낮·밤에 따라 밝기가 바뀜"], ["indoor", "실내 — 늘 같은 어두운 주변광"], ["underground", "지하 — 햇빛 없음, 광원 위주"]]
+	for pid in VisualData.profiles():
+		if not profs.any(func(x): return x[0] == pid):
+			profs.append([pid, pid])
+	_option("환경", profs, env, func(v):
+		checkpoint()
+		map.environment = {"profile": v}
+		dirty = true
+		_gfx_dirty = true)
+	_hint("밝기·색은 엑셀 graphics.xlsx DayNight. 위 '시간 미리보기'로 시각마다 확인")
 	_section("가장자리로 나가면")
 	_hint("그쪽 맨 끝 바닥 칸에 닿으면 이동 (맵 끝에 바닥을 터 두세요)")
 	if not map.has("edges") or not map.edges is Dictionary:
@@ -524,6 +615,59 @@ func _edit_object(o: Dictionary) -> void:
 			var sp := _spin("순찰 칸 수", int(o.get("patrol_len", 0)), 0, 100)
 			sp.tooltip_text = "그 칸 수만큼 왕복"
 			sp.value_changed.connect(func(v): set_field(o, "patrol_len", int(v)))
+		"light":
+			_section("광원")
+			var pres: Array = VisualData.presets()
+			_option("프리셋", [["", "(직접)"]] + pres.map(func(p): return [p.preset_id, p.name]), o.get("preset", ""), func(v):
+				var p := VisualData.preset(v)
+				checkpoint()
+				o.preset = v
+				if not p.is_empty():
+					for k in ["color", "energy", "radius", "shadow"]:
+						o[k] = p.get(k, o.get(k))
+					canvas.light_defaults = _light_from_preset(p)   # 다음에 놓을 광원도 이 프리셋
+				dirty = true
+				_gfx_dirty = true
+				canvas.queue_redraw()
+				_edit_object.call_deferred(o))
+			var cp := ColorPickerButton.new()
+			cp.color = Color.html(str(o.get("color", "#FFFFFF"))) if Color.html_is_valid(str(o.get("color", ""))) else Color.WHITE
+			cp.edit_alpha = false
+			cp.custom_minimum_size.y = 28
+			cp.color_changed.connect(func(c):
+				checkpoint("%s/color" % o.object_id)
+				o.color = "#" + c.to_html(false).to_upper()
+				dirty = true
+				_gfx_dirty = true
+				canvas.queue_redraw())
+			_row("색", cp)
+			for f in [["energy", "밝기", 0.0, 4.0, 0.05], ["radius", "범위 (칸)", 0.5, 30.0, 0.5]]:
+				var sp := SpinBox.new()
+				sp.min_value = f[2]
+				sp.max_value = f[3]
+				sp.step = f[4]
+				sp.value = float(o.get(f[0], 1.0))
+				var key: String = f[0]
+				sp.value_changed.connect(func(v):
+					checkpoint("%s/%s" % [o.object_id, key])
+					o[key] = v
+					dirty = true
+					_gfx_dirty = true
+					canvas.queue_redraw())
+				_row(f[1], sp)
+			for f in [["shadow", "벽 그림자"], ["enabled", "켜짐"]]:
+				var cb := CheckBox.new()
+				cb.text = f[1]
+				cb.button_pressed = o.get(f[0], true)
+				var key: String = f[0]
+				cb.toggled.connect(func(on):
+					checkpoint()
+					o[key] = on
+					dirty = true
+					_gfx_dirty = true
+					canvas.queue_redraw())
+				inspector.add_child(cb)
+			_hint("보이는 모습만 (적 시야·발견과는 상관없음). 위 '시간 미리보기'를 00 으로 두면 밤에 어떻게 보이는지 확인")
 		"event":
 			_section("이벤트 (밟으면 시작)")
 			_option("대화 (컷신)", dialogue_starts, o.get("ref", ""), func(v): set_field(o, "ref", v))
@@ -742,7 +886,9 @@ func _on_canvas_request(action: String) -> void:
 # ---------------------------------------------------------------- 실행 취소 / 다시 실행
 func _snapshot() -> Dictionary:
 	return {"tiles": map.get("tiles", []).duplicate(), "objects": map.get("objects", []).duplicate(true),
-		"start": map.get("start"), "run_start": map.get("run_start"), "edges": map.get("edges", {}).duplicate(true)}
+		"start": map.get("start"), "run_start": map.get("run_start"), "edges": map.get("edges", {}).duplicate(true),
+		"visual": map.visual.duplicate(true) if map.get("visual") is Dictionary else null,
+		"environment": map.environment.duplicate(true) if map.get("environment") is Dictionary else null}
 
 
 func _push_undo(snap: Dictionary) -> void:
@@ -785,8 +931,14 @@ func _restore(snap: Dictionary) -> void:
 	map.start = snap.start
 	map.run_start = snap.run_start
 	map.edges = snap.edges.duplicate(true)
+	for k in ["visual", "environment"]:
+		if snap.get(k) != null:
+			map[k] = snap[k].duplicate(true)
+		else:
+			map.erase(k)
 	_last_ck = ""
 	canvas.set_map(map)
+	_gfx_dirty = true
 	dirty = true
 	_refresh_links()
 	_edit_map()
@@ -899,20 +1051,50 @@ func _build_left_panel() -> Control:
 	map_list.item_clicked.connect(func(i, _p, _b): open_map(map_list.get_item_metadata(i)))
 	list_box.add_child(map_list)
 	list_box.size_flags_vertical = SIZE_EXPAND_FILL
+	# 타일 팔레트
+	var pal_box := _fold(vb, "타일 팔레트", true)
+	palette_layer = OptionButton.new()
+	for l in VisualData.LAYERS:
+		palette_layer.add_item(VisualData.LAYER_NAME[l])
+	palette_layer.tooltip_text = "칠할 그래픽 층 (바닥 → 바닥 장식 → 벽 외형 순서로 겹침)"
+	palette_layer.item_selected.connect(func(i):
+		canvas.tile_layer = VisualData.LAYERS[i]
+		_refresh_palette())
+	pal_box.add_child(palette_layer)
+	palette_search = LineEdit.new()
+	palette_search.placeholder_text = "타일 찾기"
+	palette_search.clear_button_enabled = true
+	palette_search.text_changed.connect(func(_t): _refresh_palette())
+	pal_box.add_child(palette_search)
+	palette = ItemList.new()
+	palette.custom_minimum_size.y = 180
+	palette.fixed_icon_size = Vector2i(40, 40)
+	palette.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	palette.max_columns = 0
+	palette.icon_mode = ItemList.ICON_MODE_TOP
+	palette.same_column_width = true
+	palette.fixed_column_width = 64
+	palette.item_selected.connect(func(i):
+		canvas.tile_key = palette.get_item_metadata(i)
+		set_tool("tile"))
+	pal_box.add_child(palette)
 	# 표시 필터
 	var filt_box := _fold(vb, "표시", false)
 	var grid := GridContainer.new()
 	grid.columns = 2
 	filt_box.add_child(grid)
 	for f in [["tiles", "타일"], ["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"],
-			["travel", "문·통로·이용"], ["arrive", "도착 P"], ["event", "이벤트"], ["sight", "순찰"], ["names", "이름표"], ["links", "연결"]]:
+			["travel", "문·통로·이용"], ["arrive", "도착 P"], ["event", "이벤트"], ["sight", "순찰"], ["names", "이름표"], ["links", "연결"],
+			["graphics", "그래픽"], ["lighting", "조명"], ["light", "광원"], ["light_range", "광원 범위"], ["occluders", "그림자 차단"], ["logic", "벽 판정"]]:
 		var cb := CheckBox.new()
 		cb.text = f[1]
-		cb.button_pressed = true
+		cb.button_pressed = not f[0] in ["occluders", "logic"]   # 그림자 차단·벽 판정 윤곽은 처음엔 끔 (canvas.filters 와 같게)
 		var key: String = f[0]
 		cb.toggled.connect(func(on):
 			canvas.filters[key] = on
 			canvas.select_many(canvas.selection.filter(canvas.is_visible_object))
+			if key in ["graphics", "lighting"]:
+				_apply_gfx_filters()
 			canvas.queue_redraw())
 		grid.add_child(cb)
 		filter_boxes[key] = cb
@@ -1137,6 +1319,20 @@ func _load_lookups() -> void:
 	var cfg: Dictionary = ToolCommon.read_json("res://data/config.json", {})
 	basecamp_id = str(cfg.get("basecamp_map", "basecamp"))
 	canvas.sight_tiles = float(cfg.get("field_enemy_sight", 5))
+	# 그래픽 (graphics.xlsx → data/graphics.json): 타일 팔레트·광원 프리셋 다시 읽기
+	tile_px = float(cfg.get("field_tile", 80))
+	VisualData.reload()
+	var pres: Array = VisualData.presets()
+	if canvas.light_defaults.is_empty() and not pres.is_empty():
+		canvas.light_defaults = _light_from_preset(pres[0])
+	if canvas.tile_key == "" or not VisualData.tiles().has(canvas.tile_key):
+		for key in VisualData.tiles():
+			if VisualData.tiles()[key].layer == canvas.tile_layer:
+				canvas.tile_key = key
+				break
+	_refresh_palette()
+	_apply_gfx_filters()
+	_gfx_dirty = true
 
 
 func _new_object_id(type: String) -> String:
@@ -1147,6 +1343,67 @@ func _new_object_id(type: String) -> String:
 	while used.has("%s_%s_%d" % [map.map_id, type, i]):
 		i += 1
 	return "%s_%s_%d" % [map.map_id, type, i]
+
+
+# ---------------------------------------------------------------- 그래픽
+## 매 프레임: 렌더러를 캔버스의 이동·확대에 맞추고, 바뀐 게 있으면 다시 그린다
+func _process(_delta: float) -> void:
+	if renderer == null or map.is_empty():
+		return
+	if _gfx_dirty:
+		_gfx_dirty = false
+		renderer.minutes = preview_minutes
+		renderer.build(map, tile_px)
+	var k: float = canvas.cell * canvas.zoom / tile_px
+	renderer.scale = Vector2(k, k)
+	renderer.position = canvas.pan
+
+
+func set_preview_time(m: float) -> void:
+	preview_minutes = fposmod(m, 1440.0)
+	if time_label:
+		time_label.text = "%02d:%02d" % [int(preview_minutes) / 60, int(preview_minutes) % 60]
+	var slider := find_child("TimeSlider", true, false)
+	if slider and not is_equal_approx(slider.value, preview_minutes):
+		slider.set_value_no_signal(preview_minutes)
+	if renderer:
+		renderer.set_time(preview_minutes)
+
+
+func _apply_gfx_filters() -> void:
+	gfx_view.visible = canvas.filters.graphics
+	canvas.graphics = canvas.filters.graphics
+	if renderer:
+		renderer.set_lighting(canvas.filters.lighting)
+
+
+## 팔레트: 지금 층의 타일 (그림 + 이름), 찾기
+func _refresh_palette() -> void:
+	if palette == null:
+		return
+	palette.clear()
+	var q := palette_search.text.strip_edges().to_lower() if palette_search else ""
+	for key in VisualData.tiles():
+		var t: Dictionary = VisualData.tiles()[key]
+		if t.layer != canvas.tile_layer or (q != "" and not q in key.to_lower() and not q in String(t.name).to_lower()):
+			continue
+		var reg := VisualData.tile_region(key)
+		var icon: Texture2D = null
+		if not reg.is_empty():
+			var at := AtlasTexture.new()
+			at.atlas = reg[0]
+			at.region = reg[1]
+			icon = at
+		var i := palette.add_item(String(t.name), icon)
+		palette.set_item_metadata(i, key)
+		palette.set_item_tooltip(i, "%s  (%s)%s" % [t.name, key, "\n빛을 막음 (그림자)" if t.get("casts_shadow", false) else ""])
+		if key == canvas.tile_key:
+			palette.select(i)
+
+
+static func _light_from_preset(p: Dictionary) -> Dictionary:
+	return {"preset": p.get("preset_id", ""), "color": p.get("color", "#FFFFFF"), "energy": float(p.get("energy", 1.0)),
+		"radius": float(p.get("radius", 4.0)), "shadow": bool(p.get("shadow", true)), "enabled": true}
 
 
 func _select_file_item(id: String) -> void:
