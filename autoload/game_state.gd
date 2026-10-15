@@ -452,11 +452,15 @@ func owned_trait_ids() -> Array:
 
 
 ## 특성 얻기(on)·잃기. 같은 특성은 한 번만. 바뀌었으면 true
+## 반대 특성(Traits.conflicts, 어느 쪽에 적혀 있든)을 가지고 있으면 그것은 사라지고 새 특성으로 바뀐다
 func set_trait(id: String, on: bool, from := "event") -> bool:
 	var have := id in owned_trait_ids()
 	if on == have:
 		return false
 	if on:
+		var mine: Array = DataLoader.traits.get(id, {}).get("conflicts", [])
+		owned_traits = owned_traits.filter(func(t):
+			return not (t.trait_id in mine or id in DataLoader.traits.get(t.trait_id, {}).get("conflicts", [])))
 		owned_traits.append({"trait_id": id, "from": from})
 	else:
 		owned_traits = owned_traits.filter(func(t): return t.trait_id != id)

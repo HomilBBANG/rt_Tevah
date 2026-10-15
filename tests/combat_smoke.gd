@@ -22,6 +22,11 @@ func _ready() -> void:
 	var acts: Array = ui.get_node("%Actions").get_children().map(func(b): return b.text)
 	check(acts == ["공격", "특수", "대화", "아이템", "도주"], "행동 버튼: 공격 · 특수 · 대화 · 아이템 · 도주 (%s)" % [acts])
 	check(is_equal_approx(ui.get_node("TextBox").get_theme_stylebox("panel").bg_color.a, 0.7), "텍스트 창 불투명도 70%")
+	var tb: Rect2 = ui.get_node("TextBox").get_global_rect()
+	var ab: Rect2 = ui.get_node("%Actions").get_global_rect()
+	var last: Rect2 = ui.get_node("%FleeButton").get_global_rect()
+	check(absf(tb.position.y - ab.position.y) < 1.0 and absf(tb.end.y - ab.end.y) < 1.0 and last.end.y <= ab.end.y + 1.0,
+		"텍스트 창 높이 = 행동 버튼 칸 (위 %d/%d, 아래 %d/%d, 마지막 버튼 %d)" % [tb.position.y, ab.position.y, tb.end.y, ab.end.y, last.end.y])
 	ui.get_node("%SpecialButton").pressed.emit()
 	await _wait(0.1)
 	check("특수 행동이 없다" in ui.get_node("%Message").text and ui.get_node("%Options").get_child_count() == 1, "특수 → 아직 없음 + 취소")

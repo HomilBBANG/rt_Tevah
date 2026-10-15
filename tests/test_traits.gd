@@ -64,13 +64,14 @@ func _ready() -> void:
 	GameState.current_map = DataLoader.get_config_str("basecamp_map")
 	SaveManager.save_run(1)          # 고지능자·골초·용감함
 	await StoryRunner.run_effects("trait:-heavy_smoker;trait:+coward")
-	check(not GameState.has_trait("heavy_smoker") and GameState.has_trait("coward"), "골초 잃고 겁쟁이 얻음")
+	check(not GameState.has_trait("heavy_smoker") and GameState.has_trait("coward") and not GameState.has_trait("brave"),
+		"골초 잃고 겁쟁이 얻음 → 반대 특성 용감함은 사라짐 (바뀜)")
 	# ---- 죽고 다음 회차: 지금 특성 그대로 (생성 화면 없음)
 	SaveManager.end_run()
 	SaveManager.begin_run()
 	GameState.world_from_dict(JSON.parse_string(FileAccess.get_file_as_string(SaveManager.world_path())))   # 다시 켠 것처럼 월드 파일에서
-	check(GameState.owned_trait_ids() == ["high_intellect", "brave", "coward"] and GameState.character_created,
-		"죽고 새 회차 → 특성 유지 (고지능자·용감함·겁쟁이): %s" % [GameState.owned_trait_ids()])
+	check(GameState.owned_trait_ids() == ["high_intellect", "coward"] and GameState.character_created,
+		"죽고 새 회차 → 특성 유지 (고지능자·겁쟁이): %s" % [GameState.owned_trait_ids()])
 	# ---- 옛 슬롯 불러오기 → 그 저장의 특성 (안 B), 월드에도
 	check(SaveManager.load_run(1) and GameState.owned_trait_ids() == ["high_intellect", "heavy_smoker", "brave"],
 		"슬롯 1 불러오기 → 저장 때 특성 (골초 있음, 겁쟁이 없음): %s" % [GameState.owned_trait_ids()])
