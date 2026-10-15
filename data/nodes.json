@@ -221,30 +221,166 @@
   "trigger": {}
  },
  {
-  "node_id": "cat_start",
+  "node_id": "intro_start",
   "episode_id": "",
   "speaker_id": "",
   "text": "",
-  "next_node": "cat_1",
+  "next_node": "intro_2",
   "on_enter": "",
   "kind": "start",
   "condition": "",
   "fail_next": "",
   "pages": [],
-  "routes": [
+  "routes": [],
+  "steps": [],
+  "trigger": {
+   "when": "logo",
+   "map": "",
+   "once": false
+  },
+  "text_speed": "",
+  "npc_id": ""
+ },
+ {
+  "node_id": "intro_2",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "EXIT",
+  "on_enter": "",
+  "kind": "direct",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "steps": [
    {
-    "condition": "count:talk==0",
-    "next_node": "fd_cat_a"
+    "file": "r_games_logo.png",
+    "fade": 0.5,
+    "do": "image"
    },
    {
-    "condition": "count:talk>=1",
-    "next_node": "cat_1"
+    "to": "clear",
+    "time": 1.0,
+    "do": "fade"
    }
   ],
+  "trigger": {},
+  "text_speed": "",
+  "npc_id": ""
+ },
+ {
+  "node_id": "opening_start",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "opening_in",
+  "on_enter": "",
+  "kind": "start",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "steps": [],
+  "trigger": {
+   "when": "new_game",
+   "map": "",
+   "once": true
+  },
+  "text_speed": "",
+  "npc_id": ""
+ },
+ {
+  "node_id": "opening_in",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "opening_line",
+  "on_enter": "",
+  "kind": "direct",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "steps": [
+   {
+    "do": "fade",
+    "to": "black",
+    "time": 0.0
+   },
+   {
+    "do": "image",
+    "file": "test_cg.png",
+    "fade": 0.0
+   },
+   {
+    "do": "fade",
+    "to": "clear",
+    "time": 1.2
+   },
+   {
+    "do": "wait",
+    "time": 0.5
+   }
+  ],
+  "trigger": {},
+  "text_speed": "",
+  "npc_id": ""
+ },
+ {
+  "node_id": "opening_line",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "(테스트) 오프닝 컷신 — Config opening_dialogue 를 비우면 나오지 않음",
+  "next_node": "opening_out",
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": "",
+  "pages": [
+   {
+    "page_id": "p1",
+    "display": "subtitle",
+    "text": "(테스트) 오프닝 컷신 — Config opening_dialogue 를 비우면 나오지 않음"
+   }
+  ],
+  "routes": [],
   "steps": [],
   "trigger": {},
   "text_speed": "",
-  "npc_id": "char_cat"
+  "npc_id": ""
+ },
+ {
+  "node_id": "opening_out",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "EXIT",
+  "on_enter": "",
+  "kind": "direct",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "steps": [
+   {
+    "do": "fade",
+    "to": "black",
+    "time": 0.8
+   },
+   {
+    "do": "image_off",
+    "fade": 0.0
+   },
+   {
+    "do": "fade",
+    "to": "clear",
+    "time": 0.8
+   }
+  ],
+  "trigger": {},
+  "text_speed": "",
+  "npc_id": ""
  },
  {
   "node_id": "fd_cat_a",
@@ -287,6 +423,32 @@
   "fail_next": "",
   "pages": [],
   "routes": [],
+  "steps": [],
+  "trigger": {},
+  "text_speed": "",
+  "npc_id": "char_cat"
+ },
+ {
+  "node_id": "cat_start",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "cat_1",
+  "on_enter": "",
+  "kind": "start",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [
+   {
+    "condition": "count:talk==0",
+    "next_node": "fd_cat_a"
+   },
+   {
+    "condition": "count:talk>=1",
+    "next_node": "cat_1"
+   }
+  ],
   "steps": [],
   "trigger": {},
   "text_speed": "",
@@ -568,118 +730,5 @@
   "trigger": {},
   "text_speed": "",
   "npc_id": "char_npc2"
- },
- {
-  "node_id": "opening_start",
-  "episode_id": "",
-  "speaker_id": "",
-  "text": "",
-  "next_node": "opening_in",
-  "on_enter": "",
-  "kind": "start",
-  "condition": "",
-  "fail_next": "",
-  "pages": [],
-  "routes": [],
-  "steps": [],
-  "trigger": {
-   "when": "new_game",
-   "map": "",
-   "once": true
-  },
-  "text_speed": "",
-  "npc_id": ""
- },
- {
-  "node_id": "opening_in",
-  "episode_id": "",
-  "speaker_id": "",
-  "text": "",
-  "next_node": "opening_line",
-  "on_enter": "",
-  "kind": "direct",
-  "condition": "",
-  "fail_next": "",
-  "pages": [],
-  "routes": [],
-  "steps": [
-   {
-    "do": "fade",
-    "to": "black",
-    "time": 0.0
-   },
-   {
-    "do": "image",
-    "file": "test_cg.png",
-    "fade": 0.0
-   },
-   {
-    "do": "fade",
-    "to": "clear",
-    "time": 1.2
-   },
-   {
-    "do": "wait",
-    "time": 0.5
-   }
-  ],
-  "trigger": {},
-  "text_speed": "",
-  "npc_id": ""
- },
- {
-  "node_id": "opening_line",
-  "episode_id": "",
-  "speaker_id": "",
-  "text": "(테스트) 오프닝 컷신 — Config opening_dialogue 를 비우면 나오지 않음",
-  "next_node": "opening_out",
-  "on_enter": "",
-  "kind": "",
-  "condition": "",
-  "fail_next": "",
-  "pages": [
-   {
-    "page_id": "p1",
-    "display": "subtitle",
-    "text": "(테스트) 오프닝 컷신 — Config opening_dialogue 를 비우면 나오지 않음"
-   }
-  ],
-  "routes": [],
-  "steps": [],
-  "trigger": {},
-  "text_speed": "",
-  "npc_id": ""
- },
- {
-  "node_id": "opening_out",
-  "episode_id": "",
-  "speaker_id": "",
-  "text": "",
-  "next_node": "EXIT",
-  "on_enter": "",
-  "kind": "direct",
-  "condition": "",
-  "fail_next": "",
-  "pages": [],
-  "routes": [],
-  "steps": [
-   {
-    "do": "fade",
-    "to": "black",
-    "time": 0.8
-   },
-   {
-    "do": "image_off",
-    "fade": 0.0
-   },
-   {
-    "do": "fade",
-    "to": "clear",
-    "time": 0.8
-   }
-  ],
-  "trigger": {},
-  "text_speed": "",
-  "npc_id": ""
  }
 ]

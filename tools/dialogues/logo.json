@@ -1,0 +1,49 @@
+{
+ "dialogue_id": "logo",
+ "episode_id": "",
+ "nodes": [
+  {
+   "node_id": "intro_start",
+   "kind": "start",
+   "routes": [],
+   "speaker_id": "",
+   "text": "",
+   "next_node": "intro_2",
+   "on_enter": "",
+   "trigger": {
+    "when": "logo",
+    "map": "",
+    "once": false
+   },
+   "pos": [
+    -40,
+    20
+   ]
+  },
+  {
+   "node_id": "intro_2",
+   "kind": "direct",
+   "speaker_id": "",
+   "text": "",
+   "next_node": "EXIT",
+   "on_enter": "",
+   "steps": [
+    {
+     "file": "r_games_logo.png",
+     "fade": 0.5,
+     "do": "image"
+    },
+    {
+     "to": "clear",
+     "time": 1.0,
+     "do": "fade"
+    }
+   ],
+   "pos": [
+    480,
+    60
+   ]
+  }
+ ],
+ "choices": []
+}
