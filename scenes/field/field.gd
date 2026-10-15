@@ -33,6 +33,7 @@ const ACTOR_LAYER := 2
 const NPC_LAYER := 4
 const Direction = preload("res://core/direction.gd")
 const MapRenderer = preload("res://core/map_renderer.gd")
+const VisualData = preload("res://core/visual_data.gd")
 const DOOR_LAYER := 8            # 닫힌 문: 플레이어·적 모두 통과 못 하고, 적의 시야도 막는다 (field_enemy._can_see)
 const INTERACT_RANGE := 1.1      # 칸
 const TOAST_TIME := 3.0
@@ -47,7 +48,8 @@ var events: Array = []          # 이벤트 칸 [{kind:"event", data, pos, tile,
 var _last_tile := Vector2i(-999, -999)   # 이벤트 칸은 '들어설 때' 한 번
 var _cam_target: Vector2i = Vector2i(-1, -1)
 var _active_tweens: Array = []
-var renderer: Node2D             # core/map_renderer.gd — 픽셀아트 타일·조명·그림자 (보이는 모습만)   # 연출 중인 걷기·카메라 (건너뛰기 때 바로 끝냄)
+var renderer: Node2D             # core/map_renderer.gd — 픽셀아트 타일·조명·그림자 (보이는 모습만)
+var held_light: PointLight2D     # 손에 든 아이템의 빛 (Items.light, 예: 손전등) — 플레이어를 따라가며 바라보는 쪽을 비춤   # 연출 중인 걷기·카메라 (건너뛰기 때 바로 끝냄)
 var player: CharacterBody2D
 var enemies: Array = []
 var spots: Array = []            # 상호작용 지점 [{ kind: "spot"/"camp"/"exit", data, pos, done }]
@@ -89,6 +91,8 @@ func _ready() -> void:
 	GameState.flags_changed.connect(_refresh_presence)
 	GameState.inventory_changed.connect(_refresh_presence)
 	StoryRunner.field_director = _direct_step
+	%World.y_sort_enabled = true   # 인물·오브젝트 그림: 아래(발)에 있을수록 앞
+	GameState.equipment_changed.connect(_update_held_light)
 	GameState.inventory_changed.connect(_update_hud)
 	GameState.body_changed.connect(_update_hud)
 	%TitleButton.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/title.tscn"))
@@ -149,6 +153,8 @@ func load_map(map_id: String) -> void:
 		move_child(renderer, 0)
 	renderer.minutes = GameState.minute_of_day()
 	renderer.build(map, tile)
+	renderer.build_props(%World)   # 오브젝트 그림은 인물과 같은 Y 정렬 노드에 (발 위치로 앞뒤)
+	_update_held_light()
 	%MapView.draw_tiles = false   # 바닥·벽은 renderer 가 그림
 	%MapView.tiles = map.tiles
 	%MapView.tile = tile
@@ -185,6 +191,14 @@ func _build_walls() -> void:
 			shape.shape = rect
 			shape.position = Vector2((start + x) * tile / 2.0, (y + 0.5) * tile)
 			body.add_child(shape)
+	# 지나갈 수 없는 오브젝트 (graphics.xlsx Props.solid — 나무 줄기·상자·탁자): 벽처럼 막고 적 시야도 가림
+	for c in VisualData.solid_cells(map):
+		var shape := CollisionShape2D.new()
+		var rect := RectangleShape2D.new()
+		rect.size = Vector2(tile, tile)
+		shape.shape = rect
+		shape.position = _tile_center(c.x, c.y)
+		body.add_child(shape)
 
 
 func _build_actors() -> void:
@@ -850,6 +864,9 @@ func _walk(who: Node2D, to: Vector2i, speed: float) -> Tween:
 		for x in row.length():
 			if _is_solid(row[x]):
 				grid.set_point_solid(Vector2i(x, y))
+	for c in VisualData.solid_cells(map):
+		if grid.region.has_point(c):
+			grid.set_point_solid(c)
 	var from := Vector2i(floori(who.global_position.x / tile), floori(who.global_position.y / tile))
 	var path: Array = []
 	if grid.region.has_point(from) and grid.region.has_point(to) and not grid.is_point_solid(to):
@@ -877,6 +894,36 @@ func _walk(who: Node2D, to: Vector2i, speed: float) -> Tween:
 			if who == player:
 				_last_tile = Vector2i(floori(player.global_position.x / tile), floori(player.global_position.y / tile)))
 	return tw
+
+
+## 손에 든 아이템 중 빛(Items.light)이 있으면 플레이어가 그 빛을 들고 다닌다 (원뿔이면 바라보는 쪽으로)
+func _update_held_light() -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	var preset := ""
+	for slot in GameState.equipment:
+		var item: Dictionary = DataLoader.items.get(GameState.equipment[slot], {})
+		var kind: String = DataLoader.equip_slots.filter(func(e): return e.slot_id == slot).map(func(e): return e.kind).front() 			if DataLoader.equip_slots.any(func(e): return e.slot_id == slot) else ""
+		if kind == "hand" and str(item.get("light", "")) != "":
+			preset = item.light
+			break
+	if held_light and is_instance_valid(held_light):
+		held_light.queue_free()
+	held_light = null
+	if preset == "":
+		return
+	var p := VisualData.preset(preset)
+	if p.is_empty():
+		return
+	held_light = MapRenderer.make_light(p, tile)
+	held_light.name = "HeldLight"
+	player.add_child(held_light)
+	held_light.rotation = player.facing.angle()
+
+
+func _process(_delta: float) -> void:
+	if held_light and is_instance_valid(held_light) and player:
+		held_light.rotation = player.facing.angle()   # 바라보는 쪽을 비춤
 
 
 func _camera() -> Camera2D:

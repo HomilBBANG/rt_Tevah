@@ -5,6 +5,7 @@ extends Node
 
 const FieldScript = preload("res://scenes/field/field.gd")
 const VisualData = preload("res://core/visual_data.gd")
+const MapRendererScript = preload("res://core/map_renderer.gd")
 
 var _fail := 0
 
@@ -49,6 +50,37 @@ func _ready() -> void:
 	await _wait(0.1)
 	check(door.open and not r.doors.tg_door.visible and door.body.collision_layer == 0, "문을 열면 빛이 지나감 (통과도 기존대로)")
 	await _snap("02_door_open")
+	# ---- 오브젝트 그림 (Y 정렬·막힘·그림자)
+	check(r.prop_sprites.size() == 2 and r.prop_sprites.all(func(sp): return sp.get_parent() == f.get_node("%World"))
+		and f.get_node("%World").y_sort_enabled, "오브젝트 그림 2개가 인물과 같은 Y 정렬 노드에")
+	var tree: Sprite2D = r.prop_sprites.filter(func(sp): return sp.get_meta("object_id") == "tg_tree")[0]
+	f.player.position = f._tile_center(3, 5)   # 나무 아래 칸 → 플레이어가 앞
+	check(f.player.position.y > tree.position.y, "나무 아래 칸의 플레이어가 그림 앞 (발 %.0f > %.0f)" % [f.player.position.y, tree.position.y])
+	var space: PhysicsDirectSpaceState2D = f.get_world_2d().direct_space_state
+	var qp := PhysicsPointQueryParameters2D.new()
+	qp.position = f._tile_center(3, 4)
+	qp.collision_mask = 1
+	check(not space.intersect_point(qp).is_empty(), "지나갈 수 없는 오브젝트(나무) 칸 = 벽 충돌 (적 시야도 막음)")
+	check(VisualData.solid_cells(f.map).size() == 3, "탁자 2칸 + 나무 1칸 막힘")
+	check(r.occluder_count >= 3, "나무가 빛을 막는 그림자 조각에 들어감")
+	# ---- 손전등: 손에 들면 원뿔 빛이 따라다니며 바라보는 쪽을 비춤
+	GameState.add_item("flashlight", 1)
+	var fi := GameState.inventory.find_custom(func(sl): return sl.id == "flashlight")
+	check(GameState.equip(fi) == "" and f.held_light != null and f.held_light.get_parent() == f.player, "손전등을 손에 들면 플레이어가 빛을 들고 다님")
+	f.player.facing = Vector2.RIGHT
+	await _wait(0.1)
+	check(is_equal_approx(f.held_light.rotation, 0.0) and f.held_light.texture == MapRendererScript.cone_texture(), "원뿔 빛, 오른쪽을 봄")
+	f.player.facing = Vector2.UP
+	await _wait(0.1)
+	check(is_equal_approx(f.held_light.rotation, -PI / 2), "위를 보면 빛도 위로")
+	f.player.position = f._tile_center(2, 4)
+	f.player.facing = Vector2.RIGHT
+	await _wait(0.1)
+	await _snap("01b_props_flashlight")
+	var hand: String = GameState.equipment.keys().filter(func(k): return GameState.equipment[k] == "flashlight")[0]
+	GameState.unequip(hand)
+	await _wait(0.05)
+	check(f.held_light == null, "손에서 내려놓으면 빛 없음")
 	# 시계가 멈추면 빛도 멈춤 / 시간이 뛰면 바로
 	var before: Color = r._modulate.color
 	f.frozen = true
@@ -96,7 +128,8 @@ func _map(profile: String) -> Dictionary:
 		return o
 	return {"map_id": "tgfx", "width": 14, "height": 7, "tiles": tiles, "start": [2, 4], "run_start": [2, 4], "edges": {},
 		"objects": [obj.call("tg_door", "exit", 7, 3, {"ref": "basecamp"}),
-			obj.call("tg_lamp", "light", 4, 2, {"preset": "warm_bulb", "color": "#FFD4A0", "energy": 1.2, "radius": 5.0, "shadow": true, "enabled": true})],
+			obj.call("tg_lamp", "light", 4, 2, {"preset": "warm_bulb", "color": "#FFD4A0", "energy": 1.2, "radius": 5.0, "shadow": true, "enabled": true}),
+			obj.call("tg_tree", "prop", 3, 4, {"ref": "tree"}), obj.call("tg_table", "prop", 9, 5, {"ref": "table"})],
 		"visual": {"layers": {"floor": {"1,1": "floor_grass", "2,1": "floor_grass", "9,2": "floor_wood"}, "detail": {"3,1": "decal_blood"}}},
 		"environment": {"profile": profile}}
 

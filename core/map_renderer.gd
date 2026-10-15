@@ -6,6 +6,8 @@ extends Node2D
 ##   그림자: 그림자를 만드는 벽 타일(casts_shadow)과 닫힌 문에 LightOccluder2D
 ##   조명: CanvasModulate(환경광, 시간대·맵 환경 outdoor/indoor/underground) + 실외 햇빛(DirectionalLight2D, 그림자 없음)
 ##         + 광원(맵 물체 type=light → PointLight2D, 벽 그림자)
+##   오브젝트 그림: 맵 물체 type=prop → Sprite2D (발 = 놓은 칸 아래쪽). 인물과 같은 Y 정렬 노드에 두면 앞뒤가 저절로
+##         (필드는 build_props(%World), 에디터는 렌더러 안 props_root)
 ## 쓰는 법: build(map, tile) → set_time(분) / set_door_open(id, 열림) / set_lighting(켜기)
 
 const VisualData = preload("res://core/visual_data.gd")
@@ -19,6 +21,9 @@ var layers := {}                 # floor / detail / wall → TileMapLayer
 var lights: Array = []           # PointLight2D
 var doors := {}                  # object_id → LightOccluder2D
 var occluder_count := 0          # 벽 그림자 조각 수 (테스트·디버그)
+var props_root: Node2D           # 오브젝트 그림을 둘 Y 정렬 노드 (기본은 렌더러 안 — 필드는 인물이 있는 %World)
+var prop_sprites: Array = []
+static var _cone_tex: Texture2D
 var _bg: ColorRect
 var _occ_root: Node2D
 var _light_root: Node2D
@@ -42,6 +47,10 @@ func _init() -> void:
 	_occ_root = Node2D.new()
 	_occ_root.name = "Occluders"
 	add_child(_occ_root)
+	props_root = Node2D.new()
+	props_root.name = "Props"
+	props_root.y_sort_enabled = true
+	add_child(props_root)
 	_light_root = Node2D.new()
 	_light_root.name = "Lights"
 	add_child(_light_root)
@@ -57,6 +66,7 @@ func build(p_map: Dictionary, p_tile: float) -> void:
 	tile = p_tile
 	rebuild_tiles()
 	rebuild_lights()
+	build_props(props_root)
 	set_time(minutes)
 
 
@@ -85,6 +95,10 @@ func rebuild_tiles() -> void:
 					layers[l].set_cell(Vector2i(x, y), _keys[key][0], _keys[key][1])
 			if keys.wall != "" and VisualData.tiles().get(keys.wall, {}).get("casts_shadow", false):
 				shadow_cells[Vector2i(x, y)] = true
+	var pc := VisualData.prop_cells(map)
+	for c in pc:
+		if pc[c].get("casts_shadow", false):
+			shadow_cells[c] = true   # 빛을 막는 오브젝트 (나무·상자) — 차지하는 칸
 	_build_occluders(shadow_cells, rows.size(), w)
 
 
@@ -157,6 +171,71 @@ func set_door_open(object_id: String, open: bool) -> void:
 		doors[object_id].visible = not open
 
 
+## 오브젝트 그림을 parent(Y 정렬 노드)에 둔다. 다시 부르면 전에 만든 것을 지우고 새로
+func build_props(parent: Node2D) -> void:
+	for s in prop_sprites:
+		if is_instance_valid(s):
+			if s.get_parent():   # 필드가 맵을 바꿀 때 이미 빼냈을 수 있음
+				s.get_parent().remove_child(s)
+			s.queue_free()
+	prop_sprites = []
+	var defs := VisualData.props()
+	var k := tile / float(VisualData.art_px())
+	for o in map.get("objects", []):
+		if o.get("type", "") != "prop" or not defs.has(str(o.get("ref", ""))):
+			continue
+		var d: Dictionary = defs[o.ref]
+		var tex := VisualData.texture(str(d.file), VisualData.PROPS_DIR)
+		if tex == null:
+			continue
+		var sp := Sprite2D.new()
+		sp.texture = tex
+		sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		sp.centered = false
+		sp.scale = Vector2(k, k)
+		# 위치 = 발(차지하는 칸의 아래 가운데) → Y 정렬 기준. 그림은 그 위로
+		var fw := int(d.get("foot_w", 1))
+		sp.position = Vector2((float(o.x) + fw / 2.0) * tile, (float(o.y) + 1.0) * tile)
+		sp.offset = Vector2(-tex.get_width() / 2.0, -tex.get_height())
+		sp.set_meta("object_id", o.get("object_id", ""))
+		parent.add_child(sp)
+		prop_sprites.append(sp)
+
+
+## 광원 노드 하나 (프리셋·맵 광원 값): shape point = 둥근 빛, cone = 앞(오른쪽, rotation 으로 돌림)으로 비추는 원뿔
+static func make_light(o: Dictionary, p_tile: float) -> PointLight2D:
+	var p := PointLight2D.new()
+	var cone: bool = str(o.get("shape", "point")) == "cone"
+	p.texture = cone_texture() if cone else light_texture()
+	p.color = Color.html(str(o.color)) if Color.html_is_valid(str(o.get("color", ""))) else Color.WHITE
+	p.energy = float(o.get("energy", 1.0))
+	p.texture_scale = float(o.get("radius", 4.0)) * p_tile * 2.0 / LIGHT_TEX_SIZE
+	p.shadow_enabled = bool(o.get("shadow", true))
+	p.shadow_filter = Light2D.SHADOW_FILTER_NONE   # 픽셀아트: 딱딱한 그림자 가장자리
+	p.enabled = bool(o.get("enabled", true))
+	return p
+
+
+## 원뿔 빛 그림: 가운데에서 오른쪽으로 퍼지는 부채꼴 (반각 28°), 멀수록 흐림
+static func cone_texture() -> Texture2D:
+	if _cone_tex == null:
+		var n := LIGHT_TEX_SIZE
+		var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+		var c := Vector2(n, n) / 2.0
+		for y in n:
+			for x in n:
+				var v := Vector2(x, y) - c
+				var d := v.length() / (n / 2.0)
+				var a := absf(v.angle())
+				var edge := clampf((deg_to_rad(28.0) - a) / deg_to_rad(8.0), 0.0, 1.0)
+				var near := clampf(1.0 - d, 0.0, 1.0)
+				var glow := clampf(1.0 - v.length() / 14.0, 0.0, 1.0) * 0.6   # 손 주변 조금
+				var k := maxf(edge * near, glow) if d <= 1.0 else 0.0
+				img.set_pixel(x, y, Color(1, 1, 1, k))
+		_cone_tex = ImageTexture.create_from_image(img)
+	return _cone_tex
+
+
 ## 광원: 맵 물체 type=light (놓을 때 프리셋 값이 복사돼 광원마다 다를 수 있음)
 func rebuild_lights() -> void:
 	for c in _light_root.get_children():
@@ -166,15 +245,8 @@ func rebuild_lights() -> void:
 	for o in map.get("objects", []):
 		if o.get("type", "") != "light":
 			continue
-		var p := PointLight2D.new()
-		p.texture = light_texture()
+		var p := make_light(o, tile)
 		p.position = Vector2((float(o.x) + 0.5) * tile, (float(o.y) + 0.5) * tile)
-		p.color = Color.html(str(o.color)) if Color.html_is_valid(str(o.get("color", ""))) else Color.WHITE
-		p.energy = float(o.get("energy", 1.0))
-		p.texture_scale = float(o.get("radius", 4.0)) * tile * 2.0 / LIGHT_TEX_SIZE
-		p.shadow_enabled = bool(o.get("shadow", true))
-		p.shadow_filter = Light2D.SHADOW_FILTER_NONE   # 픽셀아트: 딱딱한 그림자 가장자리
-		p.enabled = bool(o.get("enabled", true))
 		p.set_meta("object_id", o.get("object_id", ""))
 		_light_root.add_child(p)
 		lights.append(p)

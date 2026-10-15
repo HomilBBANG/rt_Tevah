@@ -14,20 +14,20 @@ signal stroke_started             # 한 번의 누름(칠하기·옮기기)이 �
 signal request(action: String)    # 단축키
 signal activated(obj: Dictionary) # 더블클릭
 
-const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light"]
+const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop"]
 const VisualData = preload("res://core/visual_data.gd")
 const TRAVEL_TYPES := ["exit", "passage", "transit"]
 const COLORS := {
 	"enemy": Color("d05050"), "investigate": Color("e8c35a"), "npc": Color("5a8fd0"),
 	"camp": Color("5fae6a"), "exit": Color("a07850"),
-	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"), "event": Color("c070d0"), "light": Color("f5d76e"),
+	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"), "event": Color("c070d0"), "light": Color("f5d76e"), "prop": Color("9a8a70"),
 }
-const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P", "event": "!!", "light": "빛"}
+const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P", "event": "!!", "light": "빛", "prop": "◆"}
 const EDGE_NAME := {"up": "위", "down": "아래", "left": "왼쪽", "right": "오른쪽"}
 const DIR := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 ## 표시 필터 묶음: 물체 종류 → 필터 이름
 const FILTER_OF := {"enemy": "enemy", "investigate": "investigate", "npc": "npc", "camp": "camp",
-	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive", "event": "event", "light": "light"}
+	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive", "event": "event", "light": "light", "prop": "props"}
 const PAINT_TOOLS := ["wall", "floor", "void", "tile", "tile_erase"]   # 끌어서 칠하는 도구 (tile = 그래픽 층)
 
 var map := {}                 # { map_id, tiles: [String], start, run_start, objects: [...], edges }
@@ -37,6 +37,7 @@ var tile_key := ""            # 타일 붓: 칠할 타일 (graphics.xlsx Tiles)
 var tile_layer := "floor"     # 타일 붓·지우개가 칠하는 그래픽 층 (floor / detail / wall)
 var graphics := false         # 뒤에 픽셀아트 그림(core/map_renderer)이 보이는 중 → 바닥·벽 색칠은 하지 않고 칸 선만
 var light_defaults := {}      # 광원을 놓을 때 복사할 값 (프리셋)
+var prop_id := ""             # 오브젝트 도구: 놓을 오브젝트 그림 (graphics.xlsx Props)
 var cell := 32.0
 var zoom := 1.0
 var pan := Vector2(24, 24)
@@ -47,7 +48,7 @@ var region := Rect2i()        # 영역 선택 (칸). size 0 = 없음
 var id_maker: Callable        # func(type) -> String
 var require_default := false  # 베이스캠프: ★ 기본 P 가 꼭 있어야 함 (첫 P 는 자동 기본, 기본 P 는 못 지움)
 ## 표시 필터 (false = 숨김, 숨긴 물체는 고를 수도 없음)
-var filters := {"tiles": true, "enemy": true, "investigate": true, "npc": true, "camp": true, "travel": true, "event": true, "light": true,
+var filters := {"tiles": true, "enemy": true, "investigate": true, "npc": true, "camp": true, "travel": true, "event": true, "light": true, "props": true,
 	"graphics": true, "lighting": true, "light_range": true, "occluders": false, "logic": false,
 	"arrive": true, "sight": true, "names": true, "links": true}
 ## 연결 표시: object_id → [글자, 맞으면 true] (편집기가 채움). 가장자리는 "edge:방향"
@@ -174,6 +175,11 @@ func apply_tool(t: Vector2i, first := true) -> void:
 					o.default = true   # 베이스캠프의 첫 도착 P = 기본
 				if tool == "light":
 					o.merge(light_defaults.duplicate(true), true)   # 프리셋 값 복사 (광원마다 따로 고칠 수 있음)
+				if tool == "prop":
+					if prop_id == "":
+						return
+					o.ref = prop_id
+					o.name = str(VisualData.props().get(prop_id, {}).get("name", ""))
 				map.objects.append(o)
 				select(o)
 				changed.emit()
@@ -440,6 +446,25 @@ func _draw() -> void:
 		for o in map.get("objects", []):
 			if o.type == "exit":
 				draw_rect(Rect2(pan + Vector2(o.x, o.y) * s, Vector2(s, s)).grow(-4), Color(1, 0.6, 0.1, 0.9), false, 3.0)
+	# 오브젝트 그림이 차지하는 칸 (지나갈 수 없으면 붉게)
+	if filters.props:
+		var pc := VisualData.prop_cells(map)
+		for cc in pc:
+			var solid: bool = pc[cc].get("solid", false)
+			draw_rect(Rect2(pan + Vector2(cc) * s, Vector2(s, s)).grow(-3), Color(1, 0.4, 0.3, 0.75) if solid else Color(0.8, 0.8, 0.6, 0.6), false, 1.5)
+	# 없는 타일 이름이 칠해진 칸: 붉은 X (게임에서는 기본 타일로 보임)
+	var vlayers = map.get("visual", {}).get("layers", {}) if map.get("visual") is Dictionary else {}
+	if vlayers is Dictionary and not VisualData.tiles().is_empty():
+		for l in vlayers:
+			if not vlayers[l] is Dictionary:
+				continue
+			for k in vlayers[l]:
+				if not VisualData.tiles().has(str(vlayers[l][k])):
+					var xy := str(k).split(",")
+					if xy.size() == 2:
+						var r := Rect2(pan + Vector2(int(xy[0]), int(xy[1])) * s, Vector2(s, s)).grow(-4)
+						draw_line(r.position, r.end, Color("ff4040"), 2.0)
+						draw_line(Vector2(r.end.x, r.position.y), Vector2(r.position.x, r.end.y), Color("ff4040"), 2.0)
 	# 광원 범위
 	if filters.light and filters.light_range:
 		for o in map.get("objects", []):

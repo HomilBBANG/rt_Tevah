@@ -25,7 +25,7 @@ SHEETS_DIR = ROOT / "tools" / "sheets"
 SHEET_FILES = {
     "Player": "player.xlsx", "PlayerParts": "player.xlsx", "EquipSlots": "player.xlsx", "Traits": "player.xlsx",
     "StatusEffects": "status.xlsx",
-    "Tiles": "graphics.xlsx", "LightPresets": "graphics.xlsx", "DayNight": "graphics.xlsx",
+    "Tiles": "graphics.xlsx", "LightPresets": "graphics.xlsx", "DayNight": "graphics.xlsx", "Props": "graphics.xlsx",
     "Npcs": "npc.xlsx", "NpcParts": "npc.xlsx", "NpcAttacks": "npc.xlsx",
     "Items": "item.xlsx", "Loot": "item.xlsx",
 }
@@ -81,6 +81,8 @@ SCHEMA = {
     "Tiles": ("tile_key", ["tile_key", "name", "layer", "file"], {"atlas_x": (int, 0), "atlas_y": (int, 0)}),
     "LightPresets": ("preset_id", ["preset_id", "name", "color", "energy", "radius"], {"energy": (float, None), "radius": (float, None)}),
     "DayNight": ("profile_id", ["profile_id", "hour", "ambient"], {"hour": (float, None), "sun_energy": (float, 0.0)}),
+    # 오브젝트 그림 (나무·가구): 놓은 칸 = 왼쪽 아래, foot_w·foot_h 칸 차지. solid = 지나갈 수 없음(+적 시야 막음)
+    "Props": ("prop_id", ["prop_id", "name", "file"], {"foot_w": (int, 1), "foot_h": (int, 1)}),
     # 특성 (캐릭터 생성·사건·거래). points: 긍정은 소비(음수), 부정은 획득(양수)
     "Traits": ("trait_id", ["trait_id", "name", "polarity", "points"], {"points": (int, 0)}),
     # ---- 전투 (기획서 §7–9)
@@ -103,11 +105,13 @@ SCHEMA = {
 }
 
 # 없어도 되는 시트 (없으면 빈 시트로 본다)
-OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "StatusEffects", "Traits", "Tiles", "LightPresets", "DayNight",
+OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "StatusEffects", "Traits", "Tiles", "LightPresets", "DayNight", "Props",
                    "Survival", "CampActions", "Revivals"}
 # 맵 물체: exit 문(E 로 열고 걸어 들어가면 이동) / passage 통로(밟으면 이동) / transit 이용(사다리 등, E 로 이동) /
 #         arrive 도착 지점 (이동할 때 arrive 로 고르면 P 대신 여기 도착)
-FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light"}   # light = 광원 (그래픽만)
+FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop"}   # prop = 오브젝트 그림
+PROPS_DIR = ROOT / "art" / "props"
+LIGHT_SHAPES = {"", "point", "cone"}   # light = 광원 (그래픽만)
 TILE_LAYERS = {"floor", "detail", "wall"}   # 그래픽 층: 바닥 / 바닥 장식 / 벽 외형
 TILES_DIR = ROOT / "art" / "tiles"
 LIGHT_NUMS = ("energy", "radius")   # event = 밟으면 대화(컷신)
@@ -132,7 +136,8 @@ OPTIONAL = {
     "Items": ["dice_bonus",         # 소지 시 판정 보정 "strength+2, all+1"
               "weight",             # 무게 (개당). 들고 있는 무게가 Config carry_* 를 넘으면 느려지고, 최대면 못 움직임
               "equip_slot",         # 장착 종류 (EquipSlots 의 kind). 비워도 손(kind=hand)에는 들 수 있음
-              "bag_slots"],         # 장착하면 늘어나는 인벤토리 칸 수 (가방)
+              "bag_slots",          # 장착하면 늘어나는 인벤토리 칸 수 (가방)
+              "light"],             # 손에 들면 플레이어가 들고 다니는 빛 (graphics.xlsx LightPresets 의 preset_id, 예: 손전등)
     # 선택지 종류: normal(기본) / item / dice
     # dice: check=능력치, dc=목표값, mod=상황 보정, 실패 시 fail_effects·fail_next
     # combat: check=npc_id(싸울 수 있는 NPC), 이기면 effects·next_node, 도주하면 fail_effects·fail_next (필드 대화 전용)
@@ -144,7 +149,8 @@ OPTIONAL = {
     "Traits": ["category", "description", "conflicts", "selectable", "state", "note"],
     # 상태이상: scope part(부위)/whole(전체), tick_mode·tick_amount 시간마다 효과(미정이면 빈칸), death_cause 사망 원인
     "Tiles": ["atlas_x", "atlas_y", "casts_shadow", "note"],
-    "LightPresets": ["shadow", "note"],
+    "LightPresets": ["shadow", "shape", "note"],
+    "Props": ["foot_w", "foot_h", "solid", "casts_shadow", "note"],
     "DayNight": ["sun_color", "sun_energy", "note"],
     "StatusEffects": ["scope", "tick_mode", "tick_amount", "stack_rule", "dispel", "death_cause", "state", "note"],
 }
@@ -1191,6 +1197,19 @@ def validate_graphics(d, maps, rep):
             elif tiles[need]["layer"] != layer:
                 rep.err("Tiles", f"'{need}' 의 layer 는 {layer}")
     presets = {r["preset_id"] for r in d["LightPresets"]}
+    props = {r["prop_id"] for r in d["Props"]}
+    for r in d["Props"]:
+        w = loc("Props", r)
+        if not (PROPS_DIR / r["file"]).exists():
+            rep.err(w, f"그림 파일이 없음: art/props/{r['file']}")
+        if r["foot_w"] < 1 or r["foot_h"] < 1:
+            rep.err(w, "foot_w·foot_h 는 1 이상 (차지하는 칸)")
+    for r in d["LightPresets"]:
+        if r["shape"] not in LIGHT_SHAPES:
+            rep.err(loc("LightPresets", r), f"shape 는 point / cone: '{r['shape']}'")
+    for it in d["Items"]:
+        if it["light"] and it["light"] not in presets:
+            rep.err(loc("Items", it), f"light 에 없는 광원 프리셋 '{it['light']}' (graphics.xlsx LightPresets)")
     for r in d["LightPresets"]:
         w = loc("LightPresets", r)
         if not COLOR_RE.match(r["color"]):
@@ -1231,6 +1250,10 @@ def validate_graphics(d, maps, rep):
             if out:
                 rep.warn(wm, f"그래픽 '{layer}' 층에 맵 밖 칸 {len(out)}개 (무시됨)")
         for o in m["objects"]:
+            if o.get("type") == "prop":
+                if props and o.get("ref", "") not in props:
+                    rep.warn(f"{wm} 오브젝트 {o.get('object_id', '')}", f"없는 오브젝트 그림 '{o.get('ref', '')}' (graphics.xlsx Props)")
+                continue
             if o.get("type") != "light":
                 continue
             w = f"{wm} 광원 {o.get('object_id', '')}"
@@ -1469,7 +1492,9 @@ def export(d, maps):
         # 그래픽: 타일(tile_key → 그림·칸), 광원 프리셋, 시간대 환경광 {profile: [[시, 환경색, 햇빛색, 햇빛 세기], ...]}
         "graphics": {
             "tiles": [dict(t, casts_shadow=is_true(t["casts_shadow"])) for t in clean(d["Tiles"])],
-            "light_presets": [dict(r, shadow=is_true(r["shadow"]) if r["shadow"] else True) for r in clean(d["LightPresets"])],
+            "light_presets": [dict(r, shadow=is_true(r["shadow"]) if r["shadow"] else True, shape=r["shape"] or "point")
+                              for r in clean(d["LightPresets"])],
+            "props": [dict(r, solid=is_true(r["solid"]), casts_shadow=is_true(r["casts_shadow"])) for r in clean(d["Props"])],
             "day_night": {pid: [[r["hour"], r["ambient"], r["sun_color"] or "#000000", r["sun_energy"] or 0.0]
                                 for r in sorted(rows, key=lambda r: r["hour"])]
                           for pid, rows in d.get("_profiles", {}).items()},

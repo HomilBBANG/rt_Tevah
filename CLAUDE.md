@@ -154,7 +154,10 @@ tools/
   - 조명: CanvasModulate(환경광) + 실외 DirectionalLight2D(색·밝기만, 그림자 없음 — Godot 방향광 그림자는 끝없이 길어서) + PointLight2D(광원, 그림자 필터 없음). 그림자 = casts_shadow 벽 타일(가로로 합친 LightOccluder2D) + 문(닫히면 막음, `field.toggle_door` → `renderer.set_door_open`). 게임 시계 `clock_changed` 를 따라감 → 대화·전투·메뉴에 멈추고 잠(시간 점프)에 바로 갱신. 적 AI·시야는 빛과 무관.
   - **맵 에디터 저장은 무손실**: 맵·물체의 모든 칸을 그대로 쓰고 빈 기본값(빈 edges·빈 from·default=false)만 뺀다 (전에는 정해진 칸만 써서 이벤트 once·NPC face 가 빠졌음).
   - 에디터: 도구 '그래픽'(타일 붓·타일 지우개·광원), 왼쪽 '타일 팔레트'(층·찾기·그림), 맵 설정 '환경', 광원 세부, 위 줄 '시간 미리보기'(에디터만), 표시 필터(그래픽·조명·광원·광원 범위·그림자 차단·벽 판정). 테스트 `tests/graphics_smoke`(성능 측정 포함), `map_editor_smoke`.
-  - 아직(기획 Phase 5·후속): 시간대별 야외 그림자 길이, 셰이더 픽셀 조명, 한 맵 안 실내/실외 영역 차광(지금은 맵 단위 환경), 타일 자동 연결, 오브젝트 스프라이트·Y 정렬, 인물 그림, 손전등을 들고 다니기, 광원 깜빡임.
+  - **오브젝트 그림 + Y 정렬** (2026-10-15): graphics.xlsx `Props`(prop_id·name·file(art/props/)·foot_w·foot_h·solid·casts_shadow), 맵 물체 `type=prop`(ref = prop_id, 놓은 칸 = 차지하는 칸의 왼쪽 아래). 렌더러 `build_props(parent)` 가 Sprite2D(위치 = 발, 그림은 위로)를 Y 정렬 노드에 — 필드는 인물이 있는 `%World`(y_sort), 에디터는 렌더러 안. solid = 벽 충돌(WALL_LAYER → 이동·적 시야 막음, 컷신 길 찾기도), casts_shadow = 빛 막음. `VisualData.prop_cells/solid_cells`. 더미 그림 art/props/test_*.png.
+  - **손전등**: item.xlsx Items `light` 열(= LightPresets preset_id) — 손(kind=hand) 칸에 들면 플레이어에 광원이 붙어 다님 (`field.held_light`, `_update_held_light` on equipment_changed). LightPresets `shape` point / cone(원뿔, 바라보는 쪽으로 회전). 더미 아이템 flashlight 손전등(테스트).
+  - 맵 에디터 '그래픽 경고'(`graphics_warnings`): 없는 타일·오브젝트·프리셋·환경, 맵 밖 칸 → 맵 설정 칸 위 ⚠·열 때 상태 글자, 없는 타일 칸은 캔버스에 붉은 X. 끌어서 옮기기는 마우스 칸으로 바로 (원래 위치를 물체 키 사전 대신 목록에 저장).
+  - 아직(기획 Phase 5·후속): 시간대별 야외 그림자 길이, 셰이더 픽셀 조명, 한 맵 안 실내/실외 영역 차광(지금은 맵 단위 환경), 타일 자동 연결, 인물 그림, 광원 깜빡임, 손전등 켜고 끄기·배터리.
 - **문(exit)**: 처음엔 닫힘. 닫힌 문은 플레이어·적 모두 통과 못 하고 적의 시야도 가린다(DOOR_LAYER 8). E 로 열고 닫는다. 열린 문 칸으로 걸어 들어가면 그 맵(ref)으로 나간다.
 - **빈 공간**: 맵 칸 `' '`(공백) = 검은색, 지나갈 수 없음. 맵 바깥도 검게 그린다. 맵 에디터 '빈 공간' 도구.
 - 적 순찰 경로는 매 회차 같다 (외워서 피하기, §6). 도주하면 `field_flee_grace` 초 동안 다시 덤비지 않는다.

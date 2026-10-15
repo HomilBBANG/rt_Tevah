@@ -9,7 +9,8 @@
   "dice_bonus": [],
   "weight": 0.2,
   "equip_slot": "",
-  "bag_slots": 0
+  "bag_slots": 0,
+  "light": ""
  },
  {
   "item_id": "knife",
@@ -26,7 +27,8 @@
   ],
   "weight": 1.0,
   "equip_slot": "hand",
-  "bag_slots": 0
+  "bag_slots": 0,
+  "light": ""
  },
  {
   "item_id": "junk",
@@ -38,7 +40,8 @@
   "dice_bonus": [],
   "weight": 2.0,
   "equip_slot": "",
-  "bag_slots": 0
+  "bag_slots": 0,
+  "light": ""
  },
  {
   "item_id": "pill",
@@ -50,7 +53,8 @@
   "dice_bonus": [],
   "weight": 0.1,
   "equip_slot": "",
-  "bag_slots": 0
+  "bag_slots": 0,
+  "light": ""
  },
  {
   "item_id": "food",
@@ -62,7 +66,8 @@
   "dice_bonus": [],
   "weight": 0.5,
   "equip_slot": "",
-  "bag_slots": 0
+  "bag_slots": 0,
+  "light": ""
  },
  {
   "item_id": "water",
@@ -74,7 +79,8 @@
   "dice_bonus": [],
   "weight": 1.0,
   "equip_slot": "",
-  "bag_slots": 0
+  "bag_slots": 0,
+  "light": ""
  },
  {
   "item_id": "charm",
@@ -86,7 +92,8 @@
   "dice_bonus": [],
   "weight": 0.1,
   "equip_slot": "",
-  "bag_slots": 0
+  "bag_slots": 0,
+  "light": ""
  },
  {
   "item_id": "small_bag",
@@ -98,6 +105,20 @@
   "dice_bonus": [],
   "weight": 1.0,
   "equip_slot": "bag",
-  "bag_slots": 4
+  "bag_slots": 4,
+  "light": ""
+ },
+ {
+  "item_id": "flashlight",
+  "name": "손전등(테스트)",
+  "type": "tool",
+  "description": "손에 들면 앞을 비춘다",
+  "use_effects": "",
+  "stack_max": 1,
+  "dice_bonus": [],
+  "weight": 0.5,
+  "equip_slot": "hand",
+  "bag_slots": 0,
+  "light": "flashlight"
  }
 ]

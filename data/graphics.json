@@ -89,6 +89,7 @@
    "energy": 1.0,
    "radius": 4.0,
    "shadow": true,
+   "shape": "point",
    "note": "임시값"
   },
   {
@@ -98,6 +99,7 @@
    "energy": 0.9,
    "radius": 5.0,
    "shadow": true,
+   "shape": "point",
    "note": "임시값"
   },
   {
@@ -107,6 +109,7 @@
    "energy": 0.7,
    "radius": 2.5,
    "shadow": true,
+   "shape": "point",
    "note": "임시값"
   },
   {
@@ -116,6 +119,7 @@
    "energy": 1.2,
    "radius": 6.0,
    "shadow": true,
+   "shape": "point",
    "note": "임시값"
   },
   {
@@ -125,7 +129,50 @@
    "energy": 1.3,
    "radius": 7.0,
    "shadow": true,
+   "shape": "cone",
    "note": "임시값 (지금은 놓인 자리에 고정)"
+  }
+ ],
+ "props": [
+  {
+   "prop_id": "tree",
+   "name": "나무",
+   "file": "test_tree.png",
+   "foot_w": 1,
+   "foot_h": 1,
+   "solid": true,
+   "casts_shadow": true,
+   "note": "테스트 그림. 줄기 칸만 막고, 잎은 인물 앞을 가림"
+  },
+  {
+   "prop_id": "crate",
+   "name": "상자",
+   "file": "test_crate.png",
+   "foot_w": 1,
+   "foot_h": 1,
+   "solid": true,
+   "casts_shadow": true,
+   "note": "테스트 그림"
+  },
+  {
+   "prop_id": "table",
+   "name": "탁자",
+   "file": "test_table.png",
+   "foot_w": 2,
+   "foot_h": 1,
+   "solid": true,
+   "casts_shadow": false,
+   "note": "테스트 그림 (2칸)"
+  },
+  {
+   "prop_id": "lamp_post",
+   "name": "가로등",
+   "file": "test_lamp.png",
+   "foot_w": 1,
+   "foot_h": 1,
+   "solid": true,
+   "casts_shadow": false,
+   "note": "테스트 그림. 빛은 광원을 따로 놓을 것"
   }
  ],
  "day_night": {

@@ -329,6 +329,25 @@ func _ready() -> void:
 	ed._gfx_dirty = true
 	await _frames(2)
 	check(rnd.lights.size() == 1 and is_equal_approx(rnd.lights[0].texture_scale, 6.0 * 80.0 * 2.0 / 256.0), "광원마다 범위 고치기 → 그림에 반영")
+	# 오브젝트 그림: 팔레트를 '오브젝트'로 → 고르면 오브젝트 도구 → 클릭한 칸에
+	ed.palette_layer.select(3)
+	ed._refresh_palette()
+	check(ed.palette.item_count == 4, "팔레트 '오브젝트': 나무·상자·탁자·가로등")
+	ed.palette.select(0)
+	ed.palette.item_selected.emit(0)
+	var fl3 := fl + Vector2i(2, 0) if ed.map.tiles[fl.y][fl.x + 2] == "." and c.object_at(fl + Vector2i(2, 0)).is_empty() else fl2 + Vector2i(1, 0)
+	c.stroke_started.emit()
+	c.apply_tool(fl3)
+	var prop_o: Dictionary = c.selected
+	await _frames(2)
+	check(ed.canvas.tool == "prop" and prop_o.get("type") == "prop" and prop_o.ref == c.prop_id and rnd.prop_sprites.size() == 1,
+		"오브젝트 놓기 → 에디터 그림에 스프라이트 (%s)" % prop_o.get("ref", ""))
+	# 경고: 없는 타일 이름 → 맵 설정 칸에 경고 (맵은 그대로)
+	ed.map.visual.layers.floor["%d,%d" % [fl.x, fl.y + 1]] = "no_such_tile"
+	var warns: Array = ed.graphics_warnings()
+	check(warns.size() == 1 and "no_such_tile" in warns[0], "그래픽 경고: 없는 타일 (%s)" % [warns])
+	ed.map.visual.layers.floor.erase("%d,%d" % [fl.x, fl.y + 1])
+	check(ed.graphics_warnings().is_empty(), "고치면 경고 없음")
 	ed.map.environment = {"profile": "indoor"}
 	var clock_before: float = GameState.clock
 	ed.set_preview_time(0)
@@ -353,7 +372,8 @@ func _ready() -> void:
 	check(gf.visual.layers.floor.size() == 2 and gf.environment.profile == "outdoor"
 		and gf.objects.any(func(o): return o.type == "light" and o.radius == 6.0)
 		and ev.size() == 1 and ev[0].once and ev[0].custom_key == "keep me"
-		and gf.objects.any(func(o): return o.object_id == npc_o.object_id and o.face == "left"),
+		and gf.objects.any(func(o): return o.object_id == npc_o.object_id and o.face == "left")
+		and gf.objects.any(func(o): return o.type == "prop" and o.ref == prop_o.ref),
 		"저장: 그래픽 층·광원·환경 + 모르는 칸도 그대로 (이벤트 once·NPC face — 전에 빠지던 것)")
 	ed.open_map("test_travel")
 	ed.open_map("test_field")

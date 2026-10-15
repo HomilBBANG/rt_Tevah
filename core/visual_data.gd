@@ -8,6 +8,7 @@ extends RefCounted
 
 const DATA_PATH := "res://data/graphics.json"
 const TILES_DIR := "res://art/tiles/"
+const PROPS_DIR := "res://art/props/"
 const LAYERS := ["floor", "detail", "wall"]
 const LAYER_NAME := {"floor": "바닥", "detail": "바닥 장식", "wall": "벽 외형"}
 
@@ -42,6 +43,38 @@ static func art_px() -> int:
 	return int(data().get("tile_art_px", 16))
 
 
+## 오브젝트 그림 (나무·가구): prop_id → {name, file, foot_w, foot_h, solid, casts_shadow}
+static func props() -> Dictionary:
+	var out := {}
+	for p in data().get("props", []):
+		out[p.prop_id] = p
+	return out
+
+
+## 맵의 오브젝트(type=prop)가 차지하는 칸 → prop 정의. 놓은 칸 = 왼쪽 아래, foot_w 오른쪽·foot_h 위로
+static func prop_cells(map: Dictionary) -> Dictionary:
+	var out := {}
+	var defs := props()
+	for o in map.get("objects", []):
+		if o.get("type", "") != "prop" or not defs.has(str(o.get("ref", ""))):
+			continue
+		var d: Dictionary = defs[o.ref]
+		for dy in int(d.get("foot_h", 1)):
+			for dx in int(d.get("foot_w", 1)):
+				out[Vector2i(int(o.x) + dx, int(o.y) - dy)] = d
+	return out
+
+
+## 지나갈 수 없는 오브젝트 칸 (solid) — 필드 충돌·컷신 길 찾기
+static func solid_cells(map: Dictionary) -> Array:
+	var out := []
+	var cells := prop_cells(map)
+	for c in cells:
+		if cells[c].get("solid", false):
+			out.append(c)
+	return out
+
+
 static func presets() -> Array:
 	return data().get("light_presets", [])
 
@@ -58,10 +91,10 @@ static func profiles() -> Array:
 
 
 ## 그림 파일 (가져오기된 리소스가 있으면 그것, 없으면 파일을 직접 읽음 — 처음 넣은 그림·테스트)
-static func texture(file: String) -> Texture2D:
-	if _tex.has(file):
-		return _tex[file]
-	var path := TILES_DIR + file
+static func texture(file: String, dir := TILES_DIR) -> Texture2D:
+	if _tex.has(dir + file):
+		return _tex[dir + file]
+	var path := dir + file
 	var tex: Texture2D = null
 	if ResourceLoader.exists(path):
 		tex = load(path)
@@ -71,7 +104,7 @@ static func texture(file: String) -> Texture2D:
 			tex = ImageTexture.create_from_image(img)
 	if tex == null:
 		push_warning("[그래픽] 타일 그림을 찾을 수 없음: %s" % path)
-	_tex[file] = tex
+	_tex[dir + file] = tex
 	return tex
 
 
