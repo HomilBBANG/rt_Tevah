@@ -37,6 +37,28 @@ static func take(when: String, map_id := "") -> Array:
 	return out
 
 
+## 로고 컷신의 노드인가 (로고 시작 카드에서 이어지는 카드) — 로고에는 건너뛰기 버튼을 안 띄운다. 게임·미리보기가 같이 씀
+static func is_logo(node_id: String) -> bool:
+	var seen_ids := {}
+	var todo: Array = DataLoader.triggers.get("logo", []).map(func(t): return t.node_id)
+	while not todo.is_empty():
+		var id: String = todo.pop_back()
+		if id == node_id:
+			return true
+		if seen_ids.has(id) or not DataLoader.nodes.has(id):
+			continue
+		seen_ids[id] = true
+		var n: Dictionary = DataLoader.nodes[id]
+		todo.append(str(n.get("next_node", "")))
+		todo.append(str(n.get("fail_next", "")))
+		for r in n.get("routes", []):
+			todo.append(str(r.get("next_node", "")))
+		for c in DataLoader.choices_by_node.get(id, []):
+			todo.append(str(c.get("next_node", "")))
+			todo.append(str(c.get("fail_next", "")))
+	return false
+
+
 static func _cfg_path() -> String:
 	return SaveManager.save_dir + "seen_cutscenes.cfg"
 

@@ -4,6 +4,7 @@ extends Control
 
 const DialogueScene = preload("res://scenes/main_play.tscn")
 const CombatScene = preload("res://scenes/combat.tscn")
+const Triggers = preload("res://core/cutscene_triggers.gd")
 
 var _ui: Node
 var _combat: Node
@@ -33,6 +34,7 @@ func _start(node_id: String) -> void:
 	_ui = DialogueScene.instantiate()
 	_ui.embedded = true
 	_ui.start_page = _start_page
+	_ui.skip_button = not Triggers.is_logo(node_id)   # 로고는 게임처럼 건너뛰기 버튼 없이
 	_ui.finished.connect(func(): %Info.text = "대화 끝 (EXIT).  Esc 로 다시 시작, 창을 닫으면 에디터로.")
 	%Stage.add_child(_ui)
 	StoryRunner.start_dialogue(node_id)
