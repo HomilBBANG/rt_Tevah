@@ -37,8 +37,10 @@ STATS = {"hp", "sanity", "time"}
 SHOW_MODES = {"", "hide", "gray"}
 NODE_KINDS = {"", "line", "effect", "branch", "start", "direct"}
 # direct = 🎬 연출 카드: steps [{do, ...}] 를 차례로 (core/direction.gd 와 같은 규칙)
-DIRECT_STEPS = {"image", "image_off", "fade", "shake", "wait", "walk", "camera", "vanish"}
+DIRECT_STEPS = {"image", "image_off", "fade", "shake", "wait", "sound", "music", "music_off", "walk", "camera", "vanish", "face"}
 CUTSCENE_DIR = ROOT / "art" / "cutscenes"
+AUDIO_DIRS = {"sound": ROOT / "audio" / "sfx", "music": ROOT / "audio" / "bgm"}
+FACE_DIRS = {"up", "down", "left", "right"}
 # start = 대화 시작 카드 (NPC 대화 파일마다 하나). routes 를 위에서부터 보고 조건이 맞는 첫 길로, 없으면 next_node(그 외).
 # 대본 페이지 (core/script_pages.gd 와 같은 규칙). 노드의 pages 가 없으면 speaker_id·text 로 페이지 1개.
 PAGE_DISPLAYS = {"narration", "bubble", "system"}
@@ -800,6 +802,12 @@ def validate(d, rep):
              for ep in d["Episodes"]]
     npc_refs = {o["ref"] for o in d["FieldObjects"] if o.get("type") in ("npc", "event")}
     roots.append(list(npc_refs))
+    # 오프닝 컷신 (Config opening_dialogue): 새 게임에서 캐릭터 생성 직후 한 번
+    opening = str(next((c["value"] for c in d["Config"] if c["key"] == "opening_dialogue"), "") or "")
+    if opening:
+        if opening not in nodes or nodes[opening]["episode_id"] != "":
+            rep.err("Config opening_dialogue", f"오프닝 대화는 필드 대화 노드: '{opening}'")
+        roots.append([opening])
     # 대화 시작 카드는 맵에 아직 안 놓은 NPC 의 대화여도 검사가 통과하도록 뿌리로 (안 쓰이면 경고)
     roots.append([n["node_id"] for n in d["Nodes"] if n["kind"] == "start"])
     for n in d["Nodes"]:
@@ -971,7 +979,7 @@ def check_steps(w, steps, field_objs, rep):
         if do not in DIRECT_STEPS:
             rep.err(sw, f"알 수 없는 연출 '{do}' (가능: {', '.join(sorted(DIRECT_STEPS))})")
             continue
-        for k in ("fade", "time", "speed", "power"):
+        for k in ("fade", "time", "speed", "power", "volume"):
             if k in st and not (_is_number(st[k]) and float(st[k]) >= 0):
                 rep.err(sw, f"{k} 는 0 이상 숫자: '{st[k]}'")
         if do == "image":
@@ -980,9 +988,18 @@ def check_steps(w, steps, field_objs, rep):
                 rep.err(sw, "그림 파일을 고르지 않음")
             elif not (CUTSCENE_DIR / f).exists():
                 rep.err(sw, f"그림 파일이 없음: art/cutscenes/{f}")
+        if do in AUDIO_DIRS:
+            f = str(st.get("file", ""))
+            folder = "sfx" if do == "sound" else "bgm"
+            if not f:
+                rep.err(sw, "소리 파일을 고르지 않음")
+            elif not (AUDIO_DIRS[do] / f).exists():
+                rep.err(sw, f"소리 파일이 없음: audio/{folder}/{f}")
+        if do == "face" and str(st.get("dir", "down")) not in FACE_DIRS:
+            rep.err(sw, f"바라보는 방향은 up / down / left / right: '{st.get('dir')}'")
         if do == "fade" and str(st.get("to", "black")) not in ("black", "white", "clear"):
             rep.err(sw, f"fade 의 to 는 black / white / clear: '{st.get('to')}'")
-        if do in ("walk", "vanish") or (do == "camera" and st.get("who")):
+        if do in ("walk", "vanish", "face") or (do == "camera" and st.get("who")):
             who = str(st.get("who", ""))
             if do == "vanish" and who == "player":
                 rep.err(sw, "플레이어는 숨길 수 없음")
@@ -1241,6 +1258,8 @@ def validate_field(d, maps, rep, enemies):
             elif t == "enemy" and not all(n["walk_speed"] > 0 and n["run_speed"] > 0
                                           for n in d["Npcs"] if n["npc_id"] == ref):
                 rep.err(w, f"맵의 적 '{ref}' 는 Npcs 의 walk_speed(순찰)·run_speed(추격)가 0보다 커야 함")
+            elif t == "npc" and o.get("face", "") not in ("",) + tuple(FACE_DIRS):
+                rep.err(w, f"NPC 의 바라보는 방향(face)은 up / down / left / right: '{o.get('face')}'")
             elif t in ("npc", "event") and (ref not in nodes or nodes[ref]["episode_id"] != ""):
                 rep.err(w, f"{'NPC' if t == 'npc' else '이벤트 칸'} 의 대화(ref)는 필드 대화 노드: '{ref}'")
             elif t in TRAVEL_TYPES and travel_error(maps, ref, o.get("arrive", "")):
@@ -1293,7 +1312,7 @@ def export_maps(d, maps):
         tiles = [r.ljust(width, " ") for r in m["tiles"]]   # 짧은 줄의 나머지는 빈 공간
         objects = []
         for o in m["objects"]:
-            e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition", "arrive")}
+            e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition", "arrive", "face")}
             e["from"] = arrive_from(o)   # 도착 P: 이어지는 곳 (object_id / "맵:방향")
             e["default"] = bool(o.get("default"))   # 기본 도착 P
             e["once"] = bool(o.get("once"))         # 이벤트 칸: 한 번만

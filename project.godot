@@ -21,6 +21,7 @@ DataLoader="*res://autoload/data_loader.gd"
 GameState="*res://autoload/game_state.gd"
 SaveManager="*res://autoload/save_manager.gd"
 StoryRunner="*res://autoload/story_runner.gd"
+Sound="*res://autoload/sound.gd"
 
 [display]
 

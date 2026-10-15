@@ -34,5 +34,6 @@
  "text_speed_normal": 35,
  "text_speed_fast": 70,
  "creation_start_points": 5,
- "combat_talk_uses_turn": 1
+ "combat_talk_uses_turn": 1,
+ "opening_dialogue": "opening_in"
 }

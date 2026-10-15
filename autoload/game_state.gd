@@ -28,7 +28,8 @@ var traits: Array = []        # 주인공 기본 능력 (Player.traits 열)
 ## 가진 특성 [{trait_id, from}] — from: creation(캐릭터 생성) / event(사건·거래). 회차가 바뀌어도 남는다 (월드 저장),
 ## 회차 저장에도 들어가서 슬롯을 불러오면 그 저장의 특성으로 돌아간다 (기획 §5.4 안 B)
 var owned_traits: Array = []
-var character_created := false   # 캐릭터 생성을 마쳤나 (안 했으면 타이틀 '새 게임' = 생성 화면)
+var character_created := false
+var opening_pending := false     # 캐릭터 생성 직후: 필드가 열리면 오프닝 컷신(Config opening_dialogue)을 한 번 (저장 안 함)   # 캐릭터 생성을 마쳤나 (안 했으면 타이틀 '새 게임' = 생성 화면)
 var abilities := {}           # 주사위 능력치 ability_id -> int (주인공 기본값 + 에피소드 중 성장)
 var timed_out := false        # 시간 초과 노드로 이미 보냈는지 (중복 이동 방지)
 

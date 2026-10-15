@@ -45,6 +45,7 @@ var frozen := false
 var events: Array = []          # 이벤트 칸 [{kind:"event", data, pos, tile, done}] — 화면에 안 보임
 var _last_tile := Vector2i(-999, -999)   # 이벤트 칸은 '들어설 때' 한 번
 var _cam_target: Vector2i = Vector2i(-1, -1)
+var _active_tweens: Array = []   # 연출 중인 걷기·카메라 (건너뛰기 때 바로 끝냄)
 var player: CharacterBody2D
 var enemies: Array = []
 var spots: Array = []            # 상호작용 지점 [{ kind: "spot"/"camp"/"exit", data, pos, done }]
@@ -96,6 +97,12 @@ func _ready() -> void:
 	%Equipment.visibility_changed.connect(func(): _set_frozen_by_overlay())
 	GameState.equipment_changed.connect(_update_hud)
 	load_map(GameState.current_map)
+	# 새 게임(캐릭터 생성 직후) 오프닝 컷신: Config opening_dialogue 의 대화를 한 번
+	if GameState.opening_pending:
+		GameState.opening_pending = false
+		var opening := DataLoader.get_config_str("opening_dialogue", "")
+		if opening != "" and DataLoader.nodes.has(opening):
+			_start_dialogue.call_deferred({"data": {"ref": opening}})
 
 
 func _exit_tree() -> void:
@@ -250,6 +257,7 @@ func _build_actors() -> void:
 				n.set_script(NpcScript)
 				n.radius = tile * 0.3
 				n.display_name = o.name
+				n.facing = Direction.DIR_VEC.get(o.get("face", ""), Vector2.DOWN)
 				n.collision_layer = NPC_LAYER
 				n.collision_mask = 0
 				n.position = pos
@@ -738,9 +746,19 @@ func _on_dialogue_finished() -> void:
 
 
 # ---------------------------------------------------------------- 🎬 연출 (필드 단계)
-## StoryRunner.field_director: 연출 카드의 필드 단계를 실행한다 (core/direction.gd)
+## StoryRunner.field_director: 연출 카드의 필드 단계를 실행한다 (core/direction.gd).
+## s._instant (건너뛰기) 이면 바로 끝난 모습으로. {do: "_finish"} = 돌고 있는 걷기·카메라를 바로 끝냄
 func _direct_step(s: Dictionary) -> void:
+	var instant: bool = s.get("_instant", false)
 	match s.get("do", ""):
+		"_finish":
+			for tw in _active_tweens:
+				if tw.is_valid():
+					tw.custom_step(1e6)
+		"face":
+			var who := _actor(str(s.get("who", "")))
+			if who:
+				who.facing = Direction.DIR_VEC.get(s.get("dir", "down"), Vector2.DOWN)
 		"walk":
 			var who := _actor(str(s.get("who", "")))
 			if who == null:
@@ -748,7 +766,9 @@ func _direct_step(s: Dictionary) -> void:
 				return
 			var to: Array = s.get("to", [0, 0])
 			var tw := _walk(who, Vector2i(int(to[0]), int(to[1])), float(s.get("speed", 3.0)))
-			if tw and s.get("wait", true):
+			if instant:
+				tw.custom_step(1e6)
+			elif tw and s.get("wait", true):
 				await tw.finished
 		"camera":
 			var cam := _camera()
@@ -768,18 +788,22 @@ func _direct_step(s: Dictionary) -> void:
 				var at := cam.get_screen_center_position()
 				cam.top_level = true
 				cam.global_position = at
-			if time <= 0.0:
+			if time <= 0.0 or instant:
 				cam.global_position = target
 			else:
 				var tw := create_tween()
 				tw.tween_property(cam, "global_position", target, time).set_trans(Tween.TRANS_SINE)
+				_active_tweens.append(tw)
 				await tw.finished
+				_active_tweens.erase(tw)
 		"vanish":
 			for n in npcs:
 				if n.data.object_id == s.get("who", ""):
 					n.vanished = true
 			_refresh_presence()
 		"shake":
+			if instant:
+				return
 			var cam := _camera()
 			var t := 0.0
 			var time := float(s.get("time", 0.4))
@@ -822,11 +846,16 @@ func _walk(who: Node2D, to: Vector2i, speed: float) -> Tween:
 	var at := who.position
 	for p in path.slice(1):
 		var dest := _tile_center(p.x, p.y)
+		var dir := (dest - at).normalized()
+		if dir != Vector2.ZERO:
+			tw.tween_callback(func(): if is_instance_valid(who): who.facing = dir)   # 가는 쪽을 바라봄
 		tw.tween_property(who, "position", dest, at.distance_to(dest) / maxf(0.1, speed * tile))
 		at = dest
 	if path.size() <= 1:
 		tw.tween_interval(0.0)
+	_active_tweens.append(tw)
 	tw.finished.connect(func():
+		_active_tweens.erase(tw)
 		if is_instance_valid(who):
 			for n in npcs:
 				if n.node == who:

@@ -155,6 +155,31 @@ func _step_box(i: int) -> Control:
 			_num(row, "시간", s, "time", 0, 10, key)
 		"wait":
 			_num(row, "초", s, "time", 0, 60, key)
+		"sound", "music":
+			var dir: String = Direction.SFX_DIR if s.do == "sound" else Direction.BGM_DIR
+			_file(row, s, Direction.audio_files(dir), "(소리 고르기 — %s)" % dir.trim_prefix("res://"), key)
+			if s.do == "music":
+				_num(row, "커지는 시간", s, "fade", 0, 10, key)
+			_num(row, "볼륨 %", s, "volume", 0, 100, key)
+			var play := Button.new()
+			play.text = "▶"
+			play.tooltip_text = "들어 보기"
+			play.disabled = s.file == ""
+			play.pressed.connect(func(): _listen(dir + str(s.file), float(s.volume)))
+			row.add_child(play)
+		"music_off":
+			_num(row, "작아지는 시간", s, "fade", 0, 10, key)
+		"face":
+			_who(row, s, [["player", "플레이어"]], key)
+			var o := OptionButton.new()
+			for d in [["up", "↑ 위"], ["down", "↓ 아래"], ["left", "← 왼쪽"], ["right", "→ 오른쪽"]]:
+				o.add_item(d[1])
+				if d[0] == s.get("dir", "down"):
+					o.select(o.item_count - 1)
+			o.item_selected.connect(func(idx):
+				s.dir = Direction.DIRS[idx]
+				changed.emit(key))
+			row.add_child(o)
 		"walk":
 			_who(row, s, [["player", "플레이어"]], key)
 			_tile(row, s, key)
@@ -181,6 +206,40 @@ func _step_box(i: int) -> Control:
 		hint.modulate = Color(1, 1, 1, 0.5)
 		vb.add_child(hint)
 	return panel
+
+
+## 파일 고르기 (그림·소리 공통)
+func _file(row: HBoxContainer, s: Dictionary, files: Array, empty: String, key: String) -> void:
+	var o := OptionButton.new()
+	o.add_item(empty)
+	for f in files:
+		o.add_item(f)
+		if f == s.get("file", ""):
+			o.select(o.item_count - 1)
+	if s.get("file", "") != "" and not s.file in files:
+		o.add_item("⚠ %s (없음)" % s.file)
+		o.select(o.item_count - 1)
+	o.item_selected.connect(func(idx):
+		if idx >= 1 and idx - 1 < files.size():
+			s.file = files[idx - 1]
+		rebuild()
+		changed.emit(key))
+	row.add_child(o)
+
+
+## 에디터에서 소리 들어 보기
+var _player: AudioStreamPlayer
+
+func _listen(path: String, volume: float) -> void:
+	var stream := Direction.load_audio(path)
+	if stream == null:
+		return
+	if _player == null:
+		_player = AudioStreamPlayer.new()
+		add_child(_player)
+	_player.stream = stream
+	_player.volume_db = linear_to_db(maxf(0.01, volume / 100.0))
+	_player.play()
 
 
 func _num(row: HBoxContainer, label: String, s: Dictionary, k: String, lo: float, hi: float, key: String) -> void:

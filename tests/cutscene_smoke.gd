@@ -49,6 +49,39 @@ func _ready() -> void:
 	ui.advance()
 	await _until(func(): return f._dialogue_ui == null, 3.0)
 	check(f._dialogue_ui == null, "그림 내리고 대화 끝")
+	# ---- 바라보는 방향: 맵의 face, 걸으면 가는 쪽, '바라보기'
+	check(npc.node.facing == Vector2.UP, "NPC 는 마지막으로 걸은 쪽을 봄 (벽을 돌아 (6,3)→(6,2) = 위): %s" % npc.node.facing)
+	# ---- 소리 + 바라보기 + 건너뛰기 (긴 컷신을 건너뛰면 바로 끝난 모습, 선택지에서 멈춤)
+	f._start_dialogue({"data": {"ref": "tcut_long"}})
+	await _wait(0.4)
+	check(Sound.music_file == "test_loop.wav", "배경음 틀기 (audio/bgm/test_loop.wav)")
+	check(f._dialogue_ui.skip_btn.visible, "컷신 중 '건너뛰기' 버튼")
+	await _snap("04_skip_button")
+	var t0 := Time.get_ticks_msec()
+	f._dialogue_ui.skip()
+	await _until(func(): return f._dialogue_ui and f._dialogue_ui.get_node("%Choices").get_child_count() > 0, 3.0)
+	var took := Time.get_ticks_msec() - t0
+	var nt := Vector2i(floori(npc.node.position.x / f.tile), floori(npc.node.position.y / f.tile))
+	check(took < 1500 and nt == Vector2i(2, 5) and npc.node.facing == Vector2.UP and GameState.node_id == "tcut_long_q",
+		"건너뛰기: %dms 만에 끝난 모습 (NPC (2,5)·위를 봄), 대사 넘기고 선택지에서 멈춤" % took)
+	check(not f._dialogue_ui.skipping and Sound.music_file == "", "선택지에서 건너뛰기 멈춤, 배경음 끄기도 적용됨")
+	await StoryRunner.choose("tcut_long_c")
+	await _until(func(): return f._dialogue_ui == null, 2.0)
+	f.queue_free()
+	await _wait(0.1)
+	# ---- 오프닝 컷신: 캐릭터 생성 직후 필드가 열리면 Config opening_dialogue 를 한 번
+	var keep_open: Variant = DataLoader.config.get("opening_dialogue", "")
+	DataLoader.config["opening_dialogue"] = "tcut_img"
+	GameState.opening_pending = true
+	FieldScript.next_map_id = "tcut_map"
+	f = load("res://scenes/field/field.tscn").instantiate()
+	add_child(f)
+	await _wait(0.4)
+	check(f._dialogue_ui != null and not GameState.opening_pending and GameState.node_id in ["tcut_img", "tcut_img_line"], "새 게임 → 필드가 열리자마자 오프닝 컷신")
+	f._dialogue_ui.skip()
+	await _until(func(): return f._dialogue_ui == null, 3.0)
+	check(f._dialogue_ui == null and not f.frozen, "오프닝을 건너뛰면 바로 조작 가능")
+	DataLoader.config["opening_dialogue"] = keep_open
 	f.queue_free()
 	_cleanup()
 	print("[cutscene_smoke] 실패 %d" % _fail)
@@ -79,12 +112,26 @@ func _inject() -> void:
 	node.call("tcut_img", "direct", "tcut_img_line", {"steps": [{"do": "image", "file": "test_cg.png", "fade": 0.2}]})
 	node.call("tcut_img_line", "", "tcut_img_off", {"text": "(테스트) 그림 위 대사"})
 	node.call("tcut_img_off", "direct", "EXIT", {"steps": [{"do": "image_off", "fade": 0.1}]})
+	node.call("tcut_long", "direct", "tcut_long_1", {"steps": [
+		{"do": "music", "file": "test_loop.wav", "fade": 0.2, "volume": 50},
+		{"do": "sound", "file": "test_beep.wav", "volume": 80},
+		{"do": "wait", "time": 5.0},
+		{"do": "walk", "who": "tcut_npc", "to": [2, 5], "speed": 1.0},
+		{"do": "face", "who": "tcut_npc", "dir": "up"},
+		{"do": "image", "file": "test_cg.png", "fade": 3.0},
+		{"do": "music_off", "fade": 2.0}]})
+	node.call("tcut_long_1", "", "tcut_long_2", {"text": "(테스트) 건너뛰면 넘어가는 대사 1"})
+	node.call("tcut_long_2", "", "tcut_long_q", {"text": "(테스트) 건너뛰면 넘어가는 대사 2"})
+	node.call("tcut_long_q", "", "", {"text": "(테스트) 선택지에서는 멈춤"})
+	DataLoader.choices_by_node["tcut_long_q"] = [{"choice_id": "tcut_long_c", "node_id": "tcut_long_q", "text": "(테스트) 끝", "condition": "",
+		"show_mode": "", "cost": "", "effects": "", "next_node": "EXIT", "type": "normal", "check": "", "dc": 0, "mod": 0, "fail_effects": "", "fail_next": ""}]
 
 
 func _cleanup() -> void:
 	DataLoader.maps.erase("tcut_map")
-	for id in ["tcut_a", "tcut_b", "tcut_img", "tcut_img_line", "tcut_img_off"]:
+	for id in ["tcut_a", "tcut_b", "tcut_img", "tcut_img_line", "tcut_img_off", "tcut_long", "tcut_long_1", "tcut_long_2", "tcut_long_q"]:
 		DataLoader.nodes.erase(id)
+	DataLoader.choices_by_node.erase("tcut_long_q")
 	SaveManager.delete_all()
 
 

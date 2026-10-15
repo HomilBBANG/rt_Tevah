@@ -542,6 +542,8 @@ func _edit_object(o: Dictionary) -> void:
 		"npc":
 			_section("NPC")
 			_option("대화", dialogue_starts, o.get("ref", ""), func(v): set_field(o, "ref", v))
+			_option("바라보는 방향", [["", "↓ 아래 (기본)"], ["up", "↑ 위"], ["left", "← 왼쪽"], ["right", "→ 오른쪽"]],
+				o.get("face", ""), func(v): set_field(o, "face", v))
 			_line("시간대", o.get("schedule", ""), func(v): set_field(o, "schedule", v), "06:00-12:00, 20:00-23:00 (비우면 항상)")
 		"investigate":
 			_section("조사")

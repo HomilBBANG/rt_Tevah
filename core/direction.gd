@@ -7,18 +7,28 @@ extends RefCounted
 ##     fade      {to, time}        to = black / white (화면 덮기) / clear (걷기)
 ##     shake     {power, time}     화면 흔들기 (power 1~3)
 ##     wait      {time}            기다리기 (초)
+##     sound     {file, volume}    효과음 한 번 (audio/sfx/<file>, volume 0~100 %)
+##     music     {file, fade, volume}  배경음 틀기 (audio/bgm/<file>, 반복) — 대화가 끝나도 계속, 끄려면 music_off
+##     music_off {fade}            배경음 끄기
 ##   필드 (탐험 화면이 처리 — 대화 에디터 미리보기에서는 건너뜀):
 ##     walk      {who, to:[x,y], speed, wait}   who = player 또는 맵 물체 object_id(NPC), to 까지 길을 찾아 걷기 (칸/초)
 ##     camera    {who 또는 to:[x,y], time}       카메라를 그 칸(또는 그 인물)으로. who = player 면 다시 플레이어를 따라감
 ##     vanish    {who}                           그 NPC 를 숨김 (이번에 맵에 있는 동안 — 계속 없애려면 플래그 + 나타나는 조건)
+##     face      {who, dir}                      바라보는 방향 (up / down / left / right). 걸을 때는 가는 쪽을 저절로 봄
+## 건너뛰기(대화 화면의 '건너뛰기' 버튼·Esc): 단계에 "_instant": true 를 붙여 바로 끝난 모습으로 (기다림·흔들기·효과음은 생략).
 ## 연출 카드가 돌아가는 동안 플레이어는 조작할 수 없고(대화 중), 대사 상자는 숨는다.
 
 const CUTSCENE_DIR := "res://art/cutscenes/"
-const SCREEN_STEPS := ["image", "image_off", "fade", "shake", "wait"]
-const FIELD_STEPS := ["walk", "camera", "vanish"]
+const SFX_DIR := "res://audio/sfx/"
+const BGM_DIR := "res://audio/bgm/"
+const SCREEN_STEPS := ["image", "image_off", "fade", "shake", "wait", "sound", "music", "music_off"]
+const FIELD_STEPS := ["walk", "camera", "vanish", "face"]
+const DIRS := ["up", "down", "left", "right"]
+const DIR_VEC := {"up": Vector2.UP, "down": Vector2.DOWN, "left": Vector2.LEFT, "right": Vector2.RIGHT}
 const LABEL := {
 	"image": "🖼 그림 띄우기", "image_off": "그림 내리기", "fade": "페이드 (검게·하얗게·걷기)", "shake": "화면 흔들기",
-	"wait": "기다리기", "walk": "🚶 걷게 하기 (필드)", "camera": "🎥 카메라 옮기기 (필드)", "vanish": "NPC 숨기기 (필드)",
+	"wait": "기다리기", "sound": "🔊 효과음", "music": "🎵 배경음 틀기", "music_off": "배경음 끄기",
+	"walk": "🚶 걷게 하기 (필드)", "face": "↻ 바라보기 (필드)", "camera": "🎥 카메라 옮기기 (필드)", "vanish": "NPC 숨기기 (필드)",
 }
 const FADE_TO := ["black", "white", "clear"]
 ## 단계마다 기본값 (에디터에서 새로 추가할 때·빠진 칸 채우기)
@@ -28,6 +38,10 @@ const DEFAULTS := {
 	"fade": {"to": "black", "time": 0.6},
 	"shake": {"power": 1.0, "time": 0.4},
 	"wait": {"time": 1.0},
+	"sound": {"file": "", "volume": 100.0},
+	"music": {"file": "", "fade": 1.0, "volume": 100.0},
+	"music_off": {"fade": 1.0},
+	"face": {"who": "player", "dir": "down"},
 	"walk": {"who": "player", "to": [0, 0], "speed": 3.0, "wait": true},
 	"camera": {"who": "", "to": [0, 0], "time": 1.0},
 	"vanish": {"who": ""},
@@ -43,12 +57,38 @@ static func normalize(s: Dictionary) -> Dictionary:
 
 ## 그림 파일 목록 (art/cutscenes/ 의 png·jpg·webp)
 static func image_files() -> Array:
+	return _files(CUTSCENE_DIR, ["png", "jpg", "jpeg", "webp"])
+
+
+## 소리 파일 목록 (audio/sfx/ 또는 audio/bgm/ 의 ogg·wav·mp3)
+static func audio_files(dir: String) -> Array:
+	return _files(dir, ["ogg", "wav", "mp3"])
+
+
+static func _files(dir: String, exts: Array) -> Array:
 	var out := []
-	for f in DirAccess.get_files_at(CUTSCENE_DIR):
-		if f.get_extension().to_lower() in ["png", "jpg", "jpeg", "webp"]:
+	for f in DirAccess.get_files_at(dir):
+		if f.get_extension().to_lower() in exts:
 			out.append(f)
 	out.sort()
 	return out
+
+
+## 소리 불러오기: 가져오기(import)된 리소스가 있으면 그것, 없으면 파일을 직접 읽는다
+static func load_audio(path: String) -> AudioStream:
+	if ResourceLoader.exists(path):
+		return load(path)
+	var full := ProjectSettings.globalize_path(path)
+	if not FileAccess.file_exists(full):
+		return null
+	match path.get_extension().to_lower():
+		"ogg": return AudioStreamOggVorbis.load_from_file(full)
+		"wav": return AudioStreamWAV.load_from_file(full)
+		"mp3":
+			var mp3 := AudioStreamMP3.new()
+			mp3.data = FileAccess.get_file_as_bytes(full)
+			return mp3
+	return null
 
 
 ## 그림 불러오기: 가져오기(import)된 리소스가 있으면 그것, 없으면 파일을 직접 읽는다 (테스트·처음 넣은 그림)

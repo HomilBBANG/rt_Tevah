@@ -277,5 +277,6 @@ func _confirm() -> void:
 ## 고른 특성으로 캐릭터를 만들고 첫 회차 시작
 func start_game() -> void:
 	GameState.create_character(selected.duplicate())
+	GameState.opening_pending = true   # 필드에 들어가자마자 오프닝 컷신 (Config opening_dialogue)
 	SaveManager.begin_run()   # 월드 저장도 함께 (특성·생성 완료)
 	get_tree().change_scene_to_file(FIELD)

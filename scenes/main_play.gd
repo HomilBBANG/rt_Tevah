@@ -58,6 +58,10 @@ var _auto_left := -1.0          # 자동 넘김까지 남은 초 (-1 = 없음)
 var cg: TextureRect
 var fade: ColorRect
 var directing := false
+var cutscene := false           # 이 대화에서 연출 카드를 한 번이라도 돌렸나 (건너뛰기 버튼이 보임)
+var skipping := false           # 건너뛰는 중: 연출은 바로 끝난 모습으로, 대사는 저절로 넘김 → 선택지·대화 끝에서 멈춤
+var skip_btn: Button
+var _tweens: Array = []
 
 
 func _ready() -> void:
@@ -87,6 +91,17 @@ func _ready() -> void:
 	fade.color = Color(0, 0, 0, 0)
 	add_child(fade)
 	move_child(fade, cg.get_index() + 1)
+	skip_btn = Button.new()
+	skip_btn.text = "건너뛰기 ▶▶"
+	skip_btn.tooltip_text = "컷신을 건너뜁니다 (Esc). 선택지가 나오면 멈춥니다"
+	skip_btn.focus_mode = FOCUS_NONE
+	skip_btn.anchor_left = 0.87
+	skip_btn.anchor_right = 0.985
+	skip_btn.anchor_top = 0.115
+	skip_btn.anchor_bottom = 0.165
+	skip_btn.visible = false
+	skip_btn.pressed.connect(skip)
+	add_child(skip_btn)
 	_link(GameState.stats_changed, _update_status)
 	_link(GameState.inventory_changed, _update_status)
 	%InventoryButton.pressed.connect(%Inventory.open_browse)
@@ -126,6 +141,10 @@ func _link(sig: Signal, callable: Callable) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if cutscene and event.is_action_pressed("ui_cancel"):
+		skip()
+		get_viewport().set_input_as_handled()
+		return
 	var go := event.is_action_pressed("ui_accept") or (InputMap.has_action("interact") and event.is_action_pressed("interact"))
 	if go and not %Inventory.visible:
 		advance()
@@ -216,9 +235,31 @@ func _start_pages() -> void:
 
 
 # ---------------------------------------------------------------- 🎬 연출
+## 건너뛰기: 돌고 있는 연출은 바로 끝난 모습으로, 그 뒤 대사는 저절로 넘긴다 (선택지·대화 끝에서 멈춤)
+func skip() -> void:
+	if not cutscene or skipping:
+		return
+	skipping = true
+	for tw in _tweens:
+		if tw.is_valid():
+			tw.custom_step(1e6)
+	if StoryRunner.field_director.is_valid():
+		StoryRunner.field_director.call({"do": "_finish"})
+
+
+func _skip_tick() -> void:
+	if %Choices.get_child_count() > 0 or _ended:
+		skipping = false   # 선택지는 플레이어가 고른다 (에피소드 엔딩도 멈춤)
+		return
+	if not StoryRunner.busy:
+		advance()
+
+
 ## 연출 카드: 대사 상자를 숨기고 단계를 차례로 실행한 뒤 StoryRunner 에 알린다
 func _on_direction(steps: Array) -> void:
 	directing = true
+	cutscene = true
+	skip_btn.visible = true
 	_auto_left = -1.0
 	_type_label = null
 	_clear_choices()
@@ -228,7 +269,10 @@ func _on_direction(steps: Array) -> void:
 	if embedded:
 		$Scene.color.a = 0.0   # 필드 위 연출: 뒤의 맵이 그대로 보이게
 	for s in steps:
-		await _do_step(Direction.normalize(s))
+		var st := Direction.normalize(s)
+		if skipping:
+			st["_instant"] = true
+		await _do_step(st)
 	if embedded:
 		$Scene.color.a = dim
 	directing = false
@@ -236,6 +280,11 @@ func _on_direction(steps: Array) -> void:
 
 
 func _do_step(s: Dictionary) -> void:
+	var instant: bool = s.get("_instant", false)
+	if instant:
+		for k in ["fade", "time"]:
+			if s.has(k):
+				s[k] = 0.0
 	match s.do:
 		"image":
 			var tex := Direction.load_image(str(s.file))
@@ -254,11 +303,23 @@ func _do_step(s: Dictionary) -> void:
 				fade.color = Color(c.r, c.g, c.b, fade.color.a)
 			await _tween(fade, "color:a", 0.0 if s.to == "clear" else 1.0, float(s.time))
 		"shake":
+			if instant:
+				return
 			if StoryRunner.field_director.is_valid():
 				StoryRunner.field_director.call(s)   # 맵(카메라)도 같이 — 기다리지 않음
 			await _shake(float(s.power), float(s.time))
 		"wait":
-			await get_tree().create_timer(maxf(0.0, float(s.time))).timeout
+			var left := float(s.time)
+			while left > 0.0 and not skipping:
+				await get_tree().process_frame
+				left -= get_process_delta_time()
+		"sound":
+			if not instant:
+				Sound.play_sfx(str(s.file), float(s.volume))
+		"music":
+			Sound.play_music(str(s.file), float(s.fade), float(s.volume))   # 기다리지 않음 (소리가 커지는 동안 다음 단계)
+		"music_off":
+			Sound.stop_music(float(s.fade))
 		_:
 			# 필드 단계 (walk·camera·vanish): 탐험 화면이 있을 때만 (미리보기에서는 건너뜀)
 			if StoryRunner.field_director.is_valid():
@@ -271,13 +332,17 @@ func _tween(obj: Object, prop: String, value: Variant, time: float) -> void:
 		return
 	var tw := create_tween()
 	tw.tween_property(obj, prop, value, time)
+	_tweens.append(tw)
+	if skipping:
+		tw.custom_step(1e6)
 	await tw.finished
+	_tweens.erase(tw)
 
 
 func _shake(power: float, time: float) -> void:
 	var base := position
 	var t := 0.0
-	while t < time:
+	while t < time and not skipping:
 		position = base + Vector2(randf_range(-1, 1), randf_range(-1, 1)) * 12.0 * power
 		await get_tree().process_frame
 		t += get_process_delta_time()
@@ -327,7 +392,7 @@ func _begin_typing(label: Label, p: Dictionary) -> void:
 	label.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING
 	_type_total = label.text.length()
 	_type_cps = float(p.get("cps", 0.0))
-	if _type_cps <= 0.0 or _type_total == 0:
+	if _type_cps <= 0.0 or _type_total == 0 or skipping:
 		label.visible_characters = -1
 		_page_done()
 		return
@@ -340,6 +405,9 @@ func _begin_typing(label: Label, p: Dictionary) -> void:
 
 
 func _process(delta: float) -> void:
+	if skipping and not directing:
+		_skip_tick()
+		return
 	if _type_label == null:
 		if _auto_left >= 0.0 and not %Inventory.visible:
 			_auto_left -= delta

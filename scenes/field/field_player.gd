@@ -5,7 +5,10 @@ var field: Node          # field.gd
 var radius := 23.0
 var speed := 192.0        # 걷기 (픽셀/초)
 var run_speed := 288.0    # 달리기: run 액션(Shift)을 누르는 동안
-var facing := Vector2.DOWN
+var facing := Vector2.DOWN:
+	set(v):
+		facing = v
+		queue_redraw()
 
 
 func _physics_process(_delta: float) -> void:

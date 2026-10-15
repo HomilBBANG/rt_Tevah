@@ -536,5 +536,88 @@
   "steps": [],
   "text_speed": "",
   "npc_id": "char_npc2"
+ },
+ {
+  "node_id": "opening_in",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "opening_line",
+  "on_enter": "",
+  "kind": "direct",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "steps": [
+   {
+    "do": "fade",
+    "to": "black",
+    "time": 0.0
+   },
+   {
+    "do": "image",
+    "file": "test_cg.png",
+    "fade": 0.0
+   },
+   {
+    "do": "fade",
+    "to": "clear",
+    "time": 1.2
+   },
+   {
+    "do": "wait",
+    "time": 0.5
+   }
+  ],
+  "text_speed": "",
+  "npc_id": ""
+ },
+ {
+  "node_id": "opening_line",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "(테스트) 오프닝 컷신 — Config opening_dialogue 를 비우면 나오지 않음",
+  "next_node": "opening_out",
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "steps": [],
+  "text_speed": "",
+  "npc_id": ""
+ },
+ {
+  "node_id": "opening_out",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "EXIT",
+  "on_enter": "",
+  "kind": "direct",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "steps": [
+   {
+    "do": "fade",
+    "to": "black",
+    "time": 0.8
+   },
+   {
+    "do": "image_off",
+    "fade": 0.0
+   },
+   {
+    "do": "fade",
+    "to": "clear",
+    "time": 0.8
+   }
+  ],
+  "text_speed": "",
+  "npc_id": ""
  }
 ]

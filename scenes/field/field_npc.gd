@@ -1,13 +1,19 @@
 extends StaticBody2D
-## 탐험 중 NPC (아트 전 placeholder: 파란 원 + 이름). 플레이어는 통과할 수 없고, 가까이서 조사 키로 대화.
+## 탐험 중 NPC (아트 전 placeholder: 파란 원 + 이름 + 바라보는 방향). 플레이어는 통과할 수 없고, 가까이서 조사 키로 대화.
+## 바라보는 방향: 맵 물체 face (처음), 컷신에서 걸으면 가는 쪽, 연출 '바라보기'.
 
 var radius := 25.0
 var display_name := ""
+var facing := Vector2.DOWN:
+	set(v):
+		facing = v
+		queue_redraw()
 
 
 func _draw() -> void:
 	draw_circle(Vector2.ZERO, radius, Color("5a8fd0"))
 	draw_circle(Vector2.ZERO, radius, Color("15233a"), false, 3.0, true)
+	draw_line(Vector2.ZERO, facing * radius * 0.9, Color("15233a"), 5.0, true)
 	var f := ThemeDB.fallback_font
 	var w := f.get_string_size(display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 25).x
 	var pos := Vector2(-w / 2.0, -radius - 13)
