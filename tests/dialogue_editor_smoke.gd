@@ -344,6 +344,24 @@ func _ready() -> void:
 	check(dc2 is DirectCard and dc2.data.steps.size() == 2 and dc2.data.steps[0].file == "test_cg.png" and Vector2i(dc2.data.steps[1].to[0], dc2.data.steps[1].to[1]) == Vector2i(3, 4)
 		and dc2.data.next_node == "EXIT", "연출 카드: 그림·걷기 단계, 저장 후 다시 열어도 그대로 (%s → %s)" % [dc2.data.steps if dc2 is DirectCard else dc2, dc2.data.get("next_node", "") if dc2 else ""])
 
+	# ---- 대화 목록: 순서 바꾸기·이름 바꾸기
+	var before: Array = ed._file_names()
+	var last: String = before[-1]
+	ed.move_dialogue(last, 0)
+	check(ed._file_names()[0] == last and FileAccess.file_exists(TEST_DIR + "_order.json")
+		and ed.file_list.get_item_metadata(0) == last, "순서 바꾸기: 맨 아래 → 맨 위, _order.json 저장 (%s)" % [ed._file_names()])
+	check(not "_order" in ed._file_names(), "_order.json 은 목록에 안 나옴")
+	ed.open_dialogue("t_cat")
+	var pos_before: int = ed._file_names().find("t_cat")
+	check(ed.rename_dialogue("t_cat", "t_cat2"), "이름 바꾸기 실행")
+	var rn: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "t_cat2.json"))
+	check(not FileAccess.file_exists(TEST_DIR + "t_cat.json") and rn.dialogue_id == "t_cat2"
+		and ed.dialogue.dialogue_id == "t_cat2" and ed.path == TEST_DIR + "t_cat2.json"
+		and ed._file_names().find("t_cat2") == pos_before, "이름 바꾸기: 파일·dialogue_id·열린 대화·목록 자리 유지")
+	check(not ed.rename_dialogue("t_cat2", "npc1") and not ed.rename_dialogue("t_cat2", "bad name"), "이미 있는 이름·잘못된 이름은 거절")
+	ed.save()
+	check(FileAccess.file_exists(TEST_DIR + "t_cat2.json") and not FileAccess.file_exists(TEST_DIR + "t_cat.json"), "바꾼 뒤 저장도 새 파일로")
+
 	# 변환·검사 (실제 프로젝트 데이터 — 원본 tools/dialogues 는 안 건드림)
 	var conv_ok: bool = ed.run_convert()
 	check(conv_ok and "변환 완료" in ed.log_view.text, "변환·검사 실행")

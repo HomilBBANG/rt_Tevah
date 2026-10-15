@@ -206,6 +206,7 @@ tools/
 ## 대화 에디터 (addons/dialogue_editor)
 - 대화(노드·선택지)의 원본은 **`tools/dialogues/<대화ID>.json`** (대화 하나 = 파일 하나). 변환기가 엑셀 Nodes·Choices 뒤에 합쳐 같은 규칙으로 검사한다. 엑셀 Nodes·Choices 도 계속 읽는다 (1단계 에피소드 테스트 대화는 엑셀에 있음).
   - 파일: `{ dialogue_id, episode_id("" = 필드 대화), nodes: [{node_id, speaker_id, text, next_node, on_enter, pos}], choices: [{choice_id, node_id, text, condition, show_mode, cost, effects, next_node, type, check, dc, mod, fail_effects, fail_next}] }` (combat 은 check=enemy_id, fail_*=도주)
+- 왼쪽 대화 목록: 더블클릭(또는 오른쪽 클릭 메뉴) = 대화 이름(dialogue_id·파일 이름) 바꾸기 — 카드 ID 는 그대로라 연결 유지. 끌어 놓기·오른쪽 클릭 위로/아래로 = 순서, `tools/dialogues/_order.json` 에 저장(`_` 로 시작하는 파일은 대화 아님). 변환기도 이 순서로 읽어서 같은 시점의 자동 시작 컷신이 이 순서로 나온다.
 - Godot 위쪽 **'대화' 탭** (EditorPlugin 메인 화면). 대사 카드(GraphNode)를 선으로 이어 next_node / 선택지 next_node / 판정 fail_next 를 정한다. 대화 끝(EXIT)·엔딩(END:id) 카드. 다른 파일·엑셀 노드로는 오른쪽 칸 '이동(직접 입력)'.
   - 연결선은 데이터(next_node 등)를 따른다: 연결/끊기 → 데이터 수정 → 다시 그림 (`_sync_connections`).
   - 버튼: 새 대화 / 대사 추가 / 엔딩 카드 / 저장 / 변환·검사(`tools/xlsx_to_json.py --log`, 결과는 UTF-8 로그 파일로 받음) / 미리보기(`addons/dialogue_editor/preview.tscn`, 고른 카드부터 실제 대화 화면, save 효과는 저장 안 함).

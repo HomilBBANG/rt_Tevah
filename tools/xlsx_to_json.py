@@ -1062,6 +1062,20 @@ def loc(sheet, r):
     return f"대화 {r['_row']}" if isinstance(r["_row"], str) else f"{sheet} {r['_row']}행"
 
 
+def dialogue_files():
+    """tools/dialogues/*.json 을 대화 에디터의 목록 순서(_order.json)대로 — 같은 시점의 자동 시작 컷신이 이 순서로 나온다.
+    _ 로 시작하는 파일(_order.json 등)은 대화가 아님."""
+    files = {f.stem: f for f in DIALOGUES_DIR.glob("*.json") if not f.name.startswith("_")}
+    order = []
+    op = DIALOGUES_DIR / "_order.json"
+    if op.exists():
+        try:
+            order = [str(x) for x in json.loads(op.read_text(encoding="utf-8")) if str(x) in files]
+        except (ValueError, OSError, TypeError):
+            order = []
+    return [files[n] for n in order] + [files[n] for n in sorted(files) if n not in order]
+
+
 def read_dialogues(d, rep):
     """tools/dialogues/*.json (대화 에디터 파일) 의 노드·선택지를 엑셀 Nodes·Choices 뒤에 붙인다."""
     if not DIALOGUES_DIR.exists():
@@ -1069,7 +1083,7 @@ def read_dialogues(d, rep):
     npc_ids = {r["npc_id"] for r in d.get("Npcs", [])}
     node_cols = SCHEMA["Nodes"][1] + OPTIONAL.get("Nodes", [])
     choice_cols = SCHEMA["Choices"][1] + OPTIONAL.get("Choices", [])
-    for f in sorted(DIALOGUES_DIR.glob("*.json")):
+    for f in dialogue_files():
         try:
             dlg = json.loads(f.read_text(encoding="utf-8"))
         except (ValueError, OSError) as e:

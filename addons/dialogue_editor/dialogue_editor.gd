@@ -213,7 +213,27 @@ func _build_left() -> Control:
 	file_list = ItemList.new()
 	file_list.custom_minimum_size.y = 150
 	file_list.size_flags_vertical = SIZE_EXPAND_FILL
-	file_list.item_clicked.connect(func(i, _p, _b): _request_open(file_list.get_item_metadata(i)))
+	file_list.tooltip_text = "누르면 열기 · 더블클릭 = 이름 바꾸기 · 끌어서 순서 바꾸기 · 오른쪽 클릭 = 메뉴"
+	file_list.item_clicked.connect(func(i, _p, b):
+		if b == MOUSE_BUTTON_RIGHT:
+			_file_menu(file_list.get_item_metadata(i), get_global_mouse_position())
+		else:
+			_request_open(file_list.get_item_metadata(i)))
+	file_list.item_activated.connect(func(i): _ask_rename(file_list.get_item_metadata(i)))
+	file_list.allow_rmb_select = true
+	# 끌어서 순서 바꾸기
+	file_list.set_drag_forwarding(func(pos):
+		var i := file_list.get_item_at_position(pos, true)
+		if i < 0:
+			return null
+		var l := Label.new()
+		l.text = "  " + str(file_list.get_item_metadata(i))
+		file_list.set_drag_preview(l)
+		return {"dialogue_file": file_list.get_item_metadata(i)},
+		func(_pos, d): return d is Dictionary and d.has("dialogue_file"),
+		func(pos, d):
+			var i := file_list.get_item_at_position(pos, true)
+			move_dialogue(d.dialogue_file, i if i >= 0 else 999))
 	vb.add_child(file_list)
 	vb.add_child(_caption("찾기"))
 	search = LineEdit.new()
@@ -325,15 +345,137 @@ func refresh_file_list() -> void:
 	_refresh_file_list_marks()
 
 
+## 대화 목록: _order.json 순서 (없는 것은 뒤에 이름 순). _ 로 시작하는 파일은 대화가 아님
 func _file_names() -> Array:
 	var names := []
 	var d := DirAccess.open(dir)
 	if d:
 		for f in d.get_files():
-			if f.ends_with(".json"):
+			if f.ends_with(".json") and not f.begins_with("_"):
 				names.append(f.get_basename())
 	names.sort()
-	return names
+	var order: Array = _read_json(dir + "_order.json", [])
+	if not order is Array:
+		order = []
+	var out := order.filter(func(n): return str(n) in names).map(func(n): return str(n))
+	for n in names:
+		if not n in out:
+			out.append(n)
+	return out
+
+
+func _save_order(names: Array) -> void:
+	var f := FileAccess.open(dir + "_order.json", FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(names, " ") + "\n")
+		f.close()
+
+
+## 대화 순서 바꾸기 (목록에서 끌어 놓기·위로·아래로). 같은 시점의 자동 시작 컷신도 이 순서로 나온다
+func move_dialogue(id: String, to: int) -> void:
+	var names := _file_names()
+	var from := names.find(id)
+	if from < 0:
+		return
+	to = clampi(to, 0, names.size() - 1)
+	if from == to:
+		return
+	names.remove_at(from)
+	names.insert(to, id)
+	_save_order(names)
+	refresh_file_list()
+	_status("순서 바꿈: %s → %d번째" % [id, to + 1])
+
+
+## 대화 이름(대화 ID·파일 이름) 바꾸기. 카드 ID 는 그대로라 맵 NPC·이벤트·다른 대화의 연결은 끊기지 않는다
+func rename_dialogue(old: String, new_id: String) -> bool:
+	new_id = new_id.strip_edges()
+	if new_id == old:
+		return false
+	if not RegEx.create_from_string("^[A-Za-z0-9_]+$").search(new_id) or new_id.begins_with("_"):
+		_status("대화 ID 는 영문·숫자·_ 만 (_ 로 시작하면 안 됨)")
+		return false
+	if FileAccess.file_exists(dir + new_id + ".json"):
+		_status("이미 있는 대화: " + new_id)
+		return false
+	var is_current: bool = dialogue.get("dialogue_id", "") == old
+	if is_current and dirty:
+		save()
+	var d = _read_json(dir + old + ".json", null)
+	if not d is Dictionary:
+		_status("열 수 없음: " + old)
+		return false
+	d.dialogue_id = new_id
+	var f := FileAccess.open(dir + new_id + ".json", FileAccess.WRITE)
+	if f == null:
+		_status("⛔ 저장 실패: " + new_id)
+		return false
+	f.store_string(JSON.stringify(d, " ", false) + "\n")
+	f.close()
+	DirAccess.remove_absolute(dir + old + ".json")
+	var order: Array = _read_json(dir + "_order.json", [])
+	if order is Array and old in order:
+		order[order.find(old)] = new_id
+		_save_order(order)
+	if is_current:
+		dialogue.dialogue_id = new_id
+		path = dir + new_id + ".json"
+	refresh_file_list()
+	_select_file_item(dialogue.get("dialogue_id", ""))
+	_status("이름 바꿈: %s → %s" % [old, new_id])
+	return true
+
+
+func _ask_rename(id: String) -> void:
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "대화 이름 바꾸기"
+	var box := VBoxContainer.new()
+	var l := Label.new()
+	l.text = "새 대화 ID (영문·숫자·_). 카드 ID 는 그대로라 맵·다른 대화의 연결은 그대로입니다."
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size.x = 460
+	box.add_child(l)
+	var le := LineEdit.new()
+	le.text = id
+	le.select_all_on_focus = true
+	box.add_child(le)
+	dlg.add_child(box)
+	dlg.confirmed.connect(func():
+		rename_dialogue(id, le.text)
+		dlg.queue_free())
+	le.text_submitted.connect(func(_t):
+		rename_dialogue(id, le.text)
+		dlg.hide()
+		dlg.queue_free())
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
+	le.grab_focus.call_deferred()
+
+
+## 목록 오른쪽 클릭 메뉴
+func _file_menu(id: String, at: Vector2) -> void:
+	var pm := PopupMenu.new()
+	pm.add_item("이름 바꾸기 (더블클릭)", 0)
+	pm.add_separator()
+	pm.add_item("위로", 1)
+	pm.add_item("아래로", 2)
+	pm.add_item("맨 위로", 3)
+	pm.add_item("맨 아래로", 4)
+	pm.id_pressed.connect(_on_file_menu.bind(id))
+	add_child(pm)
+	pm.popup_hide.connect(pm.queue_free)
+	pm.popup_on_parent(Rect2i(Vector2i(at), Vector2i.ZERO))
+
+
+func _on_file_menu(i: int, id: String) -> void:
+	var idx := _file_names().find(id)
+	match i:
+		0: _ask_rename(id)
+		1: move_dialogue(id, idx - 1)
+		2: move_dialogue(id, idx + 1)
+		3: move_dialogue(id, 0)
+		4: move_dialogue(id, 999)
 
 
 func _refresh_file_list_marks() -> void:
