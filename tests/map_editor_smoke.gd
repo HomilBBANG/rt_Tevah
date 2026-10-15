@@ -250,6 +250,40 @@ func _ready() -> void:
 	ed.filter_boxes.npc.button_pressed = true
 	ed.open_map("test_field")
 
+	# ---- 끌어서 옮기기: 마우스가 있는 칸으로 바로 (한 칸씩이 아니라, 한 번에 여러 칸)
+	ed.set_tool("select")
+	var dc: Control = ed.canvas
+	var mo: Dictionary = ed.map.objects.filter(func(x): return x.type == "investigate")[0]
+	var ds: float = dc.cell * dc.zoom
+	var px := func(t: Vector2i) -> Vector2: return dc.pan + (Vector2(t) + Vector2(0.5, 0.5)) * ds
+	var m0 := Vector2i(int(mo.x), int(mo.y))
+	var target := m0
+	for cand in [Vector2i(5, 2), Vector2i(4, 1), Vector2i(-3, 1), Vector2i(2, 2), Vector2i(-2, -1)]:
+		var cand_t: Vector2i = m0 + cand
+		if dc.is_floor(cand_t) and dc.object_at(cand_t).is_empty():
+			target = cand_t
+			break
+	var pr := InputEventMouseButton.new()
+	pr.button_index = MOUSE_BUTTON_LEFT
+	pr.pressed = true
+	pr.position = px.call(m0)
+	dc._gui_input(pr)
+	var mv := InputEventMouseMotion.new()
+	mv.position = px.call(m0 + Vector2i(1, 0))
+	dc._gui_input(mv)
+	var mv2 := InputEventMouseMotion.new()
+	mv2.position = px.call(target)
+	dc._gui_input(mv2)
+	var rl := InputEventMouseButton.new()
+	rl.button_index = MOUSE_BUTTON_LEFT
+	rl.pressed = false
+	rl.position = px.call(target)
+	dc._gui_input(rl)
+	check(target != m0 and Vector2i(int(mo.x), int(mo.y)) == target, "끌어서 옮기기: 한 칸 뒤 멀리 있는 칸으로 바로 (%s → %s)" % [m0, target])
+	ed.undo()
+	var mo2: Dictionary = ed.map.objects.filter(func(x): return x.object_id == mo.object_id)[0]   # 실행 취소는 새 사본
+	check(Vector2i(int(mo2.x), int(mo2.y)) == m0, "옮기기 실행 취소")
+
 	# ---- 그래픽 (픽셀아트 타일 · 광원 · 환경 · 시간 미리보기) — 논리 칸은 그대로
 	var c: Control = ed.canvas
 	var fl := Vector2i(-1, -1)

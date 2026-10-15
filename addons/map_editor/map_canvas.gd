@@ -58,7 +58,7 @@ var _painting := false
 var _panning := false
 var _press_tile := Vector2i.ZERO
 var _moving := false              # 고른 물체들 옮기는 중
-var _move_from := {}              # 물체 → 원래 위치 Vector2i
+var _move_from: Array = []        # [[물체, 원래 위치 Vector2i]] — 사전 키로 쓰면 위치가 바뀔 때 못 찾으므로 목록으로
 var _band := false                # 영역 선택 중
 var _rect_paint := false          # 사각형 칠하기 중
 var _font: Font
@@ -347,9 +347,9 @@ func _press(t: Vector2i, shift: bool, double: bool) -> void:
 		selected = o
 		selection_changed.emit(o)
 	_moving = true
-	_move_from = {}
+	_move_from = []
 	for s in selection:
-		_move_from[s] = Vector2i(int(s.x), int(s.y))
+		_move_from.append([s, Vector2i(int(s.x), int(s.y))])
 
 
 func _release(t: Vector2i) -> void:
@@ -373,15 +373,16 @@ func _release(t: Vector2i) -> void:
 
 ## 고른 물체들을 원래 자리 + d 로 (모두 바닥이고 다른 물체가 없을 때만)
 func _move_selection(d: Vector2i) -> void:
-	var moving := selection.filter(func(o): return _move_from.has(o))   # 끄는 중에 고른 것이 바뀌어도 처음 고른 것만
-	for o in moving:
-		var to: Vector2i = _move_from[o] + d
+	# 끄는 동안 마우스가 있는 칸으로 바로 (한 번에 여러 칸, 벽 너머도). 갈 칸이 벽·빈 공간이거나 다른 물체가 있으면 그 칸은 건너뜀
+	var movers := _move_from.map(func(p): return p[0])
+	for p in _move_from:
+		var to: Vector2i = p[1] + d
 		var there := object_at(to)
-		if not is_floor(to) or (not there.is_empty() and not there in selection):
+		if not is_floor(to) or (not there.is_empty() and not there in movers):
 			return
-	for o in moving:
-		o.x = _move_from[o].x + d.x
-		o.y = _move_from[o].y + d.y
+	for p in _move_from:
+		p[0].x = p[1].x + d.x
+		p[0].y = p[1].y + d.y
 	changed.emit()
 	selection_changed.emit(selected)
 
