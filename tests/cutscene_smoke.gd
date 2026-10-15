@@ -61,6 +61,7 @@ func _ready() -> void:
 	f._dialogue_ui.skip()
 	await _until(func(): return f._dialogue_ui and f._dialogue_ui.get_node("%Choices").get_child_count() > 0, 3.0)
 	var took := Time.get_ticks_msec() - t0
+	await _wait(0.1)   # 선택지가 뜬 다음 프레임에 건너뛰기가 멈춘다
 	var nt := Vector2i(floori(npc.node.position.x / f.tile), floori(npc.node.position.y / f.tile))
 	check(took < 1500 and nt == Vector2i(2, 5) and npc.node.facing == Vector2.UP and GameState.node_id == "tcut_long_q",
 		"건너뛰기: %dms 만에 끝난 모습 (NPC (2,5)·위를 봄), 대사 넘기고 선택지에서 멈춤" % took)

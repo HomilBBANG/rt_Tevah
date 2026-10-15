@@ -342,7 +342,9 @@ func _refresh_file_list_marks() -> void:
 	for i in files.item_count:
 		var n := files.get_item_text(i)
 		var who := _npc_of_file(n)
-		var row := file_list.add_item(("● " if n == current and dirty else ("▶ " if n == current else "")) + n + ("   — " + who if who != "" else ""))
+		var is_opening: bool = dialogue.get("opening", false) if n == current else bool(_read_json(dir + n + ".json", {}).get("opening", false))
+		var row := file_list.add_item(("● " if n == current and dirty else ("▶ " if n == current else "")) + n
+			+ ("   — " + who if who != "" else "") + ("   🎬 오프닝" if is_opening else ""))
 		file_list.set_item_metadata(row, n)
 	_save_btn.text = "저장 ●" if dirty else "저장"
 
@@ -1029,7 +1031,23 @@ func _edit_node(card: GraphNode) -> void:
 			script_panel.default_speaker = v
 			_touch()
 			_refresh_file_list_marks())
-		_hint("맵 탭에서 NPC 를 놓고 '대화'에 이 카드(%s)를 고르면 연결됩니다." % d.node_id)
+		_hint("맵 탭에서 NPC 를 놓고 '대화'에 이 카드(%s)를 고르면 연결됩니다. 이벤트 칸(밟으면 시작)에도 고를 수 있습니다." % d.node_id)
+		var op := CheckBox.new()
+		op.text = "🎬 게임 오프닝으로 쓰기 (새 게임 직후 한 번)"
+		op.tooltip_text = "체크하면 캐릭터 생성 직후 이 대화가 나옵니다 (오프닝은 대화 하나만).
+엑셀 Config opening_dialogue 에 값이 있으면 그쪽이 먼저입니다"
+		op.button_pressed = dialogue.get("opening", false)
+		op.toggled.connect(func(on):
+			if on:
+				dialogue.opening = true
+				var others := _opening_files().filter(func(f): return f != dialogue.get("dialogue_id", ""))
+				if not others.is_empty():
+					_status("⚠ 다른 대화도 오프닝으로 체크돼 있음: %s — 하나만 남기세요" % ", ".join(others))
+			else:
+				dialogue.erase("opening")
+			_touch()
+			_refresh_file_list_marks())
+		_box.add_child(op)
 		_section("결과")
 		_target("그 외 갈 곳", d, "next_node", card)
 		_section("고급", false)
@@ -1366,7 +1384,7 @@ func _ask_new() -> void:
 	l.text = "누구의 대화인가요? (NPC 하나 = 대화 하나, npc.xlsx Npcs)"
 	box.add_child(l)
 	var npc := OptionButton.new()
-	var npcs := _npc_list()
+	var npcs := [["", "(NPC 없음 — 오프닝·이벤트 컷신)"]] + _npc_list()
 	for x in npcs:
 		npc.add_item(x[1])
 	box.add_child(npc)
@@ -1375,9 +1393,9 @@ func _ask_new() -> void:
 	box.add_child(id)
 	var suggest := func(i: int):
 		if i >= 0 and i < npcs.size():
-			id.text = String(npcs[i][0]).trim_prefix("char_").trim_prefix("npc_")
+			id.text = String(npcs[i][0]).trim_prefix("char_").trim_prefix("npc_") if npcs[i][0] != "" else "cutscene"
 	npc.item_selected.connect(suggest)
-	suggest.call(0)
+	suggest.call(1 if npcs.size() > 1 else 0)
 	dlg.add_child(box)
 	dlg.confirmed.connect(func():
 		new_dialogue(id.text, "", npcs[npc.selected][0] if npc.selected >= 0 and npc.selected < npcs.size() else "")
@@ -1393,6 +1411,16 @@ func _npc_list() -> Array:
 	for ch in _read_json("res://data/characters.json", []):
 		if not ch.get("is_player", false):
 			out.append([ch.char_id, "%s  (%s)" % [ch.name, ch.char_id]])
+	return out
+
+
+## '게임 오프닝'으로 체크한 대화 파일들
+func _opening_files() -> Array:
+	var out := []
+	for f in _file_names():
+		var on: bool = dialogue.get("opening", false) if f == dialogue.get("dialogue_id", "") else bool(_read_json(dir + f + ".json", {}).get("opening", false))
+		if on:
+			out.append(f)
 	return out
 
 

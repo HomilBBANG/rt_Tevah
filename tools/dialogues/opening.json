@@ -1,5 +1,6 @@
 {
  "dialogue_id": "opening",
+ "opening": true,
  "episode_id": "",
  "nodes": [
   {

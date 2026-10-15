@@ -804,6 +804,12 @@ def validate(d, rep):
     roots.append(list(npc_refs))
     # 오프닝 컷신 (Config opening_dialogue): 새 게임에서 캐릭터 생성 직후 한 번
     opening = str(next((c["value"] for c in d["Config"] if c["key"] == "opening_dialogue"), "") or "")
+    flagged = d.get("_openings", [])
+    if len(flagged) > 1:
+        rep.err("오프닝", "'게임 오프닝으로 쓰기'를 체크한 대화가 여럿: " + ", ".join(f for f, _ in flagged) + " (하나만)")
+    if not opening and flagged:
+        opening = flagged[0][1]
+    d["_opening"] = opening
     if opening:
         if opening not in nodes or nodes[opening]["episode_id"] != "":
             rep.err("Config opening_dialogue", f"오프닝 대화는 필드 대화 노드: '{opening}'")
@@ -811,7 +817,7 @@ def validate(d, rep):
     # 대화 시작 카드는 맵에 아직 안 놓은 NPC 의 대화여도 검사가 통과하도록 뿌리로 (안 쓰이면 경고)
     roots.append([n["node_id"] for n in d["Nodes"] if n["kind"] == "start"])
     for n in d["Nodes"]:
-        if n["kind"] == "start" and n["node_id"] not in npc_refs:
+        if n["kind"] == "start" and n["node_id"] not in npc_refs and n["node_id"] != opening:
             rep.warn(f"{loc('Nodes', n)} ({n['node_id']})", "어느 맵의 NPC 에도 연결되지 않은 대화 시작 카드")
     for root in roots:
         q = deque(x for x in root if x in nodes)
@@ -1048,6 +1054,9 @@ def read_dialogues(d, rep):
         if npc and npc not in npc_ids:
             rep.err(f"대화 {f.name}", f"없는 npc_id '{npc}' (npc.xlsx Npcs)")
         starts = [n.get("node_id") for n in dlg.get("nodes", []) if n.get("kind") == "start"]
+        # 대화 에디터의 '게임 오프닝으로 쓰기' 체크 → 시작 카드(없으면 첫 카드)
+        if dlg.get("opening") and dlg.get("nodes"):
+            d.setdefault("_openings", []).append((f.name, starts[0] if starts else str(dlg["nodes"][0].get("node_id", ""))))
         if len(starts) > 1:
             rep.err(f"대화 {f.name}", f"대화 시작 카드가 {len(starts)}개 (하나만): {', '.join(map(str, starts))}")
         if npc and not starts:
@@ -1380,7 +1389,7 @@ def export(d, maps):
         "camp_actions": clean(d["CampActions"]),
         "revivals": clean(d["Revivals"]),
         "endings": [dict(r, world_flags_set=split_list(r["world_flags_set"])) for r in clean(d["Endings"])],
-        "config": {r["key"]: config_value(r["value"]) for r in d["Config"]},
+        "config": dict({r["key"]: config_value(r["value"]) for r in d["Config"]}, opening_dialogue=d.get("_opening", "")),
     }
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     for name, obj in out.items():

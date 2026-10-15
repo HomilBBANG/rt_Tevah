@@ -292,6 +292,23 @@ func _ready() -> void:
 	await _snap("start_card")
 	check(ed.file_list.get_item_text(ed.files.selected).contains("고양이"), "대화 목록에 NPC 이름")
 
+	# ---- NPC 없는 대화 (오프닝·이벤트 컷신) + '게임 오프닝으로 쓰기'
+	check(ed.new_dialogue("t_open", "", ""), "NPC 없는 대화 만들기")
+	var ost: GraphNode = ed.graph.get_node("t_open_start")
+	var ofirst: GraphNode = ed.graph.get_node(ost.data.next_node)
+	check(not ed.dialogue.has("npc_id") and ofirst.data.pages[0].display == "narration", "NPC 없음 → 첫 카드는 상황 묘사")
+	ed._select(ost)
+	await _frames(1)
+	var op_cb: CheckBox = ed.inspector.find_children("*", "CheckBox", true, false).filter(func(c): return "오프닝" in c.text)[0]
+	op_cb.button_pressed = true
+	ed.save()
+	var of: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "t_open.json"))
+	check(of.get("opening", false) and ed._opening_files() == ["t_open"], "오프닝 체크 → 파일에 opening: true")
+	check(ed.file_list.get_item_text(ed.files.selected).contains("🎬 오프닝"), "대화 목록에 🎬 오프닝 표시")
+	await _snap("opening_check")
+	ed.open_dialogue("t_cat")
+	await _frames(2)
+
 	# ---- 🎬 연출 카드: 단계 추가 → 저장 → 다시 열기
 	var dc: GraphNode = ed.add_func_card("direct", Vector2(40, 700))
 	dc.data.steps.append({"do": "image", "file": "test_cg.png", "fade": 0.5})
