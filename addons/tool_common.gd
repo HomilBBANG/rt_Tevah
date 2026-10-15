@@ -16,7 +16,15 @@ static func run_convert(log_view: TextEdit) -> bool:
 	if FileAccess.file_exists(log_path):
 		log_view.text = FileAccess.get_file_as_string(log_path)
 	else:
-		log_view.text = "변환 스크립트를 실행하지 못했습니다. %s 가 설치되어 있고 PATH 에 있는지 확인하세요.\n%s" % [python, "\n".join(out)]
+		var o := "\n".join(out)
+		if "openpyxl" in o:
+			# 맥에서 Godot 를 Finder 로 열면 PATH 가 짧아서 /usr/bin/python3 이 쓰인다 → 그 파이썬에 깔아야 함
+			log_view.text = "변환에 필요한 openpyxl 이 없습니다. 터미널에서 설치한 뒤 다시 누르세요:\n  %s -m pip install --user openpyxl\n\n%s" % [
+				"python" if OS.get_name() == "Windows" else "/usr/bin/python3", o]
+		elif "Traceback" in o:
+			log_view.text = "변환 스크립트가 오류로 멈췄습니다 (맨 아래 줄이 원인):\n%s" % o
+		else:
+			log_view.text = "변환 스크립트를 실행하지 못했습니다. %s 가 설치되어 있고 PATH 에 있는지 확인하세요.\n%s" % [python, o]
 	if code == 0 and Engine.is_editor_hint():
 		EditorInterface.get_resource_filesystem().scan()
 	return code == 0
