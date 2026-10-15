@@ -37,6 +37,7 @@ func _play_next() -> void:
 	var id: String = queue.pop_front()
 	ui = DialogueScene.instantiate()
 	ui.embedded = true
+	ui.skip_button = DataLoader.nodes[id].get("trigger", {}).get("when", "") != "logo"   # 로고는 버튼 없이 (Esc 로는 넘어감)
 	add_child(ui)
 	ui.get_node("Scene").color = Color.BLACK   # 검은 바탕 (필드 위 대화처럼 비치지 않게)
 	ui.get_node("%InventoryButton").visible = false

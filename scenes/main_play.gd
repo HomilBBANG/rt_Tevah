@@ -32,6 +32,8 @@ var embedded := false
 var over_combat := false
 ## 처음 보여줄 노드에서 몇 번째 페이지부터 볼지 (대화 에디터 미리보기)
 var start_page := 0
+## 컷신일 때 '건너뛰기' 버튼을 보일지 (로고는 false — 버튼 없이 Esc 로만 넘김)
+var skip_button := true
 
 var _pages: Array = []          # [{kind, text, speaker_id}]
 var _page_i := -1
@@ -151,7 +153,7 @@ func _ready() -> void:
 	if over_combat:
 		%InventoryButton.visible = false
 		$Scene.color.a = 0.35
-	else:
+	elif not embedded:   # 겹쳐 띄운 대화는 띄운 쪽이 start_dialogue() 를 부른다
 		StoryRunner.launch()
 
 
@@ -292,7 +294,8 @@ func _skip_tick() -> void:
 func _on_direction(steps: Array) -> void:
 	directing = true
 	cutscene = true
-	skip_btn.visible = true
+	skip_btn.visible = skip_button
+	%InventoryButton.visible = false   # 컷신 중에는 소지품을 열지 않는다
 	_auto_left = -1.0
 	_type_label = null
 	_clear_choices()
