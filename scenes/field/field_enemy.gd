@@ -42,6 +42,11 @@ func setup_bt(bt_asset: Dictionary, bb_asset: Dictionary, overrides: Dictionary)
 	bt.setup(bt_asset, bb_asset, self, overrides)
 
 
+## 닿으면 바로 전투하나: 예전 AI 는 늘, BT 몬스터는 그 BT 의 battle_on_contact (Root 의 '닿으면 바로 전투', 기본 켬)
+func touch_battle() -> bool:
+	return bt == null or bool(bt.asset.get("battle_on_contact", true))
+
+
 func _exit_tree() -> void:
 	if bt:
 		bt.stop("몬스터 제거·맵 이동")   # 실행 중인 Task·Service 정리 (이후 콜백 없음)

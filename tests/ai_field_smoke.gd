@@ -15,6 +15,9 @@ func _ready() -> void:
 	SaveManager.delete_all()
 	SaveManager.begin_run()
 	preload("res://scenes/field/field.gd").next_map_id = "test_ai"
+	var bt_asset: Dictionary = DataLoader.ai_assets.BT_Infected_Field
+	check(bt_asset.get("battle_on_contact", false), "샘플 BT 는 '닿으면 바로 전투' 켬")
+	bt_asset.battle_on_contact = false   # 먼저 끄고: 전투는 트리의 EnterTurnBattle 로만
 	f = load("res://scenes/field/field.tscn").instantiate()
 	add_child(f)
 	await _wait(0.3)
@@ -51,14 +54,32 @@ func _ready() -> void:
 	check(ok and not inf.bt.bb.get_value("HasLastKnownLocation"), "수색을 마치면 순찰로 돌아감")
 	check(f._combat_ui == null, "멀리 있으면 다시 덤비지 않음")
 	await _snap("back_to_patrol")
+	old.grace = 999.0   # 비교용 예전 AI 적은 자기 차례까지 쉬게 (근처라 먼저 덤비지 않게)
 	# 벽 뒤에서는 못 봄 (기둥 x6~8, y3~4)
 	_teleport(7, 5)
 	inf.position = f._tile_center(7, 2)
 	await _wait(0.4)
 	check(not inf.bt.bb.get_value("HasLineOfSight"), "기둥 너머(가까워도)는 안 보임")
 
+	# '닿으면 바로 전투' 켬: 못 보는 상태(시야 0)여도 닿으면 전투
+	bt_asset.battle_on_contact = true
+	inf.bt.bb.set_value("VisionRange", 0.0, "Editor Override")
+	await _wait_until(func(): return inf.grace == 0.0, 5.0)   # 도주 유예 동안은 닿아도 전투 안 함
+	_teleport_to(inf)
+	ok = await _wait_until(func(): return f._combat_ui != null, 2.0)
+	check(ok and f._combat_enemy == inf and not inf.bt.memory.get("battle_pending", false), "켜면 닿는 순간 전투 (트리의 전투 Task 없이)")
+	await _end_combat("fled")
+	bt_asset.battle_on_contact = false
+	await _wait_until(func(): return inf.grace == 0.0, 5.0)   # 도주 유예가 끝난 뒤에
+	_teleport_to(inf)
+	await _wait(0.5)
+	check(f._combat_ui == null, "끄면 닿아도 전투 안 함 (못 보는 동안)")
+	_teleport(1, 1)
+
 	# 예전 AI 적: 닿으면 바로 전투 (그대로)
 	inf.position = f._tile_center(14, 6)
+	inf.grace = 999.0
+	old.grace = 0.0
 	_teleport_to(old)
 	ok = await _wait_until(func(): return f._combat_ui != null, 2.0)
 	check(ok and f._combat_enemy == old, "예전 AI 적은 닿으면 바로 전투 (그대로)")

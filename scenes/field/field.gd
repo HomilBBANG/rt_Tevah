@@ -393,7 +393,7 @@ func _physics_process(delta: float) -> void:
 		_on_death(cause)
 		return
 	for e in enemies:
-		if e.bt == null and e.grace == 0.0 and e.global_position.distance_to(player.global_position) < player.radius + e.radius:   # BT 몬스터는 EnterTurnBattle Task 로
+		if e.grace == 0.0 and e.touch_battle() and e.global_position.distance_to(player.global_position) < player.radius + e.radius:
 			_start_combat(e)
 			return
 	# 맵 이동: 열린 문·통로 칸에 들어서거나, 가장자리(edges)가 있는 쪽 맨 끝 칸에 닿으면

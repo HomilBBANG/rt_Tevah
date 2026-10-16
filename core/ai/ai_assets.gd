@@ -1,7 +1,8 @@
 extends RefCounted
 ## 몬스터 AI 자산 읽기·검사·컴파일. 원본은 tools/ai/<id>.json 하나 = 자산 하나:
 ##   BB_*  Blackboard   {schema_version, asset_type:"blackboard", id, keys:[{name, type, default, instance_override?}]}
-##   BT_*  Behavior Tree {schema_version, asset_type:"behavior_tree", id, domain, blackboard_id, root_id, nodes:[…], editor_layout:{id:[x,y]}}
+##   BT_*  Behavior Tree {schema_version, asset_type:"behavior_tree", id, domain, blackboard_id, battle_on_contact, root_id, nodes:[…], editor_layout:{id:[x,y]}}
+##         battle_on_contact (테바 전용, 기본 true): 닿으면 바로 턴제 전투. false 면 EnterTurnBattle Task 로만.
 ##   BTT_* Task Graph   {schema_version, asset_type:"task_graph", id, nodes:[…], connections:[…]}  (Phase 4)
 ## 'Compile'(테바) = 코드 컴파일이 아니라 검사 + 게임이 읽는 data/ai.json 만들기.
 ## BT 노드: {id, kind: Root/Selector/Sequence/Task, name?, children:[id…] (순서 = 우선순위, 유일한 기준),

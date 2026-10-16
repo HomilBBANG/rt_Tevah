@@ -485,6 +485,7 @@ func new_bt(id: String, bb_id: String, template := "") -> bool:
 		a.id = id
 	else:
 		a = {"schema_version": Assets.SCHEMA, "asset_type": "behavior_tree", "id": id, "domain": "field", "blackboard_id": bb_id,
+			"battle_on_contact": true,
 			"root_id": "root", "nodes": [{"id": "root", "kind": "Root", "children": ["selector_1"]},
 				{"id": "selector_1", "kind": "Selector", "name": "AI Root", "children": []}], "editor_layout": {}}
 	assets[id] = a
@@ -853,6 +854,17 @@ func _build_details() -> void:
 			_changed())
 		var dom := str(cur_bt().get("domain", "field"))
 		_note("domain: %s (field = 탐험 필드. 전투 BT 는 다음 단계)" % dom)
+		var touch := CheckBox.new()
+		touch.text = "닿으면 바로 전투 (테바 전용)"
+		touch.tooltip_text = "켜면 이 BT 를 쓰는 몬스터에 플레이어가 닿는 순간 전투 (예전 AI 처럼).
+끄면 트리의 EnterTurnBattle Task 가 실행될 때만 전투.
+둘 다 있어도 전투는 한 번만 시작됩니다. (Unreal 에는 없는 테바 규칙)"
+		touch.button_pressed = bool(cur_bt().get("battle_on_contact", true))
+		touch.toggled.connect(func(v):
+			_touch()
+			cur_bt().battle_on_contact = v
+			_changed())
+		details.add_child(touch)
 	if kind == "Task":
 		var types := Tasks.TASKS.keys().map(func(k): return [k, k])
 		_option("Task 종류", types, str(n.task_type), func(v):

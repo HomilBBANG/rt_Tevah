@@ -67,6 +67,7 @@
    "id": "BT_Infected_Field",
    "domain": "field",
    "blackboard_id": "BB_Infected",
+   "battle_on_contact": true,
    "description": "감염자 필드 AI (기획 v2.0 §3.2 샘플): 접촉하면 전투 > 보이면 추격 > 놓치면 마지막 위치 수색 > 순찰",
    "root_id": "root",
    "nodes": [
