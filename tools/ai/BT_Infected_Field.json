@@ -1,0 +1,27 @@
+{
+ "schema_version": 2,
+ "asset_type": "behavior_tree",
+ "id": "BT_Infected_Field",
+ "domain": "field",
+ "blackboard_id": "BB_Infected",
+ "description": "감염자 필드 AI (기획 v2.0 §3.2 샘플): 접촉하면 전투 > 보이면 추격 > 놓치면 마지막 위치 수색 > 순찰",
+ "root_id": "root",
+ "nodes": [
+  {"id": "root", "kind": "Root", "children": ["ai_root"]},
+  {"id": "ai_root", "kind": "Selector", "name": "AI Root", "children": ["engage", "chase", "search", "patrol"],
+   "services": [{"type": "UpdatePerception", "interval": 0.2, "random_deviation": 0.0, "run_on_activation": true}]},
+  {"id": "engage", "kind": "Sequence", "name": "Engage", "children": ["battle"],
+   "decorators": [
+    {"type": "Blackboard", "name": "CanSeePlayer", "key": "HasLineOfSight", "operator": "is_set", "observer_aborts": "Both"},
+    {"type": "Blackboard", "name": "InEngageRange", "key": "DistanceToTarget", "operator": "<=", "value": 0.6, "observer_aborts": "Both"}]},
+  {"id": "battle", "kind": "Task", "task_type": "EnterTurnBattle", "params": {}},
+  {"id": "chase", "kind": "Sequence", "name": "Chase", "children": ["move_to_target"],
+   "decorators": [{"type": "Blackboard", "name": "CanSeePlayer", "key": "HasLineOfSight", "operator": "is_set", "observer_aborts": "Both"}]},
+  {"id": "move_to_target", "kind": "Task", "task_type": "MoveTo", "params": {"target_key": "TargetLocation", "run": true, "acceptance": 0.3}},
+  {"id": "search", "kind": "Sequence", "name": "Search", "children": ["search_last"],
+   "decorators": [{"type": "Blackboard", "name": "HasLastSeen", "key": "HasLastKnownLocation", "operator": "is_set", "observer_aborts": "Self"}]},
+  {"id": "search_last", "kind": "Task", "task_type": "SearchLastPosition", "params": {"destination_key": "LastKnownLocation", "seconds_key": "SearchDuration", "clear_key": "HasLastKnownLocation"}},
+  {"id": "patrol", "kind": "Task", "task_type": "Patrol", "name": "Patrol", "params": {}}
+ ],
+ "editor_layout": {}
+}

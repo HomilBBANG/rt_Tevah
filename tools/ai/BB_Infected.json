@@ -1,0 +1,18 @@
+{
+ "schema_version": 2,
+ "asset_type": "blackboard",
+ "id": "BB_Infected",
+ "description": "감염자 기본 Blackboard (기획 v2.0 §4.2 예시 키)",
+ "keys": [
+  {"name": "TargetActor", "type": "entity_ref", "default": null},
+  {"name": "HasLineOfSight", "type": "bool", "default": false},
+  {"name": "TargetLocation", "type": "vector2", "default": null},
+  {"name": "LastKnownLocation", "type": "vector2", "default": null},
+  {"name": "HasLastKnownLocation", "type": "bool", "default": false},
+  {"name": "HasHeardNoise", "type": "bool", "default": false},
+  {"name": "NoiseLocation", "type": "vector2", "default": null},
+  {"name": "DistanceToTarget", "type": "float", "default": 9999.0},
+  {"name": "VisionRange", "type": "float", "default": 5.0, "instance_override": true},
+  {"name": "SearchDuration", "type": "float", "default": 2.0, "instance_override": true}
+ ]
+}
