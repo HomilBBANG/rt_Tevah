@@ -12,6 +12,7 @@ const Blackboard = preload("res://core/ai/blackboard.gd")
 const Runner = preload("res://core/ai/bt_runner.gd")
 const Canvas = preload("res://addons/monster_ai/bt_canvas.gd")
 const GraphView = preload("res://addons/monster_ai/graph_view.gd")
+const DebugView = preload("res://addons/monster_ai/debug_view.gd")
 const Graph = preload("res://core/ai/task_graph.gd")
 
 const TAB_BT := 0
@@ -49,7 +50,7 @@ var find_edit: LineEdit
 var help_panel: PanelContainer
 var graph_view: Control
 var _back_to := ""              # Task Graph 를 연 BT (◀ 돌아가기)
-var dbg_note: Label
+var debug_view: Control
 var _problem_nodes: Array = []
 var _listing := false           # 목록을 다시 그리는 중 (고른 표시가 다시 열기를 부르지 않게)
 
@@ -158,10 +159,10 @@ func _build() -> void:
 	graph_view.name = "Task Graph"
 	graph_view.ed = self
 	tabs.add_child(graph_view)
-	dbg_note = Label.new()
-	dbg_note.name = "Debugger"
-	dbg_note.text = "Runtime Debugger — Phase 5 에서 만듭니다."
-	tabs.add_child(dbg_note)
+	debug_view = DebugView.new()
+	debug_view.name = "Debugger"
+	debug_view.ed = self
+	tabs.add_child(debug_view)
 	var ds := ScrollContainer.new()
 	ds.custom_minimum_size.x = 380
 	ds.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -299,6 +300,8 @@ func open_asset(id: String) -> void:
 			graph_view.set_graph(assets[id], _back_to)
 	_fill_palette()
 	_refresh_all()
+	if debug_view:
+		debug_view._highlight()   # 디버거: 이 BT 를 쓰는 몬스터를 고르고 있으면 카드에 실행 경로
 
 
 ## Task Graph 에서 ◀ 돌아가기 → 그 그래프를 연 BT, 그 Task 카드
@@ -424,6 +427,15 @@ func save() -> bool:
 	if Engine.is_editor_hint():
 		EditorInterface.get_resource_filesystem().scan()
 	return ok
+
+
+## 게임이 보낸 BT 몬스터 상태 (ai_debugger_plugin → 여기 → Debugger 탭)
+func on_snapshot(data: Dictionary) -> void:
+	debug_view.on_snapshot(data)
+
+
+func on_session_stopped() -> void:
+	debug_view.on_session_stopped()
 
 
 func has_unsaved() -> bool:

@@ -67,6 +67,9 @@ var _near_spot := {}
 var _collecting := false         # StoryRunner 메시지를 모으는 중 (조사·거점 행동)
 var _collected: PackedStringArray = []
 var _toast_t := 0.0
+var ai_debug := false            # F9: BT 몬스터 머리 위에 지금 Task 표시 (개발용)
+var _ai_send_t := 0.0            # 몬스터 AI 디버거로 상태 보내기 (Godot 에서 실행했을 때만)
+const AI_SEND_INTERVAL := 0.25
 var _death_revival := {}        # 사망 패널: 적용된 부활 규칙 (비면 처음부터)
 var _combat_enemy_name := ""     # 지금 싸우는 상대 이름 (사망 문구 {enemy})
 var _sleep_pick := {}            # 잠잘 시간 고르는 중: { action, hours }
@@ -433,6 +436,10 @@ func _try_event(t: Vector2i) -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F9 and OS.is_debug_build():
+		ai_debug = not ai_debug   # 개발용: BT 몬스터 머리 위에 지금 Task
+		_toast("AI 디버그 표시 " + ("켬 (F9)" if ai_debug else "끔"))
+		return
 	if not _sleep_pick.is_empty():
 		_sleep_picker_input(event)
 		return
@@ -1005,9 +1012,26 @@ func _update_held_light() -> void:
 	held_light.rotation = player.facing.angle()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if held_light and is_instance_valid(held_light) and player:
 		held_light.rotation = player.facing.angle()   # 바라보는 쪽을 비춤
+	# 몬스터 AI 디버거: Godot 에디터에서 실행(F5·맵 테스트 플레이)했으면 BT 몬스터 상태를 '몬스터 AI' 탭으로
+	if EngineDebugger.is_active():
+		_ai_send_t -= delta
+		if _ai_send_t <= 0.0:
+			_ai_send_t = AI_SEND_INTERVAL
+			EngineDebugger.send_message("monster_ai:snapshot", [ai_snapshot()])
+
+
+## 이 맵의 BT 몬스터 상태 (디버거용) {map, frozen, monsters: [{id, name, ref, tile, grace, snap}]}
+func ai_snapshot() -> Dictionary:
+	var list := []
+	for e in enemies:
+		if is_instance_valid(e) and e.bt:
+			var t: Vector2 = e.ai_tile()
+			list.append({"id": str(e.data.object_id), "name": str(e.data.get("name", "")), "ref": str(e.data.get("ref", "")),
+				"tile": [snappedf(t.x, 0.1), snappedf(t.y, 0.1)], "grace": snappedf(e.grace, 0.1), "snap": e.bt.debug_snapshot()})
+	return {"map": str(map.get("map_id", "")), "frozen": frozen, "monsters": list}
 
 
 func _camera() -> Camera2D:

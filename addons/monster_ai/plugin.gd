@@ -3,8 +3,10 @@ extends EditorPlugin
 ## Godot 에디터 위쪽에 '몬스터 AI' 탭을 추가한다 (맵·대화 옆). 저장 안 한 자산이 있으면 닫을 때 Godot 가 묻는다.
 
 const EditorPanel = preload("res://addons/monster_ai/ai_editor.gd")
+const DebuggerPlugin = preload("res://addons/monster_ai/ai_debugger_plugin.gd")
 
 var panel: Control
+var debugger: EditorDebuggerPlugin
 
 
 func _enter_tree() -> void:
@@ -12,9 +14,15 @@ func _enter_tree() -> void:
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	EditorInterface.get_editor_main_screen().add_child(panel)
 	_make_visible(false)
+	debugger = DebuggerPlugin.new()   # 게임 실행 중 BT 몬스터 상태 받기 (Runtime Debugger)
+	debugger.panel = panel
+	add_debugger_plugin(debugger)
 
 
 func _exit_tree() -> void:
+	if debugger:
+		remove_debugger_plugin(debugger)
+		debugger = null
 	if panel:
 		panel.queue_free()
 

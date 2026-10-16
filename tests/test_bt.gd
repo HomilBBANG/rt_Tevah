@@ -146,6 +146,14 @@ func _ready() -> void:
 	_ticks(inf, 60, 0.1)
 	check(not inf.bb.get_value("HasLastKnownLocation") and inf.task_node == "patrol", "수색을 마치면 키를 지우고 Patrol 로 복귀 (%s)" % inf.task_node)
 
+	# ---------- 디버거 스냅숏 (게임 → 에디터로 보내는 것)
+	var snap := inf.debug_snapshot(200)
+	check(snap.bt == "BT_Infected_Field" and snap.active.back() == snap.task and snap.task == "patrol"
+		and snap.keys.any(func(k): return k[0] == "HasLastKnownLocation" and k[2] == "Task")
+		and not snap.log.is_empty() and snap.results.get("search_last") == "SUCCESS",
+		"디버그 스냅숏: 실행 경로·Task·Blackboard 값과 출처·Observer Aborts 기록·결과 (%s %s %s %s)" % [snap.active, snap.task, snap.results, snap.keys.filter(func(k): return k[0] == "HasLastKnownLocation")])
+	check(JSON.parse_string(JSON.stringify(snap)) is Dictionary, "스냅숏은 글자·수만 (다른 프로세스로 보낼 수 있음)")
+
 	# ---------- Service: 활성 분기에서만, 주기대로
 	var st := _bt([
 		{"id": "root", "kind": "Root", "children": ["sel"]},

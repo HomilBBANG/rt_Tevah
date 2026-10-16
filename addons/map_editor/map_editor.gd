@@ -635,6 +635,8 @@ func _edit_object(o: Dictionary) -> void:
 			_option("닿으면 바로 전투", [["", base], ["on", "켬 — 닿는 순간 전투"], ["off", "끔 — 닿아도 전투 안 함"]], o.get("touch_battle", ""), func(v):
 				set_field(o, "touch_battle", v))
 			_hint("끄면 BT 의 '전투 시작'(EnterTurnBattle) Task 로만 싸웁니다." if str(o.get("bt", "")) != "" 				else "예전 AI 는 '끔' 이면 싸우지 않습니다 (따라오기만).")
+			if str(o.get("bt", "")) != "":
+				_bb_overrides(o, ai)
 		"light":
 			_section("광원")
 			var pres: Array = VisualData.presets()
@@ -840,6 +842,67 @@ func _arrive_options(map_id: String) -> Array:
 		if o.get("type", "") == "arrive":
 			out.append([o.object_id, "P: %s  (%s)" % [o.get("name", "") if o.get("name", "") != "" else o.object_id, o.object_id]])
 	return out
+
+
+## 몬스터별 Blackboard 시작값 (BB 키 중 '개체별 override' 를 켠 것만 — 몬스터 AI 탭 Blackboard 표에서 켬)
+func _bb_overrides(o: Dictionary, ai: Dictionary) -> void:
+	var bb: Dictionary = ai.get(str(ai.get(str(o.bt), {}).get("blackboard_id", "")), {})
+	var keys: Array = bb.get("keys", []).filter(func(k): return k.get("instance_override", false))
+	_section("개체별 Blackboard 시작값")
+	if keys.is_empty():
+		_hint("%s 에 개체별 override 를 켠 키가 없습니다 (몬스터 AI 탭 → Blackboard 표)" % bb.get("id", "Blackboard"))
+		return
+	var over: Dictionary = o.get("bb_overrides", {}) if o.get("bb_overrides") is Dictionary else {}
+	for k in keys:
+		var name := str(k.name)
+		var row := HBoxContainer.new()
+		var on := CheckBox.new()
+		on.text = name
+		on.button_pressed = over.has(name)
+		on.tooltip_text = "켜면 이 몬스터만 시작값을 바꿈 (기본값 %s)" % [k.get("default")]
+		row.add_child(on)
+		var val: Control
+		var cur: Variant = over.get(name, k.get("default"))
+		match str(k.type):
+			"bool":
+				val = CheckBox.new()
+				val.button_pressed = bool(cur)
+				val.toggled.connect(func(v): _set_override(o, name, v))
+			"int", "float":
+				val = SpinBox.new()
+				val.step = 1.0 if k.type == "int" else 0.1
+				val.min_value = -9999
+				val.max_value = 9999
+				val.value = float(cur) if cur != null else 0.0
+				val.value_changed.connect(func(v): _set_override(o, name, int(v) if k.type == "int" else v))
+			_:
+				val = LineEdit.new()
+				val.text = "" if cur == null else str(cur)
+				val.text_submitted.connect(func(v): _set_override(o, name, v))
+		val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		val.editable = on.button_pressed if val is LineEdit else true
+		row.add_child(val)
+		on.toggled.connect(func(v):
+			if v:
+				_set_override(o, name, val.value if val is SpinBox else (val.button_pressed if val is CheckBox else val.text))
+			else:
+				_set_override(o, name, null))
+		inspector.add_child(row)
+
+
+## v = null 이면 덮어쓰기를 끔
+func _set_override(o: Dictionary, key: String, v: Variant) -> void:
+	checkpoint("%s/bb/%s" % [o.get("object_id", ""), key])
+	var over: Dictionary = (o.get("bb_overrides", {}) if o.get("bb_overrides") is Dictionary else {}).duplicate()
+	if v == null:
+		over.erase(key)
+	else:
+		over[key] = v
+	if over.is_empty():
+		o.erase("bb_overrides")
+	else:
+		o.bb_overrides = over
+	dirty = true
 
 
 func set_field(o: Dictionary, key: String, v: Variant) -> void:

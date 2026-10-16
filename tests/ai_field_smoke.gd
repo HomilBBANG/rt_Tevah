@@ -29,6 +29,16 @@ func _ready() -> void:
 	await _wait(1.0)
 	check(inf.bt.task_node == "patrol" and inf.position.y > y0 + f.tile * 0.5, "멀면 순찰 (아래로 %.1f 칸)" % ((inf.position.y - y0) / f.tile))
 	await _snap("patrol")
+	var snap: Dictionary = f.ai_snapshot()
+	check(snap.map == "test_ai" and snap.monsters.size() == 1 and snap.monsters[0].id == "ai_infected" and snap.monsters[0].snap.task == "patrol",
+		"디버거로 보낼 상태: BT 몬스터만 (예전 AI 적은 빠짐)")
+	var ev := InputEventKey.new()
+	ev.keycode = KEY_F9
+	ev.pressed = true
+	Input.parse_input_event(ev)
+	await _wait(0.1)
+	check(f.ai_debug, "F9 → 몬스터 머리 위에 지금 Task 표시")
+	await _snap("f9_debug")
 
 	# 발견 → 추격
 	var et: Vector2 = inf.ai_tile()

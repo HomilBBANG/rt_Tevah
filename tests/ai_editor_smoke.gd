@@ -184,6 +184,42 @@ func _ready() -> void:
 	check(ed.current == "BT_03_Stalker" and ed.selected == "search_last" and ed.tabs.current_tab == 0, "◀ 돌아가기 → 그 Task 카드")
 	check(ed.new_graph("BTT_New", "BB_Infected") and ed.problems.get_item_text(0).begins_with("✓"), "새 Task Graph: 바로 검사 통과")
 
+	# ---- Runtime Debugger: 게임이 보내는 상태(진짜 BT 실행기에서 만든 것)를 받으면
+	var all := preload("res://core/ai/ai_assets.gd").load_dir()
+	var ag = preload("res://tests/test_bt.gd").FakeAgent.new()
+	ag.points = [Vector2(0, 0), Vector2(-3, 0)]   # 플레이어 반대쪽으로 순찰 → 보이면 추격 (아직 전투 거리 아님)
+	var rr = preload("res://core/ai/bt_runner.gd").new()
+	rr.setup(all.BT_Infected_Field, all.BB_Infected, ag)
+	for i in 3:
+		rr.tick(0.1)
+	ag.player = Vector2(3, 0)
+	for i in 3:
+		rr.tick(0.1)
+	var msg := {"map": "test_ai", "frozen": false, "monsters": [{"id": "ai_infected", "name": "감염자", "ref": "enemy_test", "tile": [1, 0], "grace": 0.0, "snap": rr.debug_snapshot()}]}
+	ed.open_asset("BT_Infected_Field")
+	ed.on_snapshot(JSON.parse_string(JSON.stringify(msg)))   # 다른 프로세스에서 오는 것처럼
+	var dv: Control = ed.debug_view
+	await _frames(2)
+	check(dv.list.item_count == 1 and dv.selected_id == "ai_infected" and "실행 중" in dv.status.text, "Debugger: 몬스터 목록 (%d)" % dv.list.item_count)
+	check(ed.canvas.debug.get("active", []).has("move_to_target") and ed.canvas.debug.results.get("patrol") == "ABORTED", "BT 그래프 카드에 실행 경로·결과 (추격 중, 순찰은 ABORTED)")
+	var key_rows: Array = dv.keys.get_root().get_children().map(func(it): return [it.get_text(0), it.get_text(2)])
+	check(key_rows.any(func(k): return k[0].begins_with("HasLineOfSight") and k[1] == "Service"), "Blackboard 값과 마지막으로 바꾼 곳 (Service)")
+	var log_texts: Array = range(dv.logs.item_count).map(func(i): return dv.logs.get_item_text(i))
+	check(log_texts.any(func(t): return "observer_abort" in t and "Lower Priority" in t), "기록에 Observer Aborts 중단과 이유")
+	check(range(dv.decos.item_count).any(func(i): return "CanSeePlayer" in dv.decos.get_item_text(i)), "Decorator 마지막 판정")
+	ed.tabs.current_tab = 3
+	await _frames(2)
+	await _snap("debugger")
+	var ai := log_texts.find(log_texts.filter(func(t): return "observer_abort" in t)[0])
+	dv.logs.item_clicked.emit(ai, Vector2.ZERO, MOUSE_BUTTON_LEFT)
+	await _frames(2)
+	check(ed.tabs.current_tab == 0 and ed.selected == "chase", "기록을 누르면 BT 탭의 그 노드로 (%s)" % ed.selected)
+	await _snap("bt_debug_highlight")
+	dv.follow.button_pressed = false
+	check(ed.canvas.debug.is_empty(), "'BT 그래프에 표시' 끄면 표시 없음")
+	ed.on_session_stopped()
+	check("게임이 끝남" in dv.status.text, "게임이 끝나면 알림")
+
 	# ---- 새 자산
 	check(not ed.new_bt("Bad", "BB_Infected"), "BT_ 로 시작하지 않으면 거절")
 	check(ed.new_bt("BT_Test", "BB_Infected") and ed.current == "BT_Test" and ed.node("selector_1").kind == "Selector", "새 BT: Root + Selector")

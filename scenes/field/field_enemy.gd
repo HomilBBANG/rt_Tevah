@@ -197,6 +197,11 @@ func _draw() -> void:
 	var col := Color("b84a4a") if grace == 0.0 else Color("6a5050")
 	draw_circle(Vector2.ZERO, radius, col)
 	draw_circle(Vector2.ZERO, radius, Color("2a1010"), false, 3.0, true)
+	if bt and field.ai_debug:   # F9: 지금 Task·Blackboard 요약 (개발용)
+		var f2 := ThemeDB.fallback_font
+		var t := "%s %s" % [bt.task_node if bt.task_node != "" else "-", bt.last_result.get(bt.task_node, "")]
+		draw_string_outline(f2, Vector2(-radius * 2, radius + 26), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 6, Color.BLACK)
+		draw_string(f2, Vector2(-radius * 2, radius + 26), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("ffd27a"))
 	if state == "chase":
 		var f := ThemeDB.fallback_font
 		draw_string_outline(f, Vector2(-8, -radius - 10), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, 40, 8, Color.BLACK)

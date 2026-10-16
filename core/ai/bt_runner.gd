@@ -444,6 +444,19 @@ func _log(ev: String, node: String, result: String, reason: String) -> void:
 	debug_event.emit(e)
 
 
+## 디버거로 보낼 지금 상태 (값은 글자로 — 게임과 에디터가 다른 프로세스라 그대로 보낼 수 있게)
+## {bt, bb, active:[id], task, results:{id: 결과}, decorators:{"id/번호": bool}, keys:[[키, 값, 출처, 타입]], log:[최근 기록], error, graph_trace}
+func debug_snapshot(log_count := 40) -> Dictionary:
+	var keys := []
+	for k in bb.defs:
+		keys.append([k, Blackboard.show(bb.get_value(k)), str(bb.last_source.get(k, "")), str(bb.defs[k].type)])
+	var trace: Array = task.trace.slice(-20) if task != null and "trace" in task else []
+	return {"bt": str(asset.get("id", "")), "bb": bb.asset_id, "active": active_path(), "task": task_node,
+		"results": last_result.duplicate(), "decorators": last_decorator.duplicate(), "keys": keys,
+		"log": log.slice(-log_count), "error": error, "time": snappedf(time, 0.01), "graph_trace": trace,
+		"graph": str(task.p.get("graph_id", "")) if task != null and "trace" in task else ""}
+
+
 func node_name(id: String) -> String:
 	var n: Dictionary = nodes.get(id, {})
 	var nm := str(n.get("name", ""))
