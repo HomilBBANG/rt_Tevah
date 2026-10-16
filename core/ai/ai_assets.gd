@@ -190,6 +190,16 @@ static func _check_task(n: Dictionary, keys: Dictionary, all: Dictionary, errs: 
 			var g: Dictionary = all.get(str(v), {})
 			if g.is_empty() or kind_of(g) != "task_graph":
 				errs.append({"node": id, "msg": "없는 Task Graph '%s'" % v})
+			elif keys.size() > 0 and not _same_bb(g, keys, all):
+				errs.append({"node": id, "msg": "Task Graph '%s' 의 Blackboard(%s)가 이 트리의 것과 다름" % [v, g.get("blackboard_id", "")]})
+
+
+## 그래프가 쓰는 Blackboard 의 키가 이 트리의 Blackboard 에 같은 타입으로 다 있나
+static func _same_bb(g: Dictionary, keys: Dictionary, all: Dictionary) -> bool:
+	for k in all.get(str(g.get("blackboard_id", "")), {}).get("keys", []):
+		if keys.get(str(k.name), "") != str(k.type):
+			return false
+	return true
 
 
 ## 모든 자산 검사 → {자산 id: [오류]} (오류 없는 자산은 빠짐)

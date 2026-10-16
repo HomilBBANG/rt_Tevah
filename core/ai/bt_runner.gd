@@ -38,6 +38,7 @@ var task: Object = null    # RUNNING 중인 Task
 var task_node := ""
 var services: Array = []   # 실행 중인 Service [{node, def, left}]
 var memory := {}           # Task 가 개체별로 기억할 것 (순찰 지점 번호, 전투 요청 중 …)
+var assets := {}           # Task Graph(BTT_) 를 찾을 자산 묶음 (비면 DataLoader.ai_assets)
 var last_result := {}      # node id -> "SUCCESS"/"FAILURE"/"RUNNING"/"ABORTED" (디버거)
 var last_decorator := {}   # "node id/번호" -> bool (디버거)
 var last_exit_time := {}   # node id -> 끝난 시각 (Cooldown)

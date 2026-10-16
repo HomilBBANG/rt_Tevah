@@ -1,0 +1,238 @@
+{
+ "schema_version": 2,
+ "asset_type": "task_graph",
+ "id": "BTT_SearchLastPosition",
+ "blackboard_id": "BB_Infected",
+ "description": "마지막 목격 위치로 가서 둘러본 뒤 그 기억을 지움 (기획 v2.0 §5.3 샘플 — 이동 실패·Abort 포함)",
+ "variables": [],
+ "nodes": [
+  {
+   "id": "evt_execute",
+   "type": "ReceiveExecuteAI",
+   "pos": [
+    0,
+    0
+   ]
+  },
+  {
+   "id": "get_has",
+   "type": "GetBlackboard",
+   "pos": [
+    180,
+    140
+   ],
+   "params": {
+    "key": "HasLastKnownLocation"
+   }
+  },
+  {
+   "id": "branch",
+   "type": "Branch",
+   "pos": [
+    420,
+    0
+   ]
+  },
+  {
+   "id": "get_loc",
+   "type": "GetBlackboard",
+   "pos": [
+    600,
+    140
+   ],
+   "params": {
+    "key": "LastKnownLocation"
+   }
+  },
+  {
+   "id": "move",
+   "type": "MoveToLocation",
+   "pos": [
+    840,
+    0
+   ],
+   "params": {
+    "run": false,
+    "acceptance": 0.4
+   }
+  },
+  {
+   "id": "get_dur",
+   "type": "GetBlackboard",
+   "pos": [
+    1020,
+    140
+   ],
+   "params": {
+    "key": "SearchDuration"
+   }
+  },
+  {
+   "id": "look",
+   "type": "Wait",
+   "pos": [
+    1260,
+    0
+   ]
+  },
+  {
+   "id": "clear_ok",
+   "type": "ClearBlackboard",
+   "pos": [
+    1680,
+    0
+   ],
+   "params": {
+    "key": "HasLastKnownLocation"
+   }
+  },
+  {
+   "id": "finish_ok",
+   "type": "FinishExecute",
+   "pos": [
+    2100,
+    0
+   ],
+   "params": {
+    "success": true
+   }
+  },
+  {
+   "id": "clear_fail",
+   "type": "ClearBlackboard",
+   "pos": [
+    1260,
+    250
+   ],
+   "params": {
+    "key": "HasLastKnownLocation"
+   }
+  },
+  {
+   "id": "finish_fail",
+   "type": "FinishExecute",
+   "pos": [
+    1680,
+    250
+   ],
+   "params": {
+    "success": false
+   }
+  },
+  {
+   "id": "finish_none",
+   "type": "FinishExecute",
+   "pos": [
+    840,
+    250
+   ],
+   "params": {
+    "success": false
+   }
+  },
+  {
+   "id": "evt_abort",
+   "type": "ReceiveAbortAI",
+   "pos": [
+    0,
+    520
+   ]
+  },
+  {
+   "id": "stop",
+   "type": "StopMovement",
+   "pos": [
+    420,
+    520
+   ]
+  },
+  {
+   "id": "finish_abort",
+   "type": "FinishAbort",
+   "pos": [
+    840,
+    520
+   ]
+  }
+ ],
+ "connections": [
+  {
+   "from_node": "evt_execute",
+   "from_pin": "exec_out",
+   "to_node": "branch",
+   "to_pin": "exec_in"
+  },
+  {
+   "from_node": "get_has",
+   "from_pin": "value",
+   "to_node": "branch",
+   "to_pin": "condition"
+  },
+  {
+   "from_node": "branch",
+   "from_pin": "true",
+   "to_node": "move",
+   "to_pin": "exec_in"
+  },
+  {
+   "from_node": "branch",
+   "from_pin": "false",
+   "to_node": "finish_none",
+   "to_pin": "exec_in"
+  },
+  {
+   "from_node": "get_loc",
+   "from_pin": "value",
+   "to_node": "move",
+   "to_pin": "destination"
+  },
+  {
+   "from_node": "move",
+   "from_pin": "on_success",
+   "to_node": "look",
+   "to_pin": "exec_in"
+  },
+  {
+   "from_node": "get_dur",
+   "from_pin": "value",
+   "to_node": "look",
+   "to_pin": "seconds"
+  },
+  {
+   "from_node": "look",
+   "from_pin": "completed",
+   "to_node": "clear_ok",
+   "to_pin": "exec_in"
+  },
+  {
+   "from_node": "clear_ok",
+   "from_pin": "exec_out",
+   "to_node": "finish_ok",
+   "to_pin": "exec_in"
+  },
+  {
+   "from_node": "move",
+   "from_pin": "on_fail",
+   "to_node": "clear_fail",
+   "to_pin": "exec_in"
+  },
+  {
+   "from_node": "clear_fail",
+   "from_pin": "exec_out",
+   "to_node": "finish_fail",
+   "to_pin": "exec_in"
+  },
+  {
+   "from_node": "evt_abort",
+   "from_pin": "exec_out",
+   "to_node": "stop",
+   "to_pin": "exec_in"
+  },
+  {
+   "from_node": "stop",
+   "from_pin": "exec_out",
+   "to_node": "finish_abort",
+   "to_pin": "exec_in"
+  }
+ ]
+}

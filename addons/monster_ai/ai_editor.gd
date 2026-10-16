@@ -11,9 +11,12 @@ const Tasks = preload("res://core/ai/bt_tasks.gd")
 const Blackboard = preload("res://core/ai/blackboard.gd")
 const Runner = preload("res://core/ai/bt_runner.gd")
 const Canvas = preload("res://addons/monster_ai/bt_canvas.gd")
+const GraphView = preload("res://addons/monster_ai/graph_view.gd")
+const Graph = preload("res://core/ai/task_graph.gd")
 
 const TAB_BT := 0
 const TAB_BB := 1
+const TAB_GRAPH := 2
 const PREFIX := {"behavior_tree": "BT_", "blackboard": "BB_", "task_graph": "BTT_"}
 const KIND_HELP := {
 	"Root": ["Root (Behavior Tree 의 시작)", "트리의 시작. 여기서 이 트리가 쓸 Blackboard 자산을 고른다. 자식은 Selector 나 Sequence 하나."],
@@ -44,7 +47,8 @@ var problems: ItemList
 var status: Label
 var find_edit: LineEdit
 var help_panel: PanelContainer
-var tg_note: Label
+var graph_view: Control
+var _back_to := ""              # Task Graph 를 연 BT (◀ 돌아가기)
 var dbg_note: Label
 var _problem_nodes: Array = []
 var _listing := false           # 목록을 다시 그리는 중 (고른 표시가 다시 열기를 부르지 않게)
@@ -72,11 +76,16 @@ func _build() -> void:
 	bar.add_child(lbl)
 	_btn(bar, "＋ Behavior Tree", "새 BT_ 자산", _ask_new.bind("behavior_tree"))
 	_btn(bar, "＋ Blackboard", "새 BB_ 자산", _ask_new.bind("blackboard"))
+	_btn(bar, "＋ Task Graph", "새 BTT_ 자산 (Blueprint 스타일로 Task 속을 짜기)", _ask_new.bind("task_graph"))
 	var tpl := MenuButton.new()
 	tpl.text = "템플릿 ▾"
-	tpl.tooltip_text = "예제 트리를 새 이름으로 복사"
-	tpl.get_popup().add_item("감염자 기본 (BT_Infected_Field 복사)", 0)
-	tpl.get_popup().id_pressed.connect(func(_i): _ask_new("behavior_tree", "BT_Infected_Field"))
+	tpl.tooltip_text = "예제를 새 이름으로 복사"
+	var tpls := [["behavior_tree", "BT_Infected_Field", "BT: 감염자 기본 (순찰·추격·수색·전투)"],
+		["behavior_tree", "BT_03_Stalker", "BT: 실습 3 — 수색을 Task Graph 로"],
+		["task_graph", "BTT_SearchLastPosition", "Task Graph: 마지막 위치 수색 (이동 실패·Abort 포함)"]]
+	for i in tpls.size():
+		tpl.get_popup().add_item(tpls[i][2], i)
+	tpl.get_popup().id_pressed.connect(func(i): _ask_new(tpls[i][0], tpls[i][1]))
 	bar.add_child(tpl)
 	bar.add_child(VSeparator.new())
 	_btn(bar, "저장", "바뀐 자산을 tools/ai 에 저장 (Ctrl+S)", save)
@@ -114,6 +123,7 @@ func _build() -> void:
 	asset_tree.item_selected.connect(func():
 		var it := asset_tree.get_selected()
 		if it and it.get_metadata(0) and not _listing and it.get_metadata(0) != current:
+			_back_to = ""
 			open_asset(it.get_metadata(0)))
 	left.add_child(asset_tree)
 	palette = Tree.new()
@@ -144,10 +154,10 @@ func _build() -> void:
 	bb_box.size_flags_horizontal = SIZE_EXPAND_FILL
 	bbs.add_child(bb_box)
 	tabs.add_child(bbs)
-	tg_note = Label.new()
-	tg_note.name = "Task Graph"
-	tg_note.text = "Task Graph (Blueprint 스타일) — Phase 4 에서 만듭니다."
-	tabs.add_child(tg_note)
+	graph_view = GraphView.new()
+	graph_view.name = "Task Graph"
+	graph_view.ed = self
+	tabs.add_child(graph_view)
 	dbg_note = Label.new()
 	dbg_note.name = "Debugger"
 	dbg_note.text = "Runtime Debugger — Phase 5 에서 만듭니다."
@@ -182,6 +192,18 @@ func _btn(parent: Control, text: String, tip: String, cb: Callable) -> Button:
 func _fill_palette() -> void:
 	palette.clear()
 	var r := palette.create_item()
+	if Assets.kind_of(cur()) == "task_graph":
+		for cat in Graph.CATS:
+			var gi := palette.create_item(r)
+			gi.set_text(0, cat)
+			gi.set_selectable(0, false)
+			for k in Graph.NODES:
+				if Graph.NODES[k].cat == cat:
+					var it := palette.create_item(gi)
+					it.set_text(0, Graph.NODES[k].title)
+					it.set_metadata(0, "gnode:" + k)
+					it.set_tooltip_text(0, "UE 대응: %s\n%s" % [Graph.NODES[k].ue, Graph.NODES[k].desc])
+		return
 	var groups := [["Composites", [["composite:Selector", "Selector  ? (OR)"], ["composite:Sequence", "Sequence  → (AND)"]]],
 		["Tasks", Tasks.TASKS.keys().map(func(k): return ["task:" + k, k])],
 		["Decorators", Assets.DECORATORS.keys().map(func(k): return ["decorator:" + k, "◇ " + k])],
@@ -270,7 +292,26 @@ func open_asset(id: String) -> void:
 		"blackboard":
 			selected = ""
 			tabs.current_tab = TAB_BB
+		"task_graph":
+			selected = ""
+			tabs.current_tab = TAB_GRAPH
+			graph_view.selected = ""
+			graph_view.set_graph(assets[id], _back_to)
+	_fill_palette()
 	_refresh_all()
+
+
+## Task Graph 에서 ◀ 돌아가기 → 그 그래프를 연 BT, 그 Task 카드
+func go_back() -> void:
+	var to := _back_to
+	var task := ""
+	for n in assets.get(to, {}).get("nodes", []):
+		if str(n.get("params", {}).get("graph_id", "")) == current:
+			task = str(n.id)
+	_back_to = ""
+	open_asset(to)
+	if task != "":
+		_select(task, true)
 
 
 func cur() -> Dictionary:
@@ -361,6 +402,8 @@ func _after_history() -> void:
 		if node(selected).is_empty():
 			selected = str(assets[current].get("root_id", ""))
 		canvas.selected = selected
+	elif Assets.kind_of(assets[current]) == "task_graph":
+		graph_view.set_graph(assets[current], _back_to)
 	_refresh_all()
 
 
@@ -427,7 +470,9 @@ func _goto_problem(i: int) -> void:
 		return
 	if _problem_nodes[i][0] != current:
 		open_asset(_problem_nodes[i][0])
-	if not node(_problem_nodes[i][1]).is_empty():
+	if Assets.kind_of(cur()) == "task_graph":
+		graph_view.focus_node(_problem_nodes[i][1])
+	elif not node(_problem_nodes[i][1]).is_empty():
 		_select(_problem_nodes[i][1], true)
 
 
@@ -438,13 +483,13 @@ func _status(t: String) -> void:
 # ---------------------------------------------------------------- 새 자산
 func _ask_new(kind: String, template := "") -> void:
 	var dlg := ConfirmationDialog.new()
-	dlg.title = "새 " + {"behavior_tree": "Behavior Tree", "blackboard": "Blackboard"}[kind]
+	dlg.title = "새 " + {"behavior_tree": "Behavior Tree", "blackboard": "Blackboard", "task_graph": "Task Graph"}[kind]
 	var box := VBoxContainer.new()
 	var le := LineEdit.new()
 	le.text = PREFIX[kind]
 	box.add_child(le)
 	var bbo := OptionButton.new()
-	if kind == "behavior_tree" and template == "":
+	if kind in ["behavior_tree", "task_graph"] and template == "":
 		var l := Label.new()
 		l.text = "Blackboard 자산"
 		box.add_child(l)
@@ -456,6 +501,8 @@ func _ask_new(kind: String, template := "") -> void:
 		var id := le.text.strip_edges()
 		if kind == "behavior_tree":
 			new_bt(id, bbo.get_item_text(bbo.selected) if bbo.item_count > 0 else "", template)
+		elif kind == "task_graph":
+			new_graph(id, bbo.get_item_text(bbo.selected) if bbo.item_count > 0 else "", template)
 		else:
 			new_bb(id)
 		dlg.queue_free())
@@ -495,6 +542,32 @@ func new_bt(id: String, bb_id: String, template := "") -> bool:
 	return true
 
 
+## 새 Task Graph: Receive Execute AI → Finish Execute(성공) 로 바로 검사를 통과하는 모양에서 시작
+func new_graph(id: String, bb_id: String, template := "") -> bool:
+	if not _id_ok(id, "task_graph"):
+		return false
+	var a: Dictionary
+	if template != "" and assets.has(template):
+		a = assets[template].duplicate(true)
+		a.id = id
+	else:
+		a = {"schema_version": Assets.SCHEMA, "asset_type": "task_graph", "id": id, "blackboard_id": bb_id, "variables": [],
+			"nodes": [{"id": "evt_execute", "type": "ReceiveExecuteAI", "pos": [0, 0]},
+				{"id": "finish", "type": "FinishExecute", "params": {"success": true}, "pos": [320, 0]},
+				{"id": "evt_abort", "type": "ReceiveAbortAI", "pos": [0, 200]},
+				{"id": "stop", "type": "StopMovement", "pos": [320, 200]},
+				{"id": "finish_abort", "type": "FinishAbort", "pos": [600, 200]}],
+			"connections": [{"from_node": "evt_execute", "from_pin": "exec_out", "to_node": "finish", "to_pin": "exec_in"},
+				{"from_node": "evt_abort", "from_pin": "exec_out", "to_node": "stop", "to_pin": "exec_in"},
+				{"from_node": "stop", "from_pin": "exec_out", "to_node": "finish_abort", "to_pin": "exec_in"}]}
+	assets[id] = a
+	dirty[id] = true
+	_back_to = ""
+	open_asset(id)
+	_status("새 Task Graph: %s — BT 의 Task 종류 'TaskGraph' 로 쓰세요" % id)
+	return true
+
+
 func new_bb(id: String) -> bool:
 	if not _id_ok(id, "blackboard"):
 		return false
@@ -522,6 +595,7 @@ func _activate(id: String) -> void:
 	if str(n.get("task_type", "")) == "TaskGraph":
 		var g := str(n.get("params", {}).get("graph_id", ""))
 		if assets.has(g):
+			_back_to = current
 			open_asset(g)
 			return
 	_select(id, true)
@@ -539,13 +613,14 @@ func _new_id(base: String) -> String:
 
 ## 고른 노드(또는 그 부모)에 팔레트 항목 넣기
 func add_from_palette(key: String, target := "") -> String:
-	if cur_bt().is_empty():
+	if cur_bt().is_empty() and not key.begins_with("gnode:"):
 		_status("Behavior Tree 를 먼저 여세요")
 		return ""
 	if target == "":
 		target = selected
 	var p := key.split(":")
 	match p[0]:
+		"gnode": return graph_view.add_node(p[1], graph_view._view_center())
 		"composite": return add_node(target, p[1], "")
 		"task": return add_node(target, "Task", p[1])
 		"decorator": return target if add_decorator(target, p[1]) else ""
@@ -817,6 +892,9 @@ func _build_details() -> void:
 		c.queue_free()
 	var a := cur()
 	if a.is_empty():
+		return
+	if Assets.kind_of(a) == "task_graph":
+		graph_view.build_details(details)
 		return
 	if Assets.kind_of(a) == "blackboard":
 		_head("Blackboard: " + current, "UE 대응: Blackboard Asset — 몬스터가 '지금 무엇을 알고 있는가'. 값은 몬스터마다 따로.")
@@ -1271,6 +1349,12 @@ func key_refs(bb_id: String, key: String) -> Array:
 				for spec in Tasks.TASKS.get(str(n.get("task_type", "")), {}).get("params", []):
 					if str(spec[1]).begins_with("key") and str(n.get("params", {}).get(spec[0], spec[2])) == key:   # 비어 있으면 기본값을 씀
 						out.append("%s / %s (Task %s)" % [id, n.id, spec[0]])
+	for id in _ids_of("task_graph"):
+		if str(assets[id].get("blackboard_id", "")) != bb_id:
+			continue
+		for n in assets[id].get("nodes", []):
+			if str(n.get("params", {}).get("key", "")) == key:
+				out.append("%s / %s (%s)" % [id, n.id, n.type])
 	return out
 
 
@@ -1333,6 +1417,17 @@ func _do_rename(bb_id: String, old: String, new_name: String) -> void:
 							n.params = {}
 						n.params[spec[0]] = new_name
 						hit = true
+		if hit:
+			dirty[id] = true
+			touched.append(id)
+	for id in _ids_of("task_graph"):
+		if str(assets[id].get("blackboard_id", "")) != bb_id:
+			continue
+		var hit := false
+		for n in assets[id].get("nodes", []):
+			if str(n.get("params", {}).get("key", "")) == old:
+				n.params.key = new_name
+				hit = true
 		if hit:
 			dirty[id] = true
 			touched.append(id)

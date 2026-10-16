@@ -32,6 +32,8 @@ func _ready() -> void:
 	add_child(bg)
 	add_child(ed)
 	await _frames(3)
+	ed.open_asset("BT_Infected_Field")
+	await _frames(2)
 
 	# ---- 열기·배치
 	check(ed.current == "BT_Infected_Field" and ed.canvas.rects.size() == 9, "BT 열기: 노드 9개 그림 (%s, %d)" % [ed.current, ed.canvas.rects.size()])
@@ -102,8 +104,9 @@ func _ready() -> void:
 	ed.tabs.current_tab = 1
 	await _frames(2)
 	await _snap("blackboard_tab")
-	check(ed.key_refs("BB_Infected", "HasLineOfSight").size() == 2, "키를 쓰는 곳 2개 (Engage·Chase Decorator): %s" % [ed.key_refs("BB_Infected", "HasLineOfSight")])
-	check(ed.key_refs("BB_Infected", "TargetLocation").size() == 1, "Task 의 키 (MoveTo target_key) 도 쓰는 곳")
+	var los_refs: Array = ed.key_refs("BB_Infected", "HasLineOfSight").filter(func(r): return r.begins_with("BT_Infected_Field"))
+	check(los_refs.size() == 2, "키를 쓰는 곳 (BT_Infected_Field 의 Engage·Chase Decorator): %s" % [los_refs])
+	check(ed.key_refs("BB_Infected", "TargetLocation").has("BT_Infected_Field / move_to_target (Task target_key)"), "Task 의 키 (MoveTo target_key) 도 쓰는 곳")
 	ed.rename_key("BB_Infected", "HasLineOfSight", "CanSee", false)
 	check(ed.node("chase").decorators[0].key == "CanSee" and ed.assets.BB_Infected.keys.any(func(k): return k.name == "CanSee")
 		and ed.dirty.has("BB_Infected") and ed.dirty.has("BT_Infected_Field"), "키 이름 바꾸기 → 쓰는 Decorator 도 함께, 둘 다 저장 표시")
@@ -130,7 +133,56 @@ func _ready() -> void:
 	ed.undo()
 	check(ed.compile() and FileAccess.file_exists(OUT), "고치면 Compile → %s" % OUT)
 	var out: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(OUT))
-	check(out.assets.size() == 2, "Compile 결과에 자산 2개")
+	check(out.assets.size() == ed.assets.size() and ed.assets.size() >= 4, "Compile 결과에 모든 자산 (%d)" % out.assets.size())
+
+	# ---- Task Graph (Blueprint 스타일): BT 에서 두 번 누르면 열림
+	ed.open_asset("BT_03_Stalker")
+	await _frames(2)
+	ed.canvas.node_activated.emit("search_last")
+	await _frames(3)
+	var gv: Control = ed.graph_view
+	var gnodes: Array = gv.ge.get_children().filter(func(c): return c is GraphNode)
+	check(ed.current == "BTT_SearchLastPosition" and ed.tabs.current_tab == 2 and gv.back_btn.visible and gnodes.size() == 15,
+		"BT 의 TaskGraph Task 두 번 누르기 → Task Graph 탭 (노드 %d, 돌아가기 버튼)" % gnodes.size())
+	check(gv.ge.get_connection_list().size() == 13, "연결 13개 그림 (%d)" % gv.ge.get_connection_list().size())
+	var exec_slot: Color = gnodes.filter(func(n): return n.name == "branch")[0].get_slot_color_left(0)
+	var bool_slot: Color = gnodes.filter(func(n): return n.name == "branch")[0].get_slot_color_left(1)
+	check(exec_slot == Color.WHITE and bool_slot != Color.WHITE, "실행 핀은 흰색, Bool 데이터 핀은 다른 색")
+	await _snap("task_graph")
+	var n_conn: int = ed.cur().connections.size()
+	check(gv.connect_pins("get_loc", "value", "branch", "condition") != "" and ed.cur().connections.size() == n_conn, "Vector2 → Bool 은 이어지지 않음")
+	check(gv.connect_pins("branch", "false", "finish_fail", "exec_in") == ""
+		and ed.cur().connections.filter(func(c): return c.from_node == "branch" and c.from_pin == "false").size() == 1, "실행 출력을 새로 이으면 바뀜 (한 곳으로만)")
+	check(ed.problems.get_item_text(0).contains("finish_none") or ed.problems.get_item_text(0).begins_with("✓"), "검사 결과 갱신: %s" % ed.problems.get_item_text(0))
+	ed.undo()
+	check(ed.cur().connections.filter(func(c): return c.from_node == "branch" and c.from_pin == "false")[0].to_node == "finish_none", "되돌리기")
+	var cmp: String = ed.add_from_palette("gnode:Compare")
+	check(cmp != "" and gv.node(cmp).type == "Compare" and gv.node(cmp).params.op == "<", "팔레트로 Compare 노드 넣기")
+	check(gv.connect_pins("get_dur", "value", cmp, "a") == "", "Float → Float 연결")
+	var v: String = gv.add_var()
+	ed.cur().variables.back().type = "int"
+	var gvn: String = gv.add_node("GetVariable", Vector2.ZERO, {"var": v})
+	check(gv.connect_pins(gvn, "value", cmp, "b") == "", "Int 변수 → Float 입력 (자동 변환)")
+	gv.delete_nodes([cmp])
+	check(gv.node(cmp).is_empty() and not ed.cur().connections.any(func(c): return c.to_node == cmp), "노드 지우면 그 선도 지움")
+	gv.delete_nodes(["finish_none"])
+	check(ed.problems.get_item_text(0).contains("'false' 이 이어지지 않음"), "Finish 를 지우면 오류 표시: %s" % ed.problems.get_item_text(0))
+	ed.problems.item_clicked.emit(0, Vector2.ZERO, MOUSE_BUTTON_LEFT)
+	check(gv.selected == "branch", "오류를 누르면 그 노드 (%s)" % gv.selected)
+	ed.undo()
+	ed.undo()
+	ed.undo()
+	ed.undo()
+	check(not gv.node("finish_none").is_empty() and ed.problems.get_item_text(0).begins_with("✓"), "되돌리면 다시 통과")
+	gv._select("move")
+	await _frames(1)
+	check(ed.details.get_children().any(func(c): return c is Label and "AI Move To" in c.text), "Details 에 UE 대응 (AI Move To)")
+	# 키 이름을 바꾸면 그래프의 Get/Set 도
+	ed.rename_key("BB_Infected", "LastKnownLocation", "LastSeenAt", false)
+	check(gv.node("get_loc").params.key == "LastSeenAt" and ed.dirty.has("BTT_SearchLastPosition"), "Blackboard 키 이름 바꾸면 그래프 노드도")
+	ed.go_back()
+	check(ed.current == "BT_03_Stalker" and ed.selected == "search_last" and ed.tabs.current_tab == 0, "◀ 돌아가기 → 그 Task 카드")
+	check(ed.new_graph("BTT_New", "BB_Infected") and ed.problems.get_item_text(0).begins_with("✓"), "새 Task Graph: 바로 검사 통과")
 
 	# ---- 새 자산
 	check(not ed.new_bt("Bad", "BB_Infected"), "BT_ 로 시작하지 않으면 거절")

@@ -106,6 +106,26 @@ func _ready() -> void:
 	await _wait(0.2)
 	check(r.stack.is_empty() and r.task == null, "맵을 다시 불러오면 이전 몬스터의 BT 는 멈춤")
 	check(_enemy("ai_infected") != null and _enemy("ai_infected").bt != r, "새 몬스터는 새 실행 상태")
+
+	# Task Graph (BT_03_Stalker 의 수색 = BTT_SearchLastPosition) 도 실제 필드에서
+	for o in DataLoader.maps.test_ai.objects:
+		if o.object_id == "ai_infected":
+			o.bt = "BT_03_Stalker"
+	f.load_map("test_ai")
+	await _wait(0.2)
+	var st: Node = _enemy("ai_infected")
+	_teleport(1, 6)
+	st.bt.bb.set_value("LastKnownLocation", Vector2(9, 1), "Sensor")
+	st.bt.bb.set_value("HasLastKnownLocation", true, "Sensor")
+	await _wait_until(func(): return st.bt.task_node == "search_last", 8.0)   # 수색의 Decorator 는 Self 라 순찰 한 구간이 끝난 뒤에 바뀜
+	check(st.bt.task_node == "search_last" and st.bt.task.get_script().resource_path.ends_with("task_graph_runner.gd"), "필드에서 수색 = Task Graph 실행 (%s)" % st.bt.task_node)
+	var gtask: Object = st.bt.task
+	ok = await _wait_until(func(): return st.bt.task_node == "patrol", 12.0)
+	check(ok and gtask.result == 0 and st.ai_tile().distance_to(Vector2(9, 1)) < 3.0 and not st.bt.bb.get_value("HasLastKnownLocation"),
+		"그래프: 마지막 위치까지 걸어가 둘러보고 Finish Execute → 순찰 (%s)" % [gtask.trace])
+	for o in DataLoader.maps.test_ai.objects:
+		if o.object_id == "ai_infected":
+			o.bt = "BT_Infected_Field"
 	SaveManager.delete_all()
 	print("[ai_field_smoke] 스크린샷 %d장, 실패 %d → %s" % [_shot, _fail, ProjectSettings.globalize_path("user://ai_field_smoke")])
 	get_tree().quit(1 if _fail > 0 else 0)

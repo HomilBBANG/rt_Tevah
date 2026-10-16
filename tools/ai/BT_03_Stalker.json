@@ -1,0 +1,130 @@
+{
+ "schema_version": 2,
+ "asset_type": "behavior_tree",
+ "id": "BT_03_Stalker",
+ "domain": "field",
+ "blackboard_id": "BB_Infected",
+ "battle_on_contact": true,
+ "description": "실습 템플릿 3 (기획 v2.0 §12): 감염자 트리에서 수색만 Task Graph(BTT_SearchLastPosition)로. 더블클릭하면 그래프가 열림. 연습: 그래프의 Wait 를 바꾸고 디버거로 차이 보기",
+ "root_id": "root",
+ "nodes": [
+  {
+   "id": "root",
+   "kind": "Root",
+   "children": [
+    "ai_root"
+   ]
+  },
+  {
+   "id": "ai_root",
+   "kind": "Selector",
+   "name": "AI Root",
+   "children": [
+    "engage",
+    "chase",
+    "search",
+    "patrol"
+   ],
+   "services": [
+    {
+     "type": "UpdatePerception",
+     "interval": 0.2,
+     "random_deviation": 0.0,
+     "run_on_activation": true
+    }
+   ]
+  },
+  {
+   "id": "engage",
+   "kind": "Sequence",
+   "name": "Engage",
+   "children": [
+    "battle"
+   ],
+   "decorators": [
+    {
+     "type": "Blackboard",
+     "name": "CanSeePlayer",
+     "key": "HasLineOfSight",
+     "operator": "is_set",
+     "observer_aborts": "Both"
+    },
+    {
+     "type": "Blackboard",
+     "name": "InEngageRange",
+     "key": "DistanceToTarget",
+     "operator": "<=",
+     "value": 0.6,
+     "observer_aborts": "Both"
+    }
+   ]
+  },
+  {
+   "id": "battle",
+   "kind": "Task",
+   "task_type": "EnterTurnBattle",
+   "params": {}
+  },
+  {
+   "id": "chase",
+   "kind": "Sequence",
+   "name": "Chase",
+   "children": [
+    "move_to_target"
+   ],
+   "decorators": [
+    {
+     "type": "Blackboard",
+     "name": "CanSeePlayer",
+     "key": "HasLineOfSight",
+     "operator": "is_set",
+     "observer_aborts": "Both"
+    }
+   ]
+  },
+  {
+   "id": "move_to_target",
+   "kind": "Task",
+   "task_type": "MoveTo",
+   "params": {
+    "target_key": "TargetLocation",
+    "run": true,
+    "acceptance": 0.3
+   }
+  },
+  {
+   "id": "search",
+   "kind": "Sequence",
+   "name": "Search",
+   "children": [
+    "search_last"
+   ],
+   "decorators": [
+    {
+     "type": "Blackboard",
+     "name": "HasLastSeen",
+     "key": "HasLastKnownLocation",
+     "operator": "is_set",
+     "observer_aborts": "Self"
+    }
+   ]
+  },
+  {
+   "id": "search_last",
+   "kind": "Task",
+   "task_type": "TaskGraph",
+   "params": {
+    "graph_id": "BTT_SearchLastPosition"
+   },
+   "name": "Search (Task Graph)"
+  },
+  {
+   "id": "patrol",
+   "kind": "Task",
+   "task_type": "Patrol",
+   "name": "Patrol",
+   "params": {}
+  }
+ ],
+ "editor_layout": {}
+}
