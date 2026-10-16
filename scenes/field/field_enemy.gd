@@ -42,8 +42,11 @@ func setup_bt(bt_asset: Dictionary, bb_asset: Dictionary, overrides: Dictionary)
 	bt.setup(bt_asset, bb_asset, self, overrides)
 
 
-## 닿으면 바로 전투하나: 예전 AI 는 늘, BT 몬스터는 그 BT 의 battle_on_contact (Root 의 '닿으면 바로 전투', 기본 켬)
+## 닿으면 바로 전투하나: 맵 물체 touch_battle(on/off, 몬스터마다)이 먼저, 비우면 BT 의 battle_on_contact (기본 켬), 예전 AI 는 켬
 func touch_battle() -> bool:
+	match str(data.get("touch_battle", "")):
+		"on": return true
+		"off": return false
 	return bt == null or bool(bt.asset.get("battle_on_contact", true))
 
 

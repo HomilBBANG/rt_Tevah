@@ -1088,6 +1088,7 @@
     "bb_overrides": {
      "VisionRange": 4.0
     },
+    "touch_battle": "",
     "map_id": "test_ai",
     "x": 12,
     "y": 1,
@@ -1109,6 +1110,7 @@
     "once": false,
     "bt": "",
     "bb_overrides": {},
+    "touch_battle": "",
     "map_id": "test_ai",
     "x": 2,
     "y": 6,
@@ -1291,6 +1293,7 @@
     "once": false,
     "bt": "",
     "bb_overrides": {},
+    "touch_battle": "",
     "map_id": "test_field",
     "x": 21,
     "y": 2,
@@ -1350,6 +1353,7 @@
     "once": false,
     "bt": "",
     "bb_overrides": {},
+    "touch_battle": "",
     "map_id": "test_field",
     "x": 23,
     "y": 8,

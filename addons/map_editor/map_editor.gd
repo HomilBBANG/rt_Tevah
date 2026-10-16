@@ -10,6 +10,7 @@ const ToolCommon = preload("res://addons/tool_common.gd")
 const ExprRows = preload("res://addons/expr_rows.gd")
 const MapRenderer = preload("res://core/map_renderer.gd")
 const VisualData = preload("res://core/visual_data.gd")
+const AIAssets = preload("res://core/ai/ai_assets.gd")
 
 const MAP_DIR := "res://tools/maps/"
 const PLAYTEST_FILE := "user://map_playtest.json"
@@ -622,6 +623,18 @@ func _edit_object(o: Dictionary) -> void:
 			var sp := _spin("순찰 칸 수", int(o.get("patrol_len", 0)), 0, 100)
 			sp.tooltip_text = "그 칸 수만큼 왕복"
 			sp.value_changed.connect(func(v): set_field(o, "patrol_len", int(v)))
+			# 몬스터 AI: Behavior Tree 고르기 (만들기·고치기는 '몬스터 AI' 탭에서)
+			var ai := AIAssets.load_dir()
+			var bts: Array = ai.keys().filter(func(k): return AIAssets.kind_of(ai[k]) == "behavior_tree")
+			bts.sort()
+			_option("AI (Behavior Tree)", [["", "(예전 AI — 순찰·추격)"]] + bts.map(func(k): return [k, k]), o.get("bt", ""), func(v):
+				set_field(o, "bt", v)
+				_edit_object.call_deferred(o))
+			var bt_on := bool(ai.get(str(o.get("bt", "")), {}).get("battle_on_contact", true))
+			var base := ("BT 설정 따름 (%s)" % ("켬" if bt_on else "끔")) if str(o.get("bt", "")) != "" else "기본 (켬)"
+			_option("닿으면 바로 전투", [["", base], ["on", "켬 — 닿는 순간 전투"], ["off", "끔 — 닿아도 전투 안 함"]], o.get("touch_battle", ""), func(v):
+				set_field(o, "touch_battle", v))
+			_hint("끄면 BT 의 '전투 시작'(EnterTurnBattle) Task 로만 싸웁니다." if str(o.get("bt", "")) != "" 				else "예전 AI 는 '끔' 이면 싸우지 않습니다 (따라오기만).")
 		"light":
 			_section("광원")
 			var pres: Array = VisualData.presets()

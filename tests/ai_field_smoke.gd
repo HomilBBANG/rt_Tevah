@@ -74,6 +74,20 @@ func _ready() -> void:
 	_teleport_to(inf)
 	await _wait(0.5)
 	check(f._combat_ui == null, "끄면 닿아도 전투 안 함 (못 보는 동안)")
+	# 몬스터별 (맵 물체 touch_battle) 이 BT 설정보다 먼저
+	inf.data.touch_battle = "on"   # BT 는 끔
+	_teleport_to(inf)
+	ok = await _wait_until(func(): return f._combat_ui != null, 2.0)
+	check(ok and f._combat_enemy == inf, "몬스터별 '켬' → BT 가 꺼져 있어도 닿으면 전투")
+	await _end_combat("fled")
+	await _wait_until(func(): return inf.grace == 0.0, 5.0)
+	bt_asset.battle_on_contact = true
+	inf.data.touch_battle = "off"   # BT 는 켬
+	_teleport_to(inf)
+	await _wait(0.5)
+	check(f._combat_ui == null, "몬스터별 '끔' → BT 가 켜져 있어도 닿아도 전투 안 함")
+	inf.data.touch_battle = ""
+	bt_asset.battle_on_contact = false
 	_teleport(1, 1)
 
 	# 예전 AI 적: 닿으면 바로 전투 (그대로)
