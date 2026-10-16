@@ -35,6 +35,7 @@ const Direction = preload("res://core/direction.gd")
 const MapRenderer = preload("res://core/map_renderer.gd")
 const VisualData = preload("res://core/visual_data.gd")
 const Triggers = preload("res://core/cutscene_triggers.gd")
+const AIAssets = preload("res://core/ai/ai_assets.gd")
 const DOOR_LAYER := 8            # 닫힌 문: 플레이어·적 모두 통과 못 하고, 적의 시야도 막는다 (field_enemy._can_see)
 const INTERACT_RANGE := 1.1      # 칸
 const TOAST_TIME := 3.0
@@ -56,6 +57,7 @@ var player: CharacterBody2D
 var enemies: Array = []
 var spots: Array = []            # 상호작용 지점 [{ kind: "spot"/"camp"/"exit", data, pos, done }]
 var npcs: Array = []             # NPC [{ kind: "npc", data, pos, node, active }] — active: 지금 시간대에 있음
+var _path_grid: AStarGrid2D      # 벽을 돌아가는 길 찾기 (맵마다 한 번 만듦 — 컷신 걷기·BT 몬스터 이동)
 
 var _combat_ui: Node
 var _dialogue_ui: Node
@@ -141,6 +143,7 @@ func load_map(map_id: String) -> void:
 	spots.clear()
 	npcs.clear()
 	events.clear()
+	_path_grid = null
 	_near_spot = {}
 	%Prompt.visible = false
 	map = DataLoader.maps.get(map_id, {})
@@ -279,6 +282,7 @@ func _build_actors() -> void:
 				e.collision_mask = WALL_LAYER | DOOR_LAYER
 				e.position = pos
 				e.setup_patrol(pos, dirs.get(o.patrol_dir, Vector2.ZERO) * tile, int(o.patrol_len))
+				_setup_enemy_bt(e, o)
 				_add_circle_shape(e, e.radius * 0.8)
 				%World.add_child(e)
 				enemies.append(e)
@@ -389,7 +393,7 @@ func _physics_process(delta: float) -> void:
 		_on_death(cause)
 		return
 	for e in enemies:
-		if e.grace == 0.0 and e.global_position.distance_to(player.global_position) < player.radius + e.radius:
+		if e.bt == null and e.grace == 0.0 and e.global_position.distance_to(player.global_position) < player.radius + e.radius:   # BT 몬스터는 EnterTurnBattle Task 로
 			_start_combat(e)
 			return
 	# 맵 이동: 열린 문·통로 칸에 들어서거나, 가장자리(edges)가 있는 쪽 맨 끝 칸에 닿으면
@@ -880,8 +884,10 @@ func _actor(who: String) -> Node2D:
 	return null
 
 
-## who 를 칸 to 까지 걷게 한다 (벽을 돌아가는 길 찾기). 다 걸으면 끝나는 Tween 을 돌려준다
-func _walk(who: Node2D, to: Vector2i, speed: float) -> Tween:
+## 벽·막는 오브젝트를 피하는 길 찾기 칸 (맵마다 한 번). 닫힌 문은 몸으로 막히므로 여기엔 없다
+func path_grid() -> AStarGrid2D:
+	if _path_grid:
+		return _path_grid
 	var grid := AStarGrid2D.new()
 	grid.region = Rect2i(0, 0, int(map.width), int(map.height))
 	grid.cell_size = Vector2(tile, tile)
@@ -895,6 +901,56 @@ func _walk(who: Node2D, to: Vector2i, speed: float) -> Tween:
 	for c in VisualData.solid_cells(map):
 		if grid.region.has_point(c):
 			grid.set_point_solid(c)
+	_path_grid = grid
+	return grid
+
+
+## 칸 from → to 길 (from 다음 칸부터). 길이 없으면 []
+func find_path(from: Vector2i, to: Vector2i) -> Array:
+	var grid := path_grid()
+	if not grid.region.has_point(from) or not grid.region.has_point(to) or grid.is_point_solid(to):
+		return []
+	var p: Array = grid.get_id_path(from, to, true)
+	return p.slice(1)
+
+
+## BT 몬스터의 EnterTurnBattle: 지금 전투를 시작할 수 있으면 시작하고 true
+func request_battle(e: Node) -> bool:
+	if frozen or _combat_ui != null or not e in enemies:
+		return false
+	_start_combat(e)
+	return true
+
+
+## 맵 물체 bt = BT_ 자산 → Behavior Tree 로 움직임. 자산이 없거나 잘못되면 예전 AI (경고만)
+func _setup_enemy_bt(e: Node, o: Dictionary) -> void:
+	var bt_id := str(o.get("bt", ""))
+	if bt_id == "":
+		return
+	var bt: Dictionary = DataLoader.ai_assets.get(bt_id, {})
+	var bb: Dictionary = DataLoader.ai_assets.get(str(bt.get("blackboard_id", "")), {})
+	var errs := AIAssets.validate_bt(bt, DataLoader.ai_assets) if not bt.is_empty() else [{"msg": "없는 BT (몬스터 AI 탭에서 Compile 또는 변환 필요)"}]
+	if not errs.is_empty():
+		push_warning("[field] %s 의 BT '%s' 를 쓸 수 없어 예전 AI 로: %s" % [o.object_id, bt_id, errs[0].msg])
+		return
+	var over := {}
+	var allowed := {}
+	for k in bb.get("keys", []):
+		if k.get("instance_override", false):
+			allowed[str(k.name)] = true
+	var raw = o.get("bb_overrides", {})
+	if raw is Dictionary:
+		for k in raw:
+			if allowed.has(k):
+				over[k] = raw[k]
+			else:
+				push_warning("[field] %s: Blackboard 키 '%s' 는 개체별 override 가 꺼져 있음" % [o.object_id, k])
+	e.setup_bt(bt, bb, over)
+
+
+## who 를 칸 to 까지 걷게 한다 (벽을 돌아가는 길 찾기). 다 걸으면 끝나는 Tween 을 돌려준다
+func _walk(who: Node2D, to: Vector2i, speed: float) -> Tween:
+	var grid := path_grid()
 	var from := Vector2i(floori(who.global_position.x / tile), floori(who.global_position.y / tile))
 	var path: Array = []
 	if grid.region.has_point(from) and grid.region.has_point(to) and not grid.is_point_solid(to):
@@ -1019,6 +1075,8 @@ func _on_combat_finished(outcome: String) -> void:
 		"fled":
 			_combat_enemy.grace = float(DataLoader.config.get("field_flee_grace", 3))
 			_combat_enemy.state = "return"
+			if _combat_enemy.bt:
+				_combat_enemy.bt.notify_battle_end()
 			frozen = false
 		_:
 			_on_death("combat", _combat_enemy_name)

@@ -25,6 +25,7 @@ var survival: Array = []   # 생존 파라미터 [{ param_id, name, start, max, 
 var camp_actions: Array = []  # 베이스캠프 행동 (엑셀 행 순서)
 var revivals: Array = []   # 부활 규칙 (위에서부터 먼저 맞는 것)
 var death_causes := {}     # 사망 원인: cause_id -> { name, text } (content.xlsx DeathCauses)
+var ai_assets := {}        # 몬스터 AI 자산 id -> 자산 (BT_·BB_·BTT_, data/ai.json — 몬스터 AI 탭의 Compile·변환기가 만듦)
 var config := {}           # key -> number
 
 
@@ -55,6 +56,7 @@ func load_all() -> void:
 	camp_actions = []
 	revivals = []
 	death_causes.clear()
+	ai_assets.clear()
 
 	for ep in _read_list("episodes"):
 		episodes[ep.episode_id] = ep
@@ -110,6 +112,11 @@ func load_all() -> void:
 		camp_actions = _read_list("camp_actions")
 	if FileAccess.file_exists(DATA_DIR + "revivals.json"):
 		revivals = _read_list("revivals")
+	if FileAccess.file_exists(DATA_DIR + "ai.json"):
+		var ai = _read("ai")
+		if ai is Dictionary:
+			for a in ai.get("assets", []):
+				ai_assets[str(a.id)] = a
 	if FileAccess.file_exists(DATA_DIR + "death_causes.json"):
 		for c in _read_list("death_causes"):
 			death_causes[c.cause_id] = c

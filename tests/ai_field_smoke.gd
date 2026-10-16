@@ -1,0 +1,128 @@
+extends Node
+## 몬스터 AI(BT) 필드 스모크 (창 필요): 맵 test_ai 의 감염자(BT_Infected_Field)가 실제 필드에서
+## 순찰 → 발견하면 추격(순찰 중단) → 닿으면 턴제 전투(한 번만) → 도주 유예 동안 못 봄 → 수색 → 순찰로 돌아가는지.
+## 같은 맵의 예전 AI 적(bt 없음)이 그대로 동작하는지도. 스크린샷 user://ai_field_smoke/.
+##   Godot_v4.7-stable_win64_console.exe --path . res://tests/ai_field_smoke.tscn
+
+var _shot := 0
+var _fail := 0
+var f: Node
+
+
+func _ready() -> void:
+	DirAccess.make_dir_recursive_absolute("user://ai_field_smoke")
+	SaveManager.save_dir = "user://test_saves/"
+	SaveManager.delete_all()
+	SaveManager.begin_run()
+	preload("res://scenes/field/field.gd").next_map_id = "test_ai"
+	f = load("res://scenes/field/field.tscn").instantiate()
+	add_child(f)
+	await _wait(0.3)
+	var inf: Node = _enemy("ai_infected")
+	var old: Node = _enemy("ai_old")
+	check(inf != null and inf.bt != null and old != null and old.bt == null, "BT 를 정한 적만 BT 로 (예전 AI 적은 그대로)")
+	check(inf.bt.bb.get_value("VisionRange") == 4.0 and inf.bt.bb.last_source.VisionRange == "Editor Override", "맵의 bb_overrides → 시야 4칸 (개체별)")
+	var y0: float = inf.position.y
+	await _wait(1.0)
+	check(inf.bt.task_node == "patrol" and inf.position.y > y0 + f.tile * 0.5, "멀면 순찰 (아래로 %.1f 칸)" % ((inf.position.y - y0) / f.tile))
+	await _snap("patrol")
+
+	# 발견 → 추격
+	var et: Vector2 = inf.ai_tile()
+	_teleport(et.x - 3, et.y)
+	await _wait(0.4)
+	check(inf.bt.task_node in ["move_to_target", "battle"] and inf.bt.last_result.get("patrol") == "ABORTED",
+		"3칸 앞에 보이면 Chase 가 Patrol 을 선점 (%s, patrol=%s)" % [inf.bt.task_node, inf.bt.last_result.get("patrol")])
+	check(inf.state == "chase", "추격 표시(!)")
+	await _snap("chase")
+	# 닿으면 전투 (한 번만)
+	var ok := await _wait_until(func(): return f._combat_ui != null, 5.0)
+	check(ok and f._combat_enemy == inf and inf.bt.memory.get("battle_pending", false), "가까워지면 Engage → EnterTurnBattle → 턴제 전투")
+	await _wait(0.5)
+	check(f.frozen and inf.bt.log.filter(func(e): return e.node == "battle" and e.ev == "exit").size() == 1, "전투 중엔 필드가 멈추고 전투 요청은 한 번")
+	await _snap("battle")
+	# 도주 → 유예 동안 못 봄 → 마지막 위치 수색 → 순찰
+	await _end_combat("fled")
+	check(not f.frozen and inf.grace > 0.0 and not inf.bt.memory.has("battle_pending"), "도주 → 유예, 전투 잠금 풀림")
+	_teleport(1, 1)
+	await _wait(0.5)
+	check(inf.bt.task_node == "search_last" and not inf.bt.bb.get_value("HasLineOfSight"), "유예 동안 못 봄 → 마지막 위치 수색 (%s)" % inf.bt.task_node)
+	ok = await _wait_until(func(): return inf.bt.task_node == "patrol", 12.0)
+	check(ok and not inf.bt.bb.get_value("HasLastKnownLocation"), "수색을 마치면 순찰로 돌아감")
+	check(f._combat_ui == null, "멀리 있으면 다시 덤비지 않음")
+	await _snap("back_to_patrol")
+	# 벽 뒤에서는 못 봄 (기둥 x6~8, y3~4)
+	_teleport(7, 5)
+	inf.position = f._tile_center(7, 2)
+	await _wait(0.4)
+	check(not inf.bt.bb.get_value("HasLineOfSight"), "기둥 너머(가까워도)는 안 보임")
+
+	# 예전 AI 적: 닿으면 바로 전투 (그대로)
+	inf.position = f._tile_center(14, 6)
+	_teleport_to(old)
+	ok = await _wait_until(func(): return f._combat_ui != null, 2.0)
+	check(ok and f._combat_enemy == old, "예전 AI 적은 닿으면 바로 전투 (그대로)")
+	await _end_combat("win")
+	check(not old in f.enemies and inf in f.enemies, "이기면 그 적만 사라짐")
+
+	# 맵 다시 불러오기 → BT 정리 (오류 없음)
+	var r: RefCounted = inf.bt
+	f.load_map("test_ai")
+	await _wait(0.2)
+	check(r.stack.is_empty() and r.task == null, "맵을 다시 불러오면 이전 몬스터의 BT 는 멈춤")
+	check(_enemy("ai_infected") != null and _enemy("ai_infected").bt != r, "새 몬스터는 새 실행 상태")
+	SaveManager.delete_all()
+	print("[ai_field_smoke] 스크린샷 %d장, 실패 %d → %s" % [_shot, _fail, ProjectSettings.globalize_path("user://ai_field_smoke")])
+	get_tree().quit(1 if _fail > 0 else 0)
+
+
+func _enemy(oid: String) -> Node:
+	for e in f.enemies:
+		if is_instance_valid(e) and e.data.object_id == oid:
+			return e
+	return null
+
+
+func _end_combat(outcome: String) -> void:
+	var ui: Node = f._combat_ui
+	ui.combat.outcome = outcome
+	ui._finish()
+	await _wait(0.05)
+	ui.get_node("%TitleButton").pressed.emit()
+	await _wait(0.1)
+
+
+func _teleport(tx: float, ty: float) -> void:
+	f.player.position = Vector2((tx + 0.5) * f.tile, (ty + 0.5) * f.tile)
+
+
+func _teleport_to(node: Node2D) -> void:
+	f.player.position = node.position + Vector2(4, 0)
+
+
+func _wait(sec: float) -> void:
+	await get_tree().create_timer(sec).timeout
+
+
+func _wait_until(cond: Callable, limit: float) -> bool:
+	var t := 0.0
+	while t < limit:
+		if cond.call():
+			return true
+		await get_tree().create_timer(0.05).timeout
+		t += 0.05
+	return cond.call()
+
+
+func _snap(name: String) -> void:
+	await RenderingServer.frame_post_draw
+	_shot += 1
+	get_viewport().get_texture().get_image().save_png("user://ai_field_smoke/%02d_%s.png" % [_shot, name])
+
+
+func check(ok: bool, label: String) -> void:
+	if ok:
+		print("ok   ", label)
+	else:
+		_fail += 1
+		print("FAIL ", label)

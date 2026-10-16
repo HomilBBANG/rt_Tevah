@@ -204,6 +204,14 @@ tools/
 - 필드 소지품: I / Tab. 필드 조사·거점 행동·아이템 사용은 `StoryRunner.run_effects()` / `use_item()` (대화 밖, mode="field") 으로 같은 효과 엔진을 쓴다.
 - 임시·미구현(TODO, 기획 미확정): 파라미터가 낮거나 0일 때의 효과·사망 여부(§5), 시간 배율·행동 시간(§4), 탐험 중 종료 처리(§13.2), 사망·부활 연출(§11).
 
+## 몬스터 AI (진행 중, 기획 `tevah_monster_bt_blueprint_style_spec_v2.0.md` — Unreal BT·Blackboard 학습형)
+- **Phase 1~3 완료 (2026-10-16)**, 남은 것: Phase 4 Task Graph(Blueprint 스타일), Phase 5 맵 에디터 BT 고르기·Runtime Debugger. Phase 6(전투 BT·Parallel·Subtree 등)은 승인 받고.
+- 자산 원본 `tools/ai/<id>.json` (BB_ Blackboard / BT_ Behavior Tree / BTT_ Task Graph). 변환기가 `data/ai.json` 으로 묶음(맵의 bt 참조만 검사), Godot '몬스터 AI' 탭의 **Compile** = 트리 규칙 검사 + data/ai.json. 런타임 `DataLoader.ai_assets`.
+- 런타임 `core/ai/`: `blackboard.gd`(키 타입 bool/int/float/string/vector2(칸 좌표)/entity_ref, changed 신호·출처 기록), `bt_runner.gd`(몬스터마다 하나 — Root/Selector/Sequence/Task, Decorator Blackboard·Cooldown(AND, inverse), **Observer Aborts None/Self/LowerPriority/Both 는 키 변화 이벤트로**, Service 는 붙은 노드가 실행 경로에 있는 동안만 interval 초마다, Task 중단 시 abort()·ABORTED 기록, 전투 요청 잠금 `notify_battle_end`), `bt_tasks.gd`(허용된 Task: Wait·MoveTo·Patrol·SearchLastPosition·ReturnToOrigin·EnterTurnBattle·Set/ClearBlackboardValue·TaskGraph, Service: UpdatePerception·UpdateTargetDistance·UpdateLastSeenPosition·UpdateNoise(소리 TODO) + 에디터 도움말·UE 대응 이름), `ai_assets.gd`(읽기·검사·compile).
+- 필드 연결: 맵 적 물체 `bt`(BT_ id) + `bb_overrides`({키: 값}, BB 키의 instance_override 가 켜진 것만). bt 가 없거나 자산이 잘못되면 **예전 AI**(순찰·추격) 그대로. `field_enemy.gd` 가 어댑터(ai_tile·ai_move(벽 돌아가는 길 `field.find_path`, 0.6초 못 움직이면 막힘)·ai_perceive(시야 = 벽·닫힌 문 레이캐스트, 도주 유예 동안 안 보임)·ai_request_battle → `field.request_battle`). BT 몬스터는 닿아도 바로 전투가 아니라 EnterTurnBattle Task 로. 초는 실제 초(필드가 멈추면 tick 없음). 맵 이동·제거 시 `bt.stop()`.
+- 에디터 `addons/monster_ai/` (`ai_editor.gd`, `bt_canvas.gd`): 위→아래 트리, children 순서 = 우선순위(카드 노란 번호), ◇ Decorator 는 카드 위·⟳ Service 는 아래, 끌어서 순서, 오른쪽 클릭 노드 찾기, Details(UE 대응·테바 전용 표시), Blackboard 표(키 이름 바꾸면 쓰는 곳 함께), 검사 결과 → 그 노드로, 되돌리기·복사·저장·미저장 경고.
+- 샘플: `BB_Infected`, `BT_Infected_Field`(Engage > Chase > Search > Patrol), 테스트 맵 `tools/maps/test_ai.json`(BT 감염자 + 비교용 예전 AI 적). 테스트 `tests/test_bt`(헤드리스, BT 의미), `tests/ai_editor_smoke`, `tests/ai_field_smoke`.
+
 ## 대화 에디터 (addons/dialogue_editor)
 - 대화(노드·선택지)의 원본은 **`tools/dialogues/<대화ID>.json`** (대화 하나 = 파일 하나). 변환기가 엑셀 Nodes·Choices 뒤에 합쳐 같은 규칙으로 검사한다. 엑셀 Nodes·Choices 도 계속 읽는다 (1단계 에피소드 테스트 대화는 엑셀에 있음).
   - 파일: `{ dialogue_id, episode_id("" = 필드 대화), nodes: [{node_id, speaker_id, text, next_node, on_enter, pos}], choices: [{choice_id, node_id, text, condition, show_mode, cost, effects, next_node, type, check, dc, mod, fail_effects, fail_next}] }` (combat 은 check=enemy_id, fail_*=도주)

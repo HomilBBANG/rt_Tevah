@@ -1,0 +1,68 @@
+{
+ "map_id": "test_ai",
+ "tiles": [
+  "################",
+  "#..............#",
+  "#..............#",
+  "#.....###......#",
+  "#.....###......#",
+  "#..............#",
+  "#..............#",
+  "################"
+ ],
+ "start": [
+  1,
+  1
+ ],
+ "run_start": null,
+ "objects": [
+  {
+   "object_id": "test_ai_p",
+   "type": "arrive",
+   "x": 1,
+   "y": 1,
+   "ref": "",
+   "name": "기본",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": "",
+   "default": true
+  },
+  {
+   "object_id": "ai_infected",
+   "type": "enemy",
+   "x": 12,
+   "y": 1,
+   "ref": "enemy_test",
+   "name": "감염자 (BT 테스트)",
+   "text": "",
+   "patrol_dir": "down",
+   "patrol_len": 5,
+   "condition": "",
+   "schedule": "",
+   "bt": "BT_Infected_Field",
+   "bb_overrides": {
+    "VisionRange": 4.0
+   }
+  },
+  {
+   "object_id": "ai_old",
+   "type": "enemy",
+   "x": 2,
+   "y": 6,
+   "ref": "enemy_test",
+   "name": "예전 AI 적 (비교용)",
+   "text": "",
+   "patrol_dir": "right",
+   "patrol_len": 3,
+   "condition": "",
+   "schedule": ""
+  }
+ ],
+ "environment": {
+  "profile": "indoor"
+ }
+}

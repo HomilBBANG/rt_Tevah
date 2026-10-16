@@ -31,6 +31,7 @@ SHEET_FILES = {
 }
 CONTENT_FILE = "content.xlsx"
 MAPS_DIR = ROOT / "tools" / "maps"
+AI_DIR = ROOT / "tools" / "ai"   # 몬스터 AI 자산 (BT_·BB_·BTT_ — Godot '몬스터 AI' 탭이 만들고 그 탭의 Compile 이 자세히 검사)
 DIALOGUES_DIR = ROOT / "tools" / "dialogues"
 OUT_DIR = ROOT / "data"
 
@@ -1157,7 +1158,7 @@ def read_maps(rep):
             continue
         m["file"] = f.name
         m["tiles"] = [str(r) for r in m.get("tiles", [])]
-        m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len", "from", "default", "once", "energy", "radius", "shadow", "enabled") else v for k, v in o.items()}
+        m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len", "from", "default", "once", "energy", "radius", "shadow", "enabled", "bb_overrides") else v for k, v in o.items()}
                         for o in m.get("objects", [])]
         maps[f.stem] = m
     for f in sorted(MAPS_DIR.glob("*.txt")):
@@ -1408,6 +1409,8 @@ def validate_field(d, maps, rep, enemies):
                 rep.err(w, f"type 은 {' / '.join(sorted(FIELD_TYPES))}: '{t}'")
             elif t == "enemy" and ref not in enemies:
                 rep.err(w, f"적 종류(ref)는 싸울 수 있는 NPC(NpcParts·NpcAttacks 가 있는 npc_id): '{ref}'")
+            elif t == "enemy" and (o.get("bt") or o.get("bb_overrides")) and check_enemy_bt(o, d.get("_ai", {}), w, rep):
+                pass
             elif t == "enemy" and any(n["npc_id"] == ref and n["kind"] != "monster" for n in d["Npcs"]):
                 rep.warn(w, f"맵의 적 '{ref}' 가 몬스터(Npcs kind=monster)가 아님 — 마주치면 바로 전투")
             elif t == "enemy" and not all(n["walk_speed"] > 0 and n["run_speed"] > 0
@@ -1460,6 +1463,50 @@ def parse_time_range(text):
     return None if start == end else [start, end]
 
 
+def read_ai(rep):
+    """tools/ai/*.json → {id: 자산}. 트리 규칙 검사는 Godot 몬스터 AI 탭의 Compile 이 한다 (여기선 읽기·맵 참조만)."""
+    out = {}
+    if not AI_DIR.exists():
+        return out
+    for f in sorted(AI_DIR.glob("*.json")):
+        if f.name.startswith("_"):
+            continue
+        try:
+            a = json.loads(f.read_text(encoding="utf-8"))
+        except (ValueError, OSError) as e:
+            rep.err(f"AI {f.name}", f"JSON 을 읽을 수 없음: {e}")
+            continue
+        if not isinstance(a, dict) or not a.get("id"):
+            rep.err(f"AI {f.name}", "id 가 없음")
+            continue
+        out[a["id"]] = a
+    return out
+
+
+def check_enemy_bt(o, ai, w, rep):
+    """맵의 적 물체 bt(BT_ 자산)·bb_overrides(개체별 Blackboard 시작값) 검사"""
+    bt_id = o.get("bt", "")
+    over = o.get("bb_overrides") or {}
+    if not bt_id:
+        if over:
+            rep.err(w, "bb_overrides 는 bt 를 정한 적만")
+        return
+    bt = ai.get(bt_id)
+    if not bt or bt.get("asset_type") != "behavior_tree":
+        rep.err(w, f"bt 는 tools/ai 의 Behavior Tree (BT_): '{bt_id}'")
+        return
+    bb = ai.get(bt.get("blackboard_id", ""), {})
+    keys = {k.get("name"): k for k in bb.get("keys", [])}
+    if not isinstance(over, dict):
+        rep.err(w, "bb_overrides 는 {키: 값}")
+        return
+    for k in over:
+        if k not in keys:
+            rep.err(w, f"bb_overrides 의 키 '{k}' 가 {bt.get('blackboard_id')} 에 없음")
+        elif not keys[k].get("instance_override"):
+            rep.err(w, f"bb_overrides 의 키 '{k}' 는 개체별 override 가 꺼져 있음 (Blackboard 탭에서 켜기)")
+
+
 def export_maps(d, maps):
     out = []
     for mid, m in maps.items():
@@ -1471,6 +1518,8 @@ def export_maps(d, maps):
             e["from"] = arrive_from(o)   # 도착 P: 이어지는 곳 (object_id / "맵:방향")
             e["default"] = bool(o.get("default"))   # 기본 도착 P
             e["once"] = bool(o.get("once"))         # 이벤트 칸: 한 번만
+            if o.get("type") == "enemy":            # 몬스터 AI: Behavior Tree 와 개체별 Blackboard 시작값 (비우면 예전 AI)
+                e.update(bt=o.get("bt", ""), bb_overrides=o.get("bb_overrides") or {})
             if o.get("type") == "light":            # 광원: 놓을 때 프리셋에서 복사한 값 (광원마다 고칠 수 있음)
                 e.update(preset=o.get("preset", ""), color=o.get("color", "") or "#FFFFFF",
                          energy=float(o.get("energy", 1.0)), radius=float(o.get("radius", 4.0)),
@@ -1553,6 +1602,7 @@ def export(d, maps):
         "survival": clean(d["Survival"]),
         "camp_actions": clean(d["CampActions"]),
         "revivals": clean(d["Revivals"]),
+        "ai": {"schema_version": 2, "assets": [d.get("_ai", {})[k] for k in sorted(d.get("_ai", {}))]},
         "death_causes": clean(d["DeathCauses"]),
         "endings": [dict(r, world_flags_set=split_list(r["world_flags_set"])) for r in clean(d["Endings"])],
         "config": dict({r["key"]: config_value(r["value"]) for r in d["Config"]}, opening_dialogue=d.get("_opening", "")),
@@ -1606,6 +1656,7 @@ def _run(path, say):
     read_dialogues(data, rep)
     maps = read_maps(rep)
     data["_maps"] = maps
+    data["_ai"] = read_ai(rep)
     data["FieldObjects"] = field_objects(maps)
     validate(data, rep)
     validate_field(data, maps, rep, data.get("_enemy_ids", set()))
