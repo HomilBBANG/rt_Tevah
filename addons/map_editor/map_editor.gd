@@ -784,6 +784,12 @@ func _edit_object(o: Dictionary) -> void:
 			_option("창문 모양", [["", "기본 (%s)" % VisualData.default_art("window")]] + wins.map(func(k): return [k, "%s  (%s)" % [VisualData.tiles()[k].name, k]]), o.get("look", ""), func(v):
 				set_field(o, "look", v))
 			_size_spins(o)
+			var auto_in := VisualData.window_inside(map, {"x": o.x, "y": o.y})
+			_option("안쪽 맵 (바깥 창문)", [["", "자동 — 가장 가까운 문의 맵 (%s)" % (auto_in if auto_in != "" else "없음")]] + map_ids.map(func(m): return [m, m]),
+				o.get("inside", ""), func(v):
+					set_field(o, "inside", v)
+					_gfx_dirty = true)
+			_hint("실외 맵의 창문은 햇빛을 내보내지 않고, 안쪽 맵에 켜진 광원이 있으면 불 켜진 창(따뜻한 빛, 밤에 또렷)으로 보입니다.")
 			var cur := CheckBox.new()
 			cur.text = "처음에 커튼을 쳐 둠"
 			cur.tooltip_text = "켜면 맵에 처음 들어왔을 때 커튼이 쳐져 있어 빛이 안 들어옴. 게임에서 E 로 치고 걷기 (회차 저장에 남음)"
@@ -1799,6 +1805,7 @@ func _process(_delta: float) -> void:
 	if _gfx_dirty:
 		_gfx_dirty = false
 		renderer.minutes = preview_minutes
+		renderer.world_maps = _all_maps   # 바깥 창문이 안쪽 맵의 불을 봄
 		renderer.build(map, tile_px)
 	var k: float = canvas.cell * canvas.zoom / tile_px
 	renderer.scale = Vector2(k, k)

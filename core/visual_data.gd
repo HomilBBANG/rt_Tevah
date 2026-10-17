@@ -332,6 +332,32 @@ static func window_dir(map: Dictionary, x: int, y: int) -> Vector2i:
 	return window_light(map, {"x": x, "y": y}).dir
 
 
+## 바깥 창문의 '안쪽 맵': 물체 inside(직접 고름) → 없으면 그 맵에서 가장 가까운 문·통로·이용의 이동할 맵. 없으면 ""
+static func window_inside(map: Dictionary, o: Dictionary) -> String:
+	if str(o.get("inside", "")) != "":
+		return str(o.inside)
+	var best := ""
+	var best_d := INF
+	for t in map.get("objects", []):
+		if str(t.get("type", "")) in ["exit", "passage", "transit"] and str(t.get("ref", "")) != "":
+			var d := Vector2(int(t.x) - int(o.x), int(t.y) - int(o.y)).length()
+			if d < best_d:
+				best_d = d
+				best = str(t.ref)
+	return best
+
+
+## 안쪽 맵에 켜진 광원(type=light, enabled)이 있나 — 바깥 창문이 불 켜진 창으로 보임. maps = {map_id: 맵}
+static func inside_lit(map: Dictionary, o: Dictionary, maps: Dictionary) -> bool:
+	var m = maps.get(window_inside(map, o), {})
+	if not m is Dictionary:
+		return false
+	for t in m.get("objects", []):
+		if str(t.get("type", "")) == "light" and t.get("enabled", true) != false:
+			return true
+	return false
+
+
 ## 크기가 있는 물체(가구·창문)가 차지하는 칸, 나머지는 놓은 칸 하나
 static func object_cells(o: Dictionary) -> Array:
 	if str(o.get("type", "")) in ["furniture", "window"]:

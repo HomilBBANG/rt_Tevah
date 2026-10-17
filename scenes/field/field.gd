@@ -187,6 +187,7 @@ func load_map(map_id: String) -> void:
 		add_child(renderer)
 		move_child(renderer, 0)
 	renderer.minutes = GameState.minute_of_day()
+	renderer.world_maps = DataLoader.maps   # 바깥 창문이 안쪽 맵의 불을 봄
 	renderer.build(map, tile)
 	renderer.build_props(%World)   # 오브젝트 그림은 인물과 같은 Y 정렬 노드에 (발 위치로 앞뒤)
 	for s in spots:   # 이미 조사한 곳은 반짝이 없음, 창문 커튼

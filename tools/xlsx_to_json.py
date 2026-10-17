@@ -1486,6 +1486,8 @@ def validate_field(d, maps, rep, enemies):
                     rep.err(w, f"창문 칸 {bad[0]} 가 벽이 아님")
                 elif not window_reaches_floor(floor, wall, x, y, ww, wh):
                     rep.err(w, f"창문 ({x}, {y}) 옆에 바닥이 없고 뒷벽도 아님 (빛이 들어갈 곳)")
+                if o.get("inside") and o["inside"] not in maps:
+                    rep.err(w, f"창문의 안쪽 맵(inside)이 없는 맵: '{o['inside']}'")
                 for cy in range(y, y + wh):
                     for cx in range(x, x + ww):
                         if (cx, cy) != (x, y):
@@ -1644,7 +1646,8 @@ def export_maps(d, maps):
                          role=o.get("role", ""), effects=o.get("effects", ""),
                          top_rows=max(0, int(o.get("top_rows", 0) or 0)))   # 위쪽 몇 줄은 뒤로 지나감
             if o.get("type") == "window":           # 창문: 처음에 커튼을 쳐 두었나, 크기
-                e.update(curtain=bool(o.get("curtain")), w=max(1, int(o.get("w", 1) or 1)), h=max(1, int(o.get("h", 1) or 1)))
+                e.update(curtain=bool(o.get("curtain")), w=max(1, int(o.get("w", 1) or 1)), h=max(1, int(o.get("h", 1) or 1)),
+                         inside=o.get("inside", ""))   # 바깥 창문의 안쪽 맵 (비우면 가장 가까운 문의 맵) — 그 맵에 켜진 광원이 있으면 불 켜진 창
             if o.get("type") == "light":            # 광원: 놓을 때 프리셋에서 복사한 값 (광원마다 고칠 수 있음)
                 e.update(preset=o.get("preset", ""), color=o.get("color", "") or "#FFFFFF",
                          energy=float(o.get("energy", 1.0)), radius=float(o.get("radius", 4.0)),

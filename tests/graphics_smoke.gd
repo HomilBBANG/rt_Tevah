@@ -279,6 +279,7 @@ func _ready() -> void:
 	ff.queue_free()
 	DataLoader.maps.erase("tfur")
 	await _overhead_test()
+	await _outside_window_test()
 	DataLoader.maps.erase("tback")
 	DataLoader.maps.erase("twin")
 	DataLoader.maps.erase("tgfx")
@@ -375,6 +376,43 @@ func _overhead_test() -> void:
 	DataLoader.maps.erase("tover2")
 	of = null
 	DataLoader.maps.erase("tover")
+
+
+## 실외 맵의 창문(건물 바깥): 햇빛을 내보내지 않음. 문이 이어진 안쪽 맵에 켜진 광원이 있으면 불 켜진 창 (밤에 따뜻한 빛)
+func _outside_window_test() -> void:
+	var o := func(id: String, type: String, x: int, y: int, extra := {}) -> Dictionary:
+		var d := {"object_id": id, "type": type, "ref": "", "name": id, "text": "", "condition": "", "arrive": "", "from": [], "default": false,
+			"once": false, "map_id": "tout", "x": x, "y": y, "patrol_dir": "", "patrol_len": 0, "schedule": []}
+		d.merge(extra, true)
+		return d
+	var tiles := ["##########", "#..####..#", "#..####..#", "#........#", "#........#", "##########"]
+	var outm := {"map_id": "tout", "width": 10, "height": 6, "tiles": tiles, "start": [1, 4], "run_start": [1, 4], "edges": {},
+		"objects": [o.call("to_door", "exit", 4, 3, {"ref": "tin"}), o.call("to_win", "window", 5, 1, {"w": 1, "h": 1, "curtain": false, "inside": ""})],
+		"visual": {"layers": {}}, "environment": {"profile": "outdoor"}}
+	var inm := {"map_id": "tin", "width": 4, "height": 4, "tiles": ["####", "#..#", "#..#", "####"], "start": [1, 1], "run_start": [1, 1], "edges": {},
+		"objects": [o.call("ti_lamp", "light", 1, 1, {"enabled": true, "color": "#FFD4A0", "energy": 1.0, "radius": 3.0, "shadow": true})], "visual": {"layers": {}}}
+	DataLoader.maps["tout"] = outm
+	DataLoader.maps["tin"] = inm
+	GameState.clock = 0.0
+	FieldScript.next_map_id = "tout"
+	var f: Node = load("res://scenes/field/field.tscn").instantiate()
+	add_child(f)
+	await _wait(0.3)
+	var w: Dictionary = f.renderer.windows.to_win
+	check(w.outside and w.lit and w.light.enabled and w.light.energy > 0.6 and f.renderer.markers.to_win.view.lamp, "바깥 창문: 안쪽 맵에 불 → 밤에 불 켜진 창 (따뜻한 빛)")
+	f.renderer.set_time(12 * 60)
+	check(w.light.energy < 0.2 and w.light.color != VisualData.daylight(12 * 60).color, "바깥 창문 낮: 햇빛을 내보내지 않음 (불빛만 약하게)")
+	f.queue_free()
+	await _wait(0.1)
+	inm.objects[0].enabled = false
+	FieldScript.next_map_id = "tout"
+	f = load("res://scenes/field/field.tscn").instantiate()
+	add_child(f)
+	await _wait(0.3)
+	check(not f.renderer.windows.to_win.lit and not f.renderer.windows.to_win.light.enabled, "안쪽 불이 꺼져 있으면 바깥 창문은 빛 없음")
+	f.queue_free()
+	DataLoader.maps.erase("tout")
+	DataLoader.maps.erase("tin")
 
 
 func _map(profile: String) -> Dictionary:

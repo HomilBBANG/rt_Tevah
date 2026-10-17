@@ -39,7 +39,9 @@ var overhead: TileMapLayer       # 전경 가림 층
 var overhead_alpha := 1.0        # 에디터 미리보기 투명도 (게임은 늘 1)
 var _roof_cell := {}             # Vector2i → 지붕 묶음 번호
 var markers := {}                # object_id → {sprite, kind: door/spark/window, key, frames, fps}
-var windows := {}                # object_id → {light: PointLight2D, curtain: bool}
+var windows := {}                # object_id → {light: PointLight2D, curtain: bool, outside: bool, lit: bool}
+var world_maps := {}             # 다른 맵들 {map_id: 맵} — 바깥 창문이 안쪽 맵 불을 보려고 (필드 = DataLoader.maps, 에디터 = 맵 파일들)
+const LAMP_GLOW := Color(1.0, 0.78, 0.45)   # 불 켜진 창 (안쪽 맵에 켜진 광원)
 static var _window_tex: Texture2D
 var _marker_root: Node2D
 var _anim_t := 0.0
@@ -497,7 +499,10 @@ func rebuild_lights() -> void:
 		p.set_meta("object_id", o.get("object_id", ""))
 		_light_root.add_child(p)
 		var oid := str(o.get("object_id", ""))
-		windows[oid] = {"light": p, "curtain": old[oid].curtain if old.has(oid) else bool(o.get("curtain", false))}
+		# 실외 맵의 창문 = 건물 바깥: 햇빛을 내보내지 않음. 안쪽 맵에 불이 켜져 있으면 따뜻한 불빛 (밤에 잘 보임)
+		var outside := profile() == "outdoor"
+		windows[oid] = {"light": p, "curtain": old[oid].curtain if old.has(oid) else bool(o.get("curtain", false)),
+			"outside": outside, "lit": outside and VisualData.inside_lit(map, o, world_maps)}
 	_apply_lighting()
 
 
@@ -527,17 +532,30 @@ func _apply_windows() -> void:
 	var e := float(VisualData.data().get("window_light_energy", 1.2)) * float(dl.k)
 	for id in windows:
 		var w: Dictionary = windows[id]
-		w.light.color = dl.color
-		w.light.energy = e
-		w.light.enabled = not w.curtain and e > 0.01
-		if markers.has(id) and markers[id].has("view"):   # 기본 창문 그림: 유리 밝기·커튼
+		if w.get("outside", false):   # 바깥 창문: 불 켜진 집만 따뜻한 빛, 낮엔 거의 안 보이고 밤에 또렷
+			var le := float(VisualData.data().get("window_light_energy", 1.2)) * 0.7 * (1.0 - 0.85 * float(dl.k))
+			w.light.color = LAMP_GLOW
+			w.light.energy = le
+			w.light.enabled = w.lit and not w.curtain and le > 0.01
+		else:
+			w.light.color = dl.color
+			w.light.energy = e
+			w.light.enabled = not w.curtain and e > 0.01
+		if markers.has(id) and markers[id].has("view"):   # 기본 창문 그림: 유리 밝기·커튼·불 켜짐
 			var wv = markers[id].view
 			wv.daylight = float(dl.k)
 			wv.curtain = w.curtain
+			wv.lamp = w.get("lit", false)
 			wv.refresh()
 		elif markers.has(id):   # 창문 유리: 낮에는 바깥 빛으로 밝게 (주변광과 상관없이), 밤·커튼이면 방과 같이 어둡게
 			var sp: Sprite2D = markers[id].sprite
-			if w.curtain or float(dl.k) < 0.05:
+			if w.get("lit", false) and not w.curtain:   # 불 켜진 창
+				if sp.material == null:
+					var lm := CanvasItemMaterial.new()
+					lm.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+					sp.material = lm
+				sp.modulate = LAMP_GLOW
+			elif w.curtain or float(dl.k) < 0.05:
 				sp.material = null
 				sp.modulate = Color.WHITE
 			else:

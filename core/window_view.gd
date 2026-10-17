@@ -23,6 +23,8 @@ var mode := "face"
 var px := 5.0            # 화면 픽셀 / 그림 픽셀
 var curtain := false
 var daylight := 1.0      # 0 (밤) ~ 1 (한낮) — 유리 밝기
+var lamp := false        # 안쪽에 불이 켜짐 (바깥 창문) — 유리가 따뜻하게, 밤에도 밝게
+const LAMP := Color(1.0, 0.8, 0.48)
 var _glass: Node2D
 
 
@@ -43,7 +45,7 @@ func setup(p_cells: Vector2i, p_mode: String, p_px: float) -> void:
 
 ## 커튼·낮 밝기가 바뀌면 다시 그림. 낮이고 커튼이 걷혀 있으면 유리는 빛 영향 없이 밝게
 func refresh() -> void:
-	var lit := not curtain and daylight > 0.05
+	var lit := not curtain and (daylight > 0.05 or lamp)
 	if lit and _glass.material == null:
 		var mat := CanvasItemMaterial.new()
 		mat.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
@@ -79,7 +81,10 @@ func _draw_glass() -> void:
 	for i in rows:   # 위가 밝은 하늘, 아래로 갈수록 조금 진하게
 		var t := float(i) / maxf(1.0, rows - 1.0)
 		var c := SKY_TOP.lerp(SKY_BOTTOM, t)
-		_r(g.position.x, g.position.y + i, g.size.x, 1, NIGHT.lerp(c, day) * Color(0.92 + 0.08 * day, 0.92 + 0.08 * day, 0.92 + 0.08 * day), _glass)
+		var col := NIGHT.lerp(c, day) * Color(0.92 + 0.08 * day, 0.92 + 0.08 * day, 0.92 + 0.08 * day)
+		if lamp:   # 불 켜진 창: 아래가 조금 더 밝은 따뜻한 빛, 낮에는 하늘이 조금 비침
+			col = LAMP.darkened(0.25 * (1.0 - t)).lerp(c, 0.35 * day)
+		_r(g.position.x, g.position.y + i, g.size.x, 1, col, _glass)
 	if mode == "face" and day > 0.05 and g.size.x >= 4:   # 비스듬한 반사 줄
 		for s in [2.0, 5.0]:
 			for i in mini(int(g.size.y), 6):
