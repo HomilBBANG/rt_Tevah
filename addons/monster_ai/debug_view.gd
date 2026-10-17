@@ -9,7 +9,9 @@ extends VBoxContainer
 const Runner = preload("res://core/ai/bt_runner.gd")
 
 var ed: Control                # ai_editor.gd
-var latest := {}               # 마지막으로 받은 {map, frozen, monsters}
+var latest := {}               # 마지막으로 받은 {map, frozen, paused, monsters}
+var paused := false
+var pause_btn: Button
 var selected_id := ""
 var status: Label
 var follow: CheckBox
@@ -36,6 +38,16 @@ func _ready() -> void:
 	follow.tooltip_text = "고른 몬스터의 실행 경로·결과를 Behavior Tree 탭 카드에 표시"
 	follow.toggled.connect(func(_v): _highlight())
 	bar.add_child(follow)
+	pause_btn = Button.new()
+	pause_btn.text = "⏸ 일시정지"
+	pause_btn.tooltip_text = "실행 중인 게임의 몬스터를 모두 멈춤 / 다시 움직임 (플레이어는 움직일 수 있음)"
+	pause_btn.pressed.connect(func(): set_game_paused(not paused))
+	bar.add_child(pause_btn)
+	var step := Button.new()
+	step.text = "▶| 한 단계"
+	step.tooltip_text = "멈춘 상태에서 몬스터를 한 프레임만 진행"
+	step.pressed.connect(func(): ed.send_to_game("monster_ai:step", []))
+	bar.add_child(step)
 	var open := Button.new()
 	open.text = "이 몬스터의 BT 열기"
 	open.pressed.connect(func():
@@ -101,6 +113,12 @@ func _ready() -> void:
 	col.add_child(logs)
 
 
+func set_game_paused(v: bool) -> void:
+	paused = v
+	pause_btn.text = "▶ 재개" if v else "⏸ 일시정지"
+	ed.send_to_game("monster_ai:pause", [v])
+
+
 func monster() -> Dictionary:
 	for m in latest.get("monsters", []):
 		if str(m.id) == selected_id:
@@ -112,7 +130,14 @@ func monster() -> Dictionary:
 func on_snapshot(data: Dictionary) -> void:
 	latest = data
 	var ms: Array = data.get("monsters", [])
-	status.text = "실행 중 — 맵 %s · BT 몬스터 %d%s" % [data.get("map", "?"), ms.size(), "  (필드 멈춤: 전투·대화·메뉴)" if data.get("frozen", false) else ""]
+	var hits := ms.filter(func(m): return str(m.snap.get("bp_hit", "")) != "")
+	status.text = "실행 중 — 맵 %s · BT 몬스터 %d%s%s" % [data.get("map", "?"), ms.size(), "  (필드 멈춤: 전투·대화·메뉴)" if data.get("frozen", false) else "",
+		("  ⏸ 몬스터 일시정지" + (" — 브레이크포인트: %s" % ", ".join(hits.map(func(m): return "%s @ %s" % [m.id, m.snap.bp_hit])) if not hits.is_empty() else "")) if data.get("paused", false) else ""]
+	if bool(data.get("paused", false)) != paused:
+		paused = bool(data.get("paused", false))
+		pause_btn.text = "▶ 재개" if paused else "⏸ 일시정지"
+	if not hits.is_empty() and selected_id == "":
+		selected_id = str(hits[0].id)
 	list.clear()
 	for m in ms:
 		var s: Dictionary = m.snap

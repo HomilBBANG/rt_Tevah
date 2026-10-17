@@ -220,6 +220,57 @@ func _ready() -> void:
 	ed.on_session_stopped()
 	check("게임이 끝남" in dv.status.text, "게임이 끝나면 알림")
 
+	# ---- Phase 6: Simple Parallel · Run Behavior · 전투 BT · 브레이크포인트·일시정지
+	ed.open_asset("BT_Infected_Field")
+	await _frames(1)
+	ed._select("ai_root", false)
+	var par: String = ed.add_from_palette("composite:SimpleParallel")
+	check(par != "" and ed.node(par).kind == "SimpleParallel" and ed.node(par).finish_mode == "Immediate", "팔레트: Simple Parallel (Immediate)")
+	var pm1: String = ed.add_node(par, "Task", "Wait")
+	check(ed.problems.get_item_text(0).contains("자식은 둘"), "Simple Parallel 자식이 하나면 오류")
+	var pb: String = ed.add_node(par, "Task", "RunBehavior")
+	ed.node(pb).params.bt_id = "BT_02_HearAndSearch"
+	ed._changed()
+	check(ed.problems.get_item_text(0).begins_with("✓"), "주 Task + 배경(Run Behavior) → 통과: %s" % ed.problems.get_item_text(0))
+	ed._select(pb, false)
+	await _frames(1)
+	var bt_opts: Array = []
+	for ob in ed.details.find_children("*", "OptionButton", true, false):
+		for i in ob.item_count:
+			bt_opts.append(ob.get_item_text(i))
+	check(bt_opts.has("BT_02_HearAndSearch") and bt_opts.has("BT_03_Stalker") and not bt_opts.has("BT_Battle_Test"), "Run Behavior: 같은 Blackboard·domain 의 BT 만 고르기")
+	ed._select(par, true)
+	await _frames(2)
+	await _snap("simple_parallel")
+	ed.toggle_breakpoint("chase")
+	check(ed.canvas.breakpoints.has("chase") and ed.sent.back()[0] == "monster_ai:breakpoints" and ed.sent.back()[1][0].BT_Infected_Field == ["chase"],
+		"브레이크포인트: 카드에 빨간 점 + 게임으로 보냄")
+	dv.set_game_paused(true)
+	check(ed.sent.back() == ["monster_ai:pause", [true]] and dv.pause_btn.text.contains("재개"), "일시정지 → 게임으로 pause 보냄")
+	var pmsg: Dictionary = JSON.parse_string(JSON.stringify(msg))
+	pmsg.paused = true
+	pmsg.monsters[0].snap.bp_hit = "chase"
+	ed.on_snapshot(pmsg)
+	check("브레이크포인트: ai_infected @ chase" in dv.status.text, "브레이크포인트에 걸리면 알림: %s" % dv.status.text)
+	ed.toggle_breakpoint("chase")
+	check(not ed.canvas.breakpoints.has("chase"), "브레이크포인트 끄기")
+	ed.open_asset("BT_Battle_Test")
+	await _frames(1)
+	var pal: Array = []
+	var root_item: TreeItem = ed.palette.get_root()
+	for g in root_item.get_children():
+		for it in g.get_children():
+			pal.append(it.get_text(0))
+	check(pal.has("UseAttack") and pal.has("UseRandomAttack") and not pal.has("MoveTo") and not pal.has("Patrol"), "전투 BT 팔레트: 전투 Task 만 (%s)" % [pal])
+	ed._select("use_quick", false)
+	await _frames(1)
+	var atk_opts: Array = []
+	for ob in ed.details.find_children("*", "OptionButton", true, false):
+		for i in ob.item_count:
+			atk_opts.append(ob.get_item_text(i))
+	check(atk_opts.any(func(t): return "atk_quick" in t), "UseAttack: 공격 고르기 목록 (NpcAttacks)")
+	await _snap("battle_bt")
+
 	# ---- 새 자산
 	check(not ed.new_bt("Bad", "BB_Infected"), "BT_ 로 시작하지 않으면 거절")
 	check(ed.new_bt("BT_Test", "BB_Infected") and ed.current == "BT_Test" and ed.node("selector_1").kind == "Selector", "새 BT: Root + Selector")

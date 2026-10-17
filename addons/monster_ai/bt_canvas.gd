@@ -18,8 +18,8 @@ const CARD_W := 290.0
 const H_GAP := 36.0
 const V_GAP := 70.0
 const ROW_H := 30.0
-const KIND_COLOR := {"Root": Color("3a3a44"), "Selector": Color("4a4f5a"), "Sequence": Color("4a4f5a"), "Task": Color("5a3f78")}
-const KIND_MARK := {"Root": "⌂ ROOT", "Selector": "?  Selector", "Sequence": "→  Sequence", "Task": "▶  Task"}
+const KIND_COLOR := {"Root": Color("3a3a44"), "Selector": Color("4a4f5a"), "Sequence": Color("4a4f5a"), "SimpleParallel": Color("3f5a5a"), "Task": Color("5a3f78")}
+const KIND_MARK := {"Root": "⌂ ROOT", "Selector": "?  Selector", "Sequence": "→  Sequence", "SimpleParallel": "⇉  Simple Parallel", "Task": "▶  Task"}
 const DECO_COLOR := Color("2f5f9a")
 const SERV_COLOR := Color("2f7a5a")
 const RESULT_COLOR := {"SUCCESS": Color("4caf50"), "FAILURE": Color("e05050"), "RUNNING": Color("f0c040"), "ABORTED": Color("c070ff")}
@@ -28,6 +28,7 @@ var tree := {}            # BT 자산
 var selected := ""
 var debug := {}           # 디버거: {active: [id], results: {id: 결과}} — 비면 표시 안 함
 var errors := {}          # id -> 오류 글 (카드에 ⚠)
+var breakpoints := {}     # id -> true: 디버거 브레이크포인트 (카드 왼쪽에 빨간 점)
 var zoom := 1.0
 var offset := Vector2(40, 30)
 var rects := {}           # id -> Rect2 (내용 좌표)
@@ -212,7 +213,12 @@ func _draw_card(id: String, font: Font, fs: int) -> void:
 		var idx: int = _nodes[parent].children.find(id)
 		var badge := Rect2(sr.position - Vector2(10, 10) * zoom, Vector2(24, 24) * zoom)
 		draw_rect(badge, Color("ffd27a"))
-		draw_string(font, badge.position + Vector2(6 * zoom, 18 * zoom), str(idx), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.BLACK)
+		var label := str(idx)
+		if str(_nodes[parent].get("kind", "")) == "SimpleParallel":
+			label = "주" if idx == 0 else "배"   # Simple Parallel: 0 = 주 Task, 1 = 배경 분기
+		draw_string(font, badge.position + Vector2(6 * zoom, 18 * zoom), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.BLACK)
+	if breakpoints.has(id):
+		draw_circle(Vector2(sr.position.x - 16 * zoom, sr.get_center().y), 9 * zoom, Color("e03030"))
 	# 디버그 결과
 	var res: String = debug.get("results", {}).get(id, "")
 	if res != "":

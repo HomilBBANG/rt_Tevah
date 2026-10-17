@@ -16,6 +16,7 @@ func _enter_tree() -> void:
 	_make_visible(false)
 	debugger = DebuggerPlugin.new()   # 게임 실행 중 BT 몬스터 상태 받기 (Runtime Debugger)
 	debugger.panel = panel
+	panel.debugger = debugger
 	add_debugger_plugin(debugger)
 
 

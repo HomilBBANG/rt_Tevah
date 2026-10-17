@@ -19,6 +19,9 @@ func _capture(message: String, data: Array, _session_id: int) -> bool:
 
 func _setup_session(session_id: int) -> void:
 	var s := get_session(session_id)
+	s.started.connect(func():
+		if panel:
+			panel.send_breakpoints.call_deferred())   # 게임이 켜지면 지금 브레이크포인트를 알려 줌
 	s.stopped.connect(func():
 		if panel:
 			panel.on_session_stopped())

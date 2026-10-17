@@ -23,6 +23,7 @@ const KIND_HELP := {
 	"Root": ["Root (Behavior Tree 의 시작)", "트리의 시작. 여기서 이 트리가 쓸 Blackboard 자산을 고른다. 자식은 Selector 나 Sequence 하나."],
 	"Selector": ["BTComposite_Selector", "왼쪽 자식부터 시도해서 하나라도 성공(또는 실행 중)이면 거기 머문다. 실패하면 다음 자식. = 'OR, 우선순위 목록'"],
 	"Sequence": ["BTComposite_Sequence", "왼쪽 자식부터 차례로 실행. 하나라도 실패하면 전체 실패. = 'AND, 순서대로'"],
+	"SimpleParallel": ["BTComposite_SimpleParallel", "주 Task(0, '주')를 실행하는 동안 배경 분기(1, '배')를 반복. 주 Task 가 끝나면 끝 (Immediate = 배경 바로 중단, Delayed = 배경이 지금 바퀴를 마칠 때까지). 결과 = 주 Task 결과."],
 }
 const ABORT_HELP := {"None": "중단 안 함 (들어갈 때만 판정)", "Self": "Self — 실행 중인 이 분기의 조건이 false 가 되면 중단",
 	"LowerPriority": "Lower Priority — 이 조건이 true 가 되면 오른쪽(낮은 우선순위)에서 실행 중인 것을 중단하고 이쪽으로",
@@ -82,7 +83,9 @@ func _build() -> void:
 	tpl.text = "템플릿 ▾"
 	tpl.tooltip_text = "예제를 새 이름으로 복사"
 	var tpls := [["behavior_tree", "BT_Infected_Field", "BT: 감염자 기본 (순찰·추격·수색·전투)"],
+		["behavior_tree", "BT_02_HearAndSearch", "BT: 실습 2 — 소리 감지·확인"],
 		["behavior_tree", "BT_03_Stalker", "BT: 실습 3 — 수색을 Task Graph 로"],
+		["behavior_tree", "BT_Battle_Test", "BT: 전투 — 상황에 따라 공격 고르기"],
 		["task_graph", "BTT_SearchLastPosition", "Task Graph: 마지막 위치 수색 (이동 실패·Abort 포함)"]]
 	for i in tpls.size():
 		tpl.get_popup().add_item(tpls[i][2], i)
@@ -205,8 +208,9 @@ func _fill_palette() -> void:
 					it.set_metadata(0, "gnode:" + k)
 					it.set_tooltip_text(0, "UE 대응: %s\n%s" % [Graph.NODES[k].ue, Graph.NODES[k].desc])
 		return
-	var groups := [["Composites", [["composite:Selector", "Selector  ? (OR)"], ["composite:Sequence", "Sequence  → (AND)"]]],
-		["Tasks", Tasks.TASKS.keys().map(func(k): return ["task:" + k, k])],
+	var dom := Assets.bt_domain(cur_bt())
+	var groups := [["Composites", [["composite:Selector", "Selector  ? (OR)"], ["composite:Sequence", "Sequence  → (AND)"], ["composite:SimpleParallel", "Simple Parallel  ⇉"]]],
+		["Tasks (%s)" % dom, Tasks.TASKS.keys().filter(func(k): return Assets.task_domain(k) in ["any", dom]).map(func(k): return ["task:" + k, k])],
 		["Decorators", Assets.DECORATORS.keys().map(func(k): return ["decorator:" + k, "◇ " + k])],
 		["Services", Tasks.SERVICES.keys().map(func(k): return ["service:" + k, "⟳ " + k])]]
 	for g in groups:
@@ -290,6 +294,7 @@ func open_asset(id: String) -> void:
 			tabs.current_tab = TAB_BT
 			canvas.set_tree(assets[id])
 			canvas.selected = selected
+			canvas.breakpoints = breakpoints_of(id)
 		"blackboard":
 			selected = ""
 			tabs.current_tab = TAB_BB
@@ -436,6 +441,46 @@ func on_snapshot(data: Dictionary) -> void:
 
 func on_session_stopped() -> void:
 	debug_view.on_session_stopped()
+
+
+# ---------------------------------------------------------------- 디버거 연결 (브레이크포인트·일시정지)
+var debugger: EditorDebuggerPlugin = null   # plugin.gd 가 넣음 (테스트에서는 없음)
+var breakpoints := {}           # bt id -> {node id: true}
+var sent: Array = []            # 테스트용: 게임으로 보낸 메시지 기록
+
+
+func breakpoints_of(bt_id: String) -> Dictionary:
+	return breakpoints.get(bt_id, {})
+
+
+func toggle_breakpoint(id: String) -> void:
+	if not breakpoints.has(current):
+		breakpoints[current] = {}
+	if breakpoints[current].has(id):
+		breakpoints[current].erase(id)
+	else:
+		breakpoints[current][id] = true
+	canvas.breakpoints = breakpoints[current]
+	canvas.queue_redraw()
+	send_breakpoints()
+	_build_details()
+
+
+func send_breakpoints() -> void:
+	var out := {}
+	for bt in breakpoints:
+		out[bt] = breakpoints[bt].keys()
+	send_to_game("monster_ai:breakpoints", [out])
+
+
+## 실행 중인 게임으로 (Godot 디버거 세션). 게임이 없으면 아무것도 안 함
+func send_to_game(message: String, data: Array) -> void:
+	sent.append([message, data])
+	if debugger == null:
+		return
+	for s in debugger.get_sessions():
+		if s.is_active():
+			s.send_message(message, data)
 
 
 func has_unsaved() -> bool:
@@ -665,6 +710,8 @@ func add_node(parent: String, kind: String, task_type: String) -> String:
 		n.erase("children")
 		n.task_type = task_type
 		n.params = default_params(task_type)
+	if kind == "SimpleParallel":
+		n.finish_mode = "Immediate"
 	cur_bt().nodes.append(n)
 	if not pn.has("children"):
 		pn.children = []
@@ -892,6 +939,8 @@ func _shortcut_input(e: InputEvent) -> void:
 		delete_node(selected)
 	elif e.keycode == KEY_F and canvas.has_focus():
 		canvas.focus_node(selected)
+	elif e.keycode == KEY_F9 and canvas.has_focus() and selected != "" and node(selected).get("kind", "") != "Root":
+		toggle_breakpoint(selected)
 	else:
 		return
 	get_viewport().set_input_as_handled()
@@ -942,8 +991,15 @@ func _build_details() -> void:
 			_touch()
 			cur_bt().blackboard_id = v
 			_changed())
-		var dom := str(cur_bt().get("domain", "field"))
-		_note("domain: %s (field = 탐험 필드. 전투 BT 는 다음 단계)" % dom)
+		var dom := Assets.bt_domain(cur_bt())
+		_option("쓰는 곳 (domain)", [["field", "field — 탐험 필드에서 움직임"], ["battle", "battle — 턴제 전투에서 공격 고르기 (npc.xlsx Npcs battle_bt)"]], dom, func(v):
+			_touch()
+			cur_bt().domain = v
+			_fill_palette()
+			_changed())
+		if dom == "battle":
+			_note("전투 BT: 적 차례마다 처음부터 한 바퀴 → UseAttack / UseRandomAttack 이 고른 공격. 아무것도 못 고르면 가중치. Blackboard 에 전투가 SelfHpRatio·PlayerHpRatio·Turn·Self_<부위>_Broken·Player_<부위>_Broken 을 씀 (있는 키만).")
+			return
 		var touch := CheckBox.new()
 		touch.text = "닿으면 바로 전투 (테바 전용)"
 		touch.tooltip_text = "켜면 이 BT 를 쓰는 몬스터에 플레이어가 닿는 순간 전투 (예전 AI 처럼).
@@ -955,8 +1011,16 @@ func _build_details() -> void:
 			cur_bt().battle_on_contact = v
 			_changed())
 		details.add_child(touch)
+	if kind == "SimpleParallel":
+		_option("Finish Mode", [["Immediate", "Immediate — 주 Task 가 끝나면 배경 바로 중단"], ["Delayed", "Delayed — 배경이 지금 바퀴를 마칠 때까지 기다림"]],
+			str(n.get("finish_mode", "Immediate")), func(v):
+				_touch()
+				n.finish_mode = v
+				_changed())
+		_note("자식 0 '주' = 주 Task (Task 만), 1 '배' = 배경 분기 (주 Task 가 도는 동안 반복)")
 	if kind == "Task":
-		var types := Tasks.TASKS.keys().map(func(k): return [k, k])
+		var dom2 := Assets.bt_domain(cur_bt())
+		var types := Tasks.TASKS.keys().filter(func(k): return Assets.task_domain(k) in ["any", dom2]).map(func(k): return [k, k])
 		_option("Task 종류", types, str(n.task_type), func(v):
 			_touch()
 			n.task_type = v
@@ -970,11 +1034,17 @@ func _build_details() -> void:
 		_btn(row, "복사", "Ctrl+C", copy_selected)
 		_btn(row, "지우기", "Delete (아래 노드 포함)", func(): delete_node(id))
 		details.add_child(row)
-	if kind in ["Root", "Selector", "Sequence"]:
+		var bp := Button.new()
+		bp.text = ("● 브레이크포인트 끄기" if breakpoints_of(current).has(id) else "○ 브레이크포인트") + " (F9)"
+		bp.tooltip_text = "게임을 실행하는 동안 이 노드에 들어가면 모든 몬스터가 멈춤 (Debugger 탭의 재개·한 단계)"
+		bp.pressed.connect(func(): toggle_breakpoint(id))
+		details.add_child(bp)
+	if kind in ["Root", "Selector", "Sequence", "SimpleParallel"]:
 		var add := MenuButton.new()
 		add.text = "＋ 자식 넣기 ▾"
 		var pm := add.get_popup()
-		var keys := ["composite:Selector", "composite:Sequence"] + Tasks.TASKS.keys().map(func(k): return "task:" + k)
+		var dom3 := Assets.bt_domain(cur_bt())
+		var keys := ["composite:Selector", "composite:Sequence", "composite:SimpleParallel"] + Tasks.TASKS.keys().filter(func(k): return Assets.task_domain(k) in ["any", dom3]).map(func(k): return "task:" + k)
 		for i in keys.size():
 			pm.add_item(keys[i].replace("composite:", "").replace("task:", "Task: "), i)
 		pm.id_pressed.connect(func(i): add_from_palette(keys[i], id))
@@ -992,7 +1062,9 @@ func _build_details() -> void:
 		addd.get_popup().add_item(k)
 	addd.get_popup().index_pressed.connect(func(i): add_decorator(id, Assets.DECORATORS.keys()[i]))
 	details.add_child(addd)
-	# Services
+	# Services (전투 BT 는 없음 — 차례마다 한 번에 판정)
+	if Assets.bt_domain(cur_bt()) == "battle":
+		return
 	_section("⟳ Services (이 분기가 실행 중인 동안만, 정해진 초마다)")
 	var ss: Array = n.get("services", [])
 	for i in ss.size():
@@ -1155,6 +1227,17 @@ func _task_params(n: Dictionary) -> void:
 			row.add_child(_value_editor(t if t != "" else "string", p.get(name), set_v))
 		elif kind == "graph":
 			_option(name, _ids_of("task_graph").map(func(g): return [g, g]), str(p.get(name, "")), set_v)
+		elif kind == "bt":   # Run Behavior: 같은 Blackboard·같은 domain 의 다른 BT
+			var same := _ids_of("behavior_tree").filter(_can_run_behavior)
+			_option(name, same.map(func(b): return [b, b]), str(p.get(name, "")), set_v)
+		elif kind == "attack":   # 전투 BT: NpcAttacks 의 공격 (data/enemies.json)
+			var atks := Assets.attack_ids()
+			_option(name, atks.keys().map(func(a): return [a, "%s  (%s)" % [atks[a], a]]), str(p.get(name, "")), set_v)
+
+
+## Run Behavior 로 부를 수 있는 BT: 자기 말고, 같은 Blackboard·같은 domain
+func _can_run_behavior(b: String) -> bool:
+	return b != current and str(assets[b].get("blackboard_id", "")) == str(cur_bt().get("blackboard_id", "")) 		and Assets.bt_domain(assets[b]) == Assets.bt_domain(cur_bt())
 
 
 func cur_bb_key_type(key: String) -> String:
