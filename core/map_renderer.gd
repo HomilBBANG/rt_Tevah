@@ -17,6 +17,7 @@ extends Node2D
 ## 쓰는 법: build(map, tile) → set_time(분) / set_door_open(id, 열림) / set_lighting(켜기)
 
 const VisualData = preload("res://core/visual_data.gd")
+const WindowView = preload("res://core/window_view.gd")
 const LIGHT_TEX_SIZE := 256
 
 var map := {}
@@ -185,8 +186,19 @@ func build_markers() -> void:
 			key = spark
 			kind = "spark"
 		elif o.get("type") == "window":
-			key = str(o.get("look", "")) if str(o.get("look", "")) != "" and VisualData.tiles().has(str(o.get("look", ""))) else VisualData.default_art("window")
+			key = str(o.get("look", "")) if VisualData.tiles().has(str(o.get("look", ""))) else ""
 			kind = "window"
+			if key == "":   # 그림을 따로 안 골랐으면 크기에 맞춰 그린 기본 창문 (core/window_view.gd)
+				var wv := WindowView.new()
+				var wl := VisualData.window_light(map, o)
+				var mode := "side_v" if wl.dir in [Vector2i.LEFT, Vector2i.RIGHT] else ("side_h" if wl.dir == Vector2i.UP else "face")
+				wv.position = Vector2(float(o.x), float(o.y)) * tile
+				wv.setup(Vector2i(int(o.get("w", 1)), int(o.get("h", 1))), mode, tile / px)
+				_marker_root.add_child(wv)
+				markers[str(o.object_id)] = {"view": wv, "kind": "window", "key": "", "frames": 1, "fps": 0.0}
+				if windows.has(str(o.object_id)):
+					set_curtain(str(o.object_id), windows[str(o.object_id)].curtain)
+				continue
 		if key == "":
 			continue
 		var fr := VisualData.tile_frame(key, 0)
@@ -335,7 +347,9 @@ func set_door_open(object_id: String, open: bool) -> void:
 func set_curtain(object_id: String, closed: bool) -> void:
 	if windows.has(object_id):
 		windows[object_id].curtain = closed
-	if markers.has(object_id) and markers[object_id].kind == "window":
+	if markers.has(object_id) and markers[object_id].has("view"):
+		markers[object_id].view.curtain = closed
+	elif markers.has(object_id) and markers[object_id].kind == "window":
 		var m: Dictionary = markers[object_id]
 		var key: String = m.key + "_curtain" if closed and VisualData.tiles().has(m.key + "_curtain") else m.key
 		var fr := VisualData.tile_frame(key, 0)
@@ -478,7 +492,12 @@ func _apply_windows() -> void:
 		w.light.color = dl.color
 		w.light.energy = e
 		w.light.enabled = not w.curtain and e > 0.01
-		if markers.has(id):   # 창문 유리: 낮에는 바깥 빛으로 밝게 (주변광과 상관없이), 밤·커튼이면 방과 같이 어둡게
+		if markers.has(id) and markers[id].has("view"):   # 기본 창문 그림: 유리 밝기·커튼
+			var wv = markers[id].view
+			wv.daylight = float(dl.k)
+			wv.curtain = w.curtain
+			wv.refresh()
+		elif markers.has(id):   # 창문 유리: 낮에는 바깥 빛으로 밝게 (주변광과 상관없이), 밤·커튼이면 방과 같이 어둡게
 			var sp: Sprite2D = markers[id].sprite
 			if w.curtain or float(dl.k) < 0.05:
 				sp.material = null

@@ -183,16 +183,16 @@ func _ready() -> void:
 	var wr: Node2D = wf.renderer
 	check(wr.windows.has("tw_win") and wr.windows.tw_win.light.enabled and wr.windows.tw_win.light.energy > 0.5
 		and is_equal_approx(wr.windows.tw_win.light.rotation, PI / 2), "창문: 실내 맵 정오에 아래(바닥 쪽)로 햇빛")
-	check(wr.markers.has("tw_win") and wr.markers.tw_win.kind == "window", "창문 그림")
+	check(wr.markers.has("tw_win") and wr.markers.tw_win.has("view") and wr.markers.tw_win.view.mode == "face"
+		and wr.markers.tw_win.view._glass.material != null, "기본 창문 그림 (벽면 창, 낮이라 유리가 밝음)")
 	wf.player.position = wf._tile_center(3, 2)
 	await _snap("window_noon")
 	var ws: Dictionary = wf.spots.filter(func(x): return x.kind == "window")[0]
-	var open_x: float = wr.markers.tw_win.sprite.texture.region.position.x
 	wf.player.position = wf._tile_center(3, 1)
 	await _wait(0.1)
 	check(wf._near_spot == ws and "커튼 치기" in wf.get_node("%Prompt").text, "창문 옆에서 '커튼 치기' 안내")
 	wf.interact()
-	check(ws.curtain and not wr.windows.tw_win.light.enabled and wr.markers.tw_win.sprite.texture.region.position.x != open_x
+	check(ws.curtain and not wr.windows.tw_win.light.enabled and wr.markers.tw_win.view.curtain and wr.markers.tw_win.view._glass.material == null
 		and GameState.field_has("twin", "curtain", "tw_win"), "커튼을 치면 빛이 막히고 커튼 그림, 회차 상태에 기록")
 	await _wait(0.1)
 	check("커튼 걷기" in wf.get_node("%Prompt").text, "커튼을 친 뒤 안내는 '커튼 걷기'")
@@ -221,7 +221,8 @@ func _ready() -> void:
 	check(br.windows.has("tb_win") and br.windows.tb_win.light.enabled and is_equal_approx(br.windows.tb_win.light.rotation, PI / 2)
 		and absf(br.windows.tb_win.light.position.y - 3.04 * bf.tile) < 1.0 and absf(br.windows.tb_win.light.position.x - 4.0 * bf.tile) < 1.0,
 		"뒷벽 창문: 빛이 창문 아래 바닥 가장자리(가운데)에서 아래로")
-	check(is_equal_approx(br.markers.tb_win.sprite.scale.x, 2.0 * bf.tile / 16.0), "2×2 창문 그림은 2칸 크기")
+	check(br.markers.tb_win.view.cells == Vector2i(2, 2) and br.markers.tb_win.view.mode == "face", "2×2 창문 그림은 2×2 칸 크기로 그림")
+	check(bf.get_node("HUD/Vignette").visible and bf.get_node("HUD").get_child(0).name == "Vignette", "비네트 (HUD 맨 아래)")
 	bf.player.position = bf._tile_center(4, 3)
 	await _wait(0.1)
 	check("커튼 치기: 높은 창" in bf.get_node("%Prompt").text, "뒷벽 창문 밑 바닥에서 '커튼 치기' 안내")

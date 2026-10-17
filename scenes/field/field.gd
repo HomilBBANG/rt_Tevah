@@ -26,6 +26,7 @@ const ChoiceButton = preload("res://ui/choice_button.gd")
 const SlotPicker = preload("res://ui/save_slot_picker.gd")
 const NpcScript = preload("res://scenes/field/field_npc.gd")
 const FurnitureScript = preload("res://scenes/field/field_furniture.gd")
+const VignetteScript = preload("res://ui/vignette.gd")
 const PlayerScript = preload("res://scenes/field/field_player.gd")
 const EnemyScript = preload("res://scenes/field/field_enemy.gd")
 
@@ -92,6 +93,11 @@ var _sleep_wake: Label
 
 func _ready() -> void:
 	InputActions.ensure()
+	var vig := ColorRect.new()   # 화면 가장자리 어둠 (Config vignette_*) — HUD 맨 아래: 지도·인물 위, 글자·창 아래
+	vig.set_script(VignetteScript)
+	vig.name = "Vignette"
+	$HUD.add_child(vig)
+	$HUD.move_child(vig, 0)
 	if GameState.current_map == "":
 		SaveManager.begin_run()          # 타이틀을 거치지 않고 바로 열었을 때
 	if next_map_id != "":
