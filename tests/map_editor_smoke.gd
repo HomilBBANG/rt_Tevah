@@ -416,6 +416,21 @@ func _ready() -> void:
 	check(not ed.new_map("bad id!", 5, 5), "잘못된 ID 거부")
 	await _snap("new_map")
 
+	# 모두 지우기 → 빈 맵 (테두리 벽 + 도착 P 하나), 실행 취소로 되돌림
+	ed.open_map("test_field")
+	await _frames(1)
+	var clr_n: int = ed.map.objects.size()
+	var clr_tiles: Array = ed.map.tiles.duplicate()
+	ed.clear_all()
+	var inner_ok := true
+	for y in range(1, ed.map.tiles.size() - 1):
+		if ed.map.tiles[y].substr(1, ed.map.tiles[y].length() - 2).count("#") > 0:
+			inner_ok = false
+	check(inner_ok and ed.map.tiles[0].count("#") == ed.map.tiles[0].length() and ed.map.objects.size() == 1 and ed.map.objects[0].type == "arrive"
+		and not ed.map.has("visual") and ed.map.tiles.size() == clr_tiles.size(), "모두 지우기: 테두리 벽 + 바닥, 도착 P 하나 (크기 그대로)")
+	ed.undo()
+	check(ed.map.objects.size() == clr_n and ed.map.tiles == clr_tiles, "실행 취소로 모두 되돌림")
+
 	# 변환·검사 (실제 프로젝트 데이터 — 원본 tools/maps 는 안 건드림)
 	check(ed.run_convert() and "변환 완료" in ed.log_view.text, "변환·검사 실행")
 

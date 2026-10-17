@@ -161,7 +161,7 @@ func _init() -> void:
 	var pm := edit_menu.get_popup()
 	for it in [["복사   Ctrl+C", copy_selection], ["붙여넣기   Ctrl+V  (마우스가 있는 칸)", func(): paste_at(canvas._hover)],
 			["삭제   Delete", delete_selection], [], ["모두 선택   Ctrl+A", func(): canvas.select_many(map.get("objects", []).filter(canvas.is_visible_object))],
-			["선택 해제   Esc", func(): canvas.select({})]]:
+			["선택 해제   Esc", func(): canvas.select({})], [], ["모두 지우기…  (빈 맵으로)", _ask_clear_all]]:
 		if it.is_empty():
 			pm.add_separator()
 			continue
@@ -1062,6 +1062,52 @@ func _restore(snap: Dictionary) -> void:
 	dirty = true
 	_refresh_links()
 	_edit_map()
+
+
+## 모두 지우기: 크기·환경만 남기고 테두리 벽 + 바닥, 도착 P 하나만. 실행 취소(Ctrl+Z) 가능, 저장 전에는 파일 그대로
+func clear_all() -> void:
+	if map.is_empty():
+		return
+	checkpoint()
+	var h: int = map.tiles.size()
+	var w := 0
+	for r in map.tiles:
+		w = maxi(w, String(r).length())
+	var tiles := []
+	for y in h:
+		var row := ""
+		for x in w:
+			row += "#" if x == 0 or y == 0 or x == w - 1 or y == h - 1 else "."
+		tiles.append(row)
+	var had_default: bool = map.get("objects", []).any(func(o): return o.get("type") == "arrive" and o.get("default", false))
+	var p := {"object_id": str(map.map_id) + "_p", "type": "arrive", "x": w / 2, "y": h / 2, "ref": "", "name": "기본", "text": "",
+		"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}
+	if had_default or map.map_id == basecamp_id:
+		p.default = true
+	_restore({"tiles": tiles, "objects": [p], "start": [w / 2, h / 2], "run_start": null, "edges": {}, "visual": null,
+		"environment": map.environment.duplicate(true) if map.get("environment") is Dictionary else null})
+	canvas.select({})
+	_status("모두 지움 (%d×%d) — Ctrl+Z 로 되돌리기, 저장해야 파일에 반영" % [w, h])
+
+
+func _ask_clear_all() -> void:
+	if map.is_empty():
+		return
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "모두 지우기"
+	dlg.dialog_text = "'%s' 를 빈 맵으로 만들까요?
+
+벽·바닥, 칠한 그림(바닥·벽·지붕), 물체(적·NPC·문·조사·나무·광원 …), 가장자리 연결이 모두 사라지고
+테두리 벽과 가운데 도착 P 하나만 남습니다. 크기와 환경(조명)은 그대로.
+
+Ctrl+Z 로 되돌릴 수 있고, 저장하기 전에는 파일이 바뀌지 않아요." % map.map_id
+	dlg.ok_button_text = "모두 지우기"
+	dlg.confirmed.connect(func():
+		clear_all()
+		dlg.queue_free())
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
 
 
 # ---------------------------------------------------------------- 복사 / 붙여넣기 / 삭제
