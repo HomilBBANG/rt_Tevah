@@ -78,6 +78,8 @@ const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
 [b]5. 반영[/b]  [b]저장[/b] → [b]변환·검사[/b] (오류가 있으면 아래에 결과 칸이 열림) → [b]▶ 테스트 플레이[/b] (진짜 저장은 건드리지 않음)
 
 [b]5. 그래픽 (픽셀아트 · 조명)[/b] — 보이는 모습만. 지나갈 수 있는지(벽 #·바닥 .)는 위 '칠하기'가 정합니다.
+  · [b]전경 가림[/b]: 팔레트 층 '전경 가림'(검은 가림막 등)으로 칠하면 게임에서 캐릭터 [b]위[/b]에 늘 그려짐 — 통로 위 천장·상단 벽. 지나가는 건 막지 않고(충돌은 벽 #), 적 시야·빛도 안 막음.
+    표시 칸의 '전경 가림' 끄기 / '전경만' / '전경 투명도'(편집 미리보기 전용, 저장 안 됨)로 아래를 고치기 쉽게. '벽 판정'을 켜면 실제로 막힌 곳이 붉게.
   · [b]타일 붓[/b]: 왼쪽 [b]타일 팔레트[/b]에서 층(바닥 / 바닥 장식 / 벽 외형)과 타일을 고르고 끌어서 칠함. □ 사각형·Shift 로 채우기. [b]타일 지우개[/b] = 지금 층에서 지움.
     안 칠한 칸은 기본 바닥·기본 벽으로 보입니다. 새 타일은 그림을 art/tiles/ 에 넣고 엑셀 graphics.xlsx 'Tiles' 에 한 줄 → 변환·검사.
   · [b]오브젝트[/b] (나무·가구 그림): 타일 팔레트 층을 '오브젝트'로 바꿔 고르고 칸 클릭 (놓은 칸 = 왼쪽 아래). 인물과 앞뒤는 발 위치로 저절로.
@@ -138,6 +140,7 @@ var palette_layer: OptionButton
 var palette_search: LineEdit
 var time_label: Label
 var _gfx_dirty := true
+var overhead_slider: HSlider         # 전경 가림 편집용 투명도 (미리보기 전용)
 
 
 func _init() -> void:
@@ -1447,7 +1450,7 @@ func _build_left_panel() -> Control:
 	for l in VisualData.PAINT_LAYERS:
 		palette_layer.add_item(VisualData.LAYER_NAME[l])
 	palette_layer.add_item("오브젝트 (나무·가구)")
-	palette_layer.tooltip_text = "칠할 그래픽 층 (바닥 → 바닥 장식 → 벽 외형 순서로 겹침, 지붕은 인물 위 — 게임에서 집 안에 들어가면 그 집 지붕만 사라짐), 또는 놓을 오브젝트 그림"
+	palette_layer.tooltip_text = "칠할 그래픽 층 (바닥 → 바닥 장식 → 벽 외형 순서로 겹침, 지붕은 인물 위 — 게임에서 집 안에 들어가면 그 집 지붕만 사라짐, 전경 가림은 인물 위에 늘 보임 — 통로 위 천장·검은 가림막, 지나가는 건 막지 않음), 또는 놓을 오브젝트 그림"
 	palette_layer.item_selected.connect(func(i):
 		if i < VisualData.PAINT_LAYERS.size():
 			canvas.tile_layer = VisualData.PAINT_LAYERS[i]
@@ -1481,19 +1484,42 @@ func _build_left_panel() -> Control:
 	filt_box.add_child(grid)
 	for f in [["tiles", "타일"], ["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["furniture", "가구"],
 			["travel", "문·통로·이용"], ["arrive", "도착 P"], ["event", "이벤트"], ["sight", "순찰"], ["names", "이름표"], ["links", "연결"],
-			["graphics", "그래픽"], ["lighting", "조명"], ["roof", "지붕"], ["props", "오브젝트"], ["light", "광원"], ["light_range", "광원 범위"], ["occluders", "그림자 차단"], ["logic", "벽 판정"]]:
+			["graphics", "그래픽"], ["lighting", "조명"], ["roof", "지붕"], ["overhead", "전경 가림"], ["overhead_only", "전경만"], ["props", "오브젝트"], ["light", "광원"], ["light_range", "광원 범위"], ["occluders", "그림자 차단"], ["logic", "벽 판정"]]:
 		var cb := CheckBox.new()
 		cb.text = f[1]
-		cb.button_pressed = not f[0] in ["occluders", "logic"]   # 그림자 차단·벽 판정 윤곽은 처음엔 끔 (canvas.filters 와 같게)
+		cb.button_pressed = not f[0] in ["occluders", "logic", "overhead_only"]   # 그림자 차단·벽 판정·전경만은 처음엔 끔 (canvas.filters 와 같게)
+		if f[0] == "logic":
+			cb.tooltip_text = "지나갈 수 없는 곳(충돌)을 붉게: 벽·빈 공간·막힌 오브젝트·가구. 전경 가림은 충돌이 아니라 안 칠해짐"
+		elif f[0] == "overhead":
+			cb.tooltip_text = "전경 가림 층 보이기 — 끄면 그 아래 바닥·문·물체를 고치기 쉬움 (게임에는 영향 없음)"
+		elif f[0] == "overhead_only":
+			cb.tooltip_text = "전경 가림만 보이기 (위치 검사용)"
 		var key: String = f[0]
 		cb.toggled.connect(func(on):
 			canvas.filters[key] = on
 			canvas.select_many(canvas.selection.filter(canvas.is_visible_object))
-			if key in ["graphics", "lighting"]:
+			if key in ["graphics", "lighting", "roof", "overhead", "overhead_only"]:
 				_apply_gfx_filters()
 			canvas.queue_redraw())
 		grid.add_child(cb)
 		filter_boxes[key] = cb
+	# 전경 가림 편집용 투명도 — 미리보기 전용 (맵 파일·게임 출력은 늘 불투명)
+	var oa := HBoxContainer.new()
+	var oal := Label.new()
+	oal.text = "전경 투명도"
+	oal.tooltip_text = "편집 미리보기 전용 — 저장되지 않고 게임에서는 늘 불투명"
+	oa.add_child(oal)
+	overhead_slider = HSlider.new()
+	overhead_slider.min_value = 0
+	overhead_slider.max_value = 100
+	overhead_slider.value = 100
+	overhead_slider.size_flags_horizontal = SIZE_EXPAND_FILL
+	overhead_slider.tooltip_text = oal.tooltip_text
+	overhead_slider.value_changed.connect(func(v):
+		if renderer:
+			renderer.set_overhead_alpha(v / 100.0))
+	oa.add_child(overhead_slider)
+	filt_box.add_child(oa)
 	return scroll
 
 
@@ -1773,7 +1799,10 @@ func _apply_gfx_filters() -> void:
 	canvas.graphics = canvas.filters.graphics
 	if renderer:
 		renderer.set_lighting(canvas.filters.lighting)
-		renderer.set_roofs_visible(canvas.filters.get("roof", true))
+		var only: bool = canvas.filters.get("overhead_only", false)
+		renderer.set_overhead_only(only)
+		renderer.set_roofs_visible(canvas.filters.get("roof", true) and not only)
+		renderer.set_overhead_visible(canvas.filters.get("overhead", true) or only)
 
 
 ## 팔레트: 지금 층의 타일 (그림 + 이름), 찾기

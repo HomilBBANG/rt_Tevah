@@ -52,7 +52,7 @@ var id_maker: Callable        # func(type) -> String
 var require_default := false  # 베이스캠프: ★ 기본 P 가 꼭 있어야 함 (첫 P 는 자동 기본, 기본 P 는 못 지움)
 ## 표시 필터 (false = 숨김, 숨긴 물체는 고를 수도 없음)
 var filters := {"tiles": true, "enemy": true, "investigate": true, "npc": true, "camp": true, "travel": true, "event": true, "light": true, "props": true, "furniture": true,
-	"graphics": true, "lighting": true, "roof": true, "light_range": true, "occluders": false, "logic": false,
+	"graphics": true, "lighting": true, "roof": true, "overhead": true, "overhead_only": false, "light_range": true, "occluders": false, "logic": false,
 	"arrive": true, "sight": true, "names": true, "links": true}
 ## 연결 표시: object_id → [글자, 맞으면 true] (편집기가 채움). 가장자리는 "edge:방향"
 var link_labels := {}
@@ -566,6 +566,16 @@ func _draw() -> void:
 			draw_rect(r, col)
 			if grid_lines:
 				draw_rect(r, Color(1, 1, 1, 0.05), false, 1.0)
+	# 충돌 표시('벽 판정'): 막힌 오브젝트·가구도 붉게, 닫히는 문은 주황 테두리 (전경 가림은 충돌이 아니라 안 칠함)
+	if filters.logic:
+		for c in VisualData.solid_cells(map):
+			draw_rect(Rect2(pan + Vector2(c) * s, Vector2(s, s)), Color(1, 0.2, 0.2, 0.28))
+		for o in map.get("objects", []):
+			if o.get("type", "") == "furniture" and o.get("solid", true) != false:
+				for c in VisualData.furniture_cells(o):
+					draw_rect(Rect2(pan + Vector2(c) * s, Vector2(s, s)), Color(1, 0.2, 0.2, 0.28))
+			elif o.get("type", "") == "exit":
+				draw_rect(Rect2(pan + Vector2(int(o.x), int(o.y)) * s, Vector2(s, s)).grow(-3), Color(1, 0.6, 0.1, 0.9), false, 2.0)
 	# 그림자 차단 윤곽: 빛을 막는 벽 타일·문 (그래픽 데이터 기준)
 	if filters.occluders:
 		for y in range(y0, y1):

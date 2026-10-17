@@ -13,7 +13,7 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(TEST_DIR)
 	for f in DirAccess.get_files_at(TEST_DIR):
 		DirAccess.remove_absolute(TEST_DIR + f)
-	for f in ["test_field", "basecamp", "test_travel", "test_arrive"]:
+	for f in ["test_field", "basecamp", "test_travel", "test_arrive", "test_overhead"]:
 		var w := FileAccess.open(TEST_DIR + f + ".json", FileAccess.WRITE)
 		# 테스트 전용 맵 복사본 (tools/maps 의 test_ 맵을 고쳐도 테스트가 안 깨지게)
 		w.store_string(FileAccess.get_file_as_string("res://tests/fixtures/maps/%s.json" % f))
@@ -29,7 +29,7 @@ func _ready() -> void:
 	add_child(bg)
 	add_child(ed)
 	await _frames(2)
-	check(ed.files.item_count == 4, "맵 4개 목록")
+	check(ed.files.item_count == 5, "맵 5개 목록")
 	ed.open_map("test_field")
 	await _frames(2)
 	var cv = ed.canvas
@@ -358,7 +358,7 @@ func _ready() -> void:
 	await _frames(1)
 	check(not ed.map.visual.layers.has("roof"), "지붕도 실행 취소")
 	# 오브젝트 그림: 팔레트를 '오브젝트'로 → 고르면 오브젝트 도구 → 클릭한 칸에
-	ed.palette_layer.select(4)
+	ed.palette_layer.select(preload("res://core/visual_data.gd").PAINT_LAYERS.size())   # 칠하는 층들 다음 = 오브젝트
 	ed._refresh_palette()
 	check(ed.palette.item_count == 4, "팔레트 '오브젝트': 나무·상자·탁자·가로등")
 	ed.palette.select(0)
@@ -501,6 +501,46 @@ func _ready() -> void:
 	ed.paste_at(Vector2i(20, 5))
 	check(ed.map.visual.layers.floor.get("20,5", "") == "floor_wood" and ed.map.visual.layers.roof.get("21,5", "") == "roof_red", "복사·붙여넣기: 칠한 그림도")
 	ed.map.objects = ed.map.objects.filter(func(o): return not str(o.object_id).begins_with("rm_") and o.get("type", "") != "furniture")
+
+	# 전경 가림 (기획 tevah_foreground_occlusion): 칠해도 벽·바닥은 그대로, 지우개는 전경만, 실행 취소, 편집용 투명도는 저장 안 됨
+	ed.open_map("test_overhead")
+	await _frames(2)
+	check(ed.map.visual.layers.overhead.size() == 30 and cv.is_floor(Vector2i(9, 3)), "테스트 맵: 통로 위 전경 가림 30칸, 통로는 바닥")
+	cv.tile_layer = "overhead"
+	cv.tile_key = "overhead_black"
+	ed.set_tool("tile")
+	cv._press(Vector2i(3, 3), false, false)
+	cv._release(Vector2i(3, 3))
+	check(ed.map.visual.layers.overhead.get("3,3", "") == "overhead_black" and cv.is_floor(Vector2i(3, 3)), "전경 칠하기: 그 칸은 여전히 바닥 (충돌 없음)")
+	ed.map.visual.layers.floor = {"3,3": "floor_wood"}
+	ed.set_tool("tile_erase")
+	cv._press(Vector2i(3, 3), false, false)
+	cv._release(Vector2i(3, 3))
+	check(not ed.map.visual.layers.overhead.has("3,3") and ed.map.visual.layers.floor.get("3,3", "") == "floor_wood", "전경 지우개: 전경만 지우고 바닥 그림은 그대로")
+	ed.undo()
+	check(ed.map.visual.layers.overhead.get("3,3", "") == "overhead_black", "실행 취소 → 전경 다시")
+	ed.redo()
+	check(not ed.map.visual.layers.overhead.has("3,3"), "다시 실행 → 전경 지움")
+	ed._gfx_dirty = true
+	await _frames(2)
+	check(ed.renderer.overhead.get_used_cells().size() == 30 and ed.renderer.overhead.z_index > 50, "에디터 미리보기: 전경 층 (지붕보다 위)")
+	ed.overhead_slider.value = 40
+	ed.filter_boxes.overhead.button_pressed = false
+	await _frames(1)
+	check(is_equal_approx(ed.renderer.overhead.modulate.a, 0.4) and not ed.renderer.overhead.visible, "편집용 투명도 40% · 전경 숨기기")
+	ed.filter_boxes.overhead.button_pressed = true
+	ed.filter_boxes.overhead_only.button_pressed = true
+	await _frames(1)
+	check(ed.renderer.overhead.visible and not ed.renderer.layers.floor.visible, "전경만 보기")
+	ed.filter_boxes.overhead_only.button_pressed = false
+	ed.save()
+	var oh_saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_overhead.json"))
+	check(oh_saved.visual.layers.overhead.size() == 30 and not JSON.stringify(oh_saved).contains("alpha"), "저장: 전경 칸 그대로, 편집용 투명도는 저장 안 됨")
+	ed.open_map("test_field")
+	ed.open_map("test_overhead")
+	check(ed.map.visual.layers.overhead.get("9,3", "") == "overhead_black", "다시 열기: 전경 유지")
+	ed.overhead_slider.value = 100
+	cv.tile_layer = "floor"
 
 	# 맵 삭제: 쓰는 곳(다른 맵의 문) 목록 → 파일 지움, 베이스캠프는 못 지움
 	ed.new_map("test_del", 5, 5)

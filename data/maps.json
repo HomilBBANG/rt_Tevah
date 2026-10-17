@@ -3212,6 +3212,93 @@
   }
  },
  {
+  "map_id": "test_overhead",
+  "width": 20,
+  "height": 8,
+  "tiles": [
+   "####################",
+   "#......#####.......#",
+   "#......#####.......#",
+   "#..................#",
+   "#..................#",
+   "#......#####.......#",
+   "#......#####.......#",
+   "####################"
+  ],
+  "start": [
+   2,
+   3
+  ],
+  "run_start": [
+   2,
+   3
+  ],
+  "objects": [
+   {
+    "object_id": "test_overhead_p",
+    "type": "arrive",
+    "ref": "",
+    "name": "방 A",
+    "text": "",
+    "condition": "",
+    "arrive": "",
+    "face": "",
+    "look": "",
+    "from": [],
+    "default": true,
+    "once": false,
+    "map_id": "test_overhead",
+    "x": 2,
+    "y": 3,
+    "patrol_dir": "",
+    "patrol_len": 0,
+    "schedule": []
+   }
+  ],
+  "edges": {},
+  "visual": {
+   "layers": {
+    "overhead": {
+     "7,1": "overhead_black",
+     "7,2": "overhead_black",
+     "7,3": "overhead_black",
+     "7,4": "overhead_black",
+     "7,5": "overhead_black",
+     "7,6": "overhead_black",
+     "8,1": "overhead_black",
+     "8,2": "overhead_black",
+     "8,3": "overhead_black",
+     "8,4": "overhead_black",
+     "8,5": "overhead_black",
+     "8,6": "overhead_black",
+     "9,1": "overhead_black",
+     "9,2": "overhead_black",
+     "9,3": "overhead_black",
+     "9,4": "overhead_black",
+     "9,5": "overhead_black",
+     "9,6": "overhead_black",
+     "10,1": "overhead_black",
+     "10,2": "overhead_black",
+     "10,3": "overhead_black",
+     "10,4": "overhead_black",
+     "10,5": "overhead_black",
+     "10,6": "overhead_black",
+     "11,1": "overhead_black",
+     "11,2": "overhead_black",
+     "11,3": "overhead_black",
+     "11,4": "overhead_black",
+     "11,5": "overhead_black",
+     "11,6": "overhead_black"
+    }
+   },
+   "default_floor": "",
+   "default_wall": ""
+  },
+  "environment": {
+   "profile": "indoor"
+  }
+ },
+ {
   "map_id": "test_travel",
   "width": 9,
   "height": 6,

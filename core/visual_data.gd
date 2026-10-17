@@ -11,8 +11,9 @@ const TILES_DIR := "res://art/tiles/"
 const PROPS_DIR := "res://art/props/"
 const LAYERS := ["floor", "detail", "wall"]   # 바닥 그림 층 (cell_keys)
 ## 칠할 수 있는 층 = 바닥 그림 층 + 지붕 (지붕은 인물보다 위에 따로 — map_renderer 의 roof)
-const PAINT_LAYERS := ["floor", "detail", "wall", "roof"]
-const LAYER_NAME := {"floor": "바닥", "detail": "바닥 장식", "wall": "벽 외형", "roof": "지붕"}
+## 전경 가림(overhead): 인물 위에 늘 보이는 가림막·천장·상단 벽 — 보이기만, 충돌·시야·빛 차단 없음 (map_renderer 의 Overhead)
+const PAINT_LAYERS := ["floor", "detail", "wall", "roof", "overhead"]
+const LAYER_NAME := {"floor": "바닥", "detail": "바닥 장식", "wall": "벽 외형", "roof": "지붕", "overhead": "전경 가림"}
 
 static var _data := {}
 static var _tiles := {}
@@ -203,6 +204,26 @@ static func tile_frame(key: String, frame: int) -> Array:
 		return []
 	var px := art_px()
 	return [tex, Rect2((int(t.get("atlas_x", 0)) + frame) * px, int(t.get("atlas_y", 0)) * px, px, px)]
+
+
+## 전경 가림 칸 {Vector2i: tile_key} — 맵 안, 있는 overhead 타일만 (없는·다른 층 타일은 변환기가 오류로 잡음)
+static func overhead_cells(map: Dictionary) -> Dictionary:
+	var out := {}
+	var cells = ((map.get("visual", {}) if map.get("visual") is Dictionary else {}).get("layers", {})).get("overhead", {})
+	if not cells is Dictionary:
+		return out
+	var rows: Array = map.get("tiles", [])
+	for k in cells:
+		var xy := str(k).split(",")
+		if xy.size() != 2:
+			continue
+		var c := Vector2i(int(xy[0]), int(xy[1]))
+		if c.y < 0 or c.y >= rows.size() or c.x < 0 or c.x >= String(rows[c.y]).length():
+			continue
+		var key := str(cells[k])
+		if tiles().has(key) and str(tiles()[key].get("layer", "")) == "overhead":
+			out[c] = key
+	return out
 
 
 ## 지붕 칸 {Vector2i: tile_key} — 맵 안, 있는 지붕 타일(layer=roof)만. 이어진 칸 묶음 하나 = 집 한 채

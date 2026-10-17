@@ -274,6 +274,7 @@ func _ready() -> void:
 	check(is_equal_approx(float(GameState.survival.thirst), 70.0) and tap in ff.furniture, "사용 가구는 여러 번 (사라지지 않음)")
 	ff.queue_free()
 	DataLoader.maps.erase("tfur")
+	await _overhead_test()
 	DataLoader.maps.erase("tback")
 	DataLoader.maps.erase("twin")
 	DataLoader.maps.erase("tgfx")
@@ -283,6 +284,57 @@ func _ready() -> void:
 
 
 ## 테스트 맵 14x7: 가운데 벽(x=7)에 문, 왼쪽 방에 광원, 잔디·핏자국 칠함, 오른쪽 끝은 빈 공간
+## 전경 가림 (기획 tevah_foreground_occlusion §9): 두 방 사이 통로 위 검은 가림막 — 화면에서는 덮이고, 걸어서 지나가짐
+func _overhead_test() -> void:
+	var src: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://tests/fixtures/maps/test_overhead.json"))
+	var om := {"map_id": "tover", "width": 20, "height": src.tiles.size(), "tiles": src.tiles, "start": [2, 3], "run_start": [2, 3], "edges": {},
+		"objects": [], "visual": src.visual, "environment": src.environment}
+	DataLoader.maps["tover"] = om
+	GameState.clock = 12 * 60.0
+	FieldScript.next_map_id = "tover"
+	var of: Node = load("res://scenes/field/field.tscn").instantiate()
+	add_child(of)
+	await _wait(0.3)
+	var orr: Node2D = of.renderer
+	var t: float = of.tile
+	check(orr.overhead.get_used_cells().size() == 30 and orr.overhead.z_index > orr._roof_root.z_index and is_equal_approx(orr.overhead.modulate.a, 1.0),
+		"01·02 전경 30칸, 인물·지붕보다 위(z %d), 게임에서는 불투명" % orr.overhead.z_index)
+	check(not of.path_grid().is_point_solid(Vector2i(9, 3)) and of.path_grid().is_point_solid(Vector2i(9, 1)) and not of.find_path(Vector2i(2, 3), Vector2i(16, 3)).is_empty(),
+		"03·04·13 통로는 길 찾기에서 열림, 전경 아래 벽(#)은 그대로 막힘")
+	var q := PhysicsRayQueryParameters2D.create(Vector2(3.5, 3.5) * t, Vector2(16.5, 3.5) * t, of.WALL_LAYER | of.DOOR_LAYER)
+	check(of.get_world_2d().direct_space_state.intersect_ray(q).is_empty(), "14 적 시야: 전경만으로는 막히지 않음 (통로 너머가 보임)")
+	var lit := true
+	for occ in orr._occ_root.get_children():
+		if Geometry2D.is_point_in_polygon(Vector2(9.5, 3.5) * t, (occ as LightOccluder2D).occluder.polygon):
+			lit = false
+	check(lit, "15 빛: 전경 칸에 빛 막는 그림자 조각 없음")
+	check(of.get_node("HUD").layer > 0 and orr.overhead.get_canvas_layer_node() == null, "17 전경은 월드에 그림 — HUD(대화·전투·글자)는 따로 위")
+	# 실제로 걸어서 방 A → 통로 → 방 B
+	of.player.position = of._tile_center(2, 3)
+	Input.action_press("move_right")
+	var under := false
+	for i in 360:
+		await get_tree().physics_frame
+		var c := Vector2i(floori(of.player.position.x / t), floori(of.player.position.y / t))
+		if orr.overhead.get_cell_source_id(c) != -1 and not under:
+			under = true
+			await _snap("overhead_under")
+		if of.player.position.x > 15 * t:
+			break
+	Input.action_release("move_right")
+	check(under and of.player.position.x > 15 * t, "01·03 걸어서 통로 통과 (전경 아래를 지남, x = %.1f칸)" % (of.player.position.x / t))
+	# 전경 아래 벽으로는 못 감
+	of.player.position = of._tile_center(9, 3)
+	await get_tree().physics_frame
+	Input.action_press("move_up")
+	for i in 40:
+		await get_tree().physics_frame
+	Input.action_release("move_up")
+	check(of.player.position.y > 2.9 * t, "04 전경 아래 벽(#)은 계속 막힘 (y = %.2f칸)" % (of.player.position.y / t))
+	of.queue_free()
+	DataLoader.maps.erase("tover")
+
+
 func _map(profile: String) -> Dictionary:
 	var tiles := ["##############", "#......#....# ", "#......#....# ", "#............ ", "#......#....# ", "#......#....# ", "##############"]
 	var obj := func(id: String, type: String, x: int, y: int, extra := {}) -> Dictionary:

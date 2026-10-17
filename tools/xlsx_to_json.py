@@ -121,7 +121,8 @@ PROPS_DIR = ROOT / "art" / "props"
 LIGHT_SHAPES = {"", "point", "cone"}   # light = 광원 (그래픽만)
 # 칠하지 않고 물체에 씀: door = 문(exit) 그림 (닫힘 key, 열림 key_open), marker = 조사 지점 반짝이, window = 창문 (커튼 key_curtain)
 OBJECT_ART_LAYERS = {"door", "marker", "window"}
-TILE_LAYERS = {"floor", "detail", "wall", "roof"}   # 그래픽 층: 바닥 / 바닥 장식 / 벽 외형 / 지붕 (인물 위 — 집 안에 들어가면 사라짐)
+# 그래픽 층: 바닥 / 바닥 장식 / 벽 외형 / 지붕 (인물 위 — 집 안에 들어가면 사라짐) / 전경 가림 (인물 위, 늘 보임 — 충돌·시야·빛 차단 없음)
+TILE_LAYERS = {"floor", "detail", "wall", "roof", "overhead"}
 TILES_DIR = ROOT / "art" / "tiles"
 LIGHT_NUMS = ("energy", "radius")   # event = 밟으면 대화(컷신)
 TRAVEL_TYPES = {"exit", "passage", "transit"}
@@ -1247,7 +1248,7 @@ def validate_graphics(d, maps, rep):
     for t in d["Tiles"]:
         w = loc("Tiles", t)
         if t["layer"] not in TILE_LAYERS | OBJECT_ART_LAYERS:
-            rep.err(w, f"layer 는 floor / detail / wall / roof (칠하기) 또는 door (문 그림) / marker (조사 반짝이) / window (창문): '{t['layer']}'")
+            rep.err(w, f"layer 는 floor / detail / wall / roof / overhead (칠하기) 또는 door (문 그림) / marker (조사 반짝이) / window (창문): '{t['layer']}'")
         if t["layer"] == "window" and not t["tile_key"].endswith("_curtain") and t["tile_key"] + "_curtain" not in tiles:
             rep.warn(w, f"창문 '{t['tile_key']}' 의 커튼 그림 '{t['tile_key']}_curtain' 이 없음 (커튼을 쳐도 같은 그림)")
         if t["layer"] == "door" and not t["tile_key"].endswith("_open") and t["tile_key"] + "_open" not in tiles:
@@ -1311,9 +1312,15 @@ def validate_graphics(d, maps, rep):
                 rep.warn(wm, f"알 수 없는 그래픽 층 '{layer}'")
                 continue
             bad = sorted({k for k in cells.values() if k not in tiles})
+            wrong = sorted({k for k in cells.values() if k in tiles and tiles[k]["layer"] != layer})
+            if layer == "overhead":   # 전경 가림: 없는 타일·다른 층 타일은 오류 (기획 §6.2 — 안 보이는 가림막이 생기지 않게)
+                if bad and tiles:
+                    rep.err(wm, f"전경 가림 층에 없는 타일 {', '.join(bad)}")
+                if wrong:
+                    rep.err(wm, f"전경 가림 층에 다른 층 타일 {', '.join(wrong)} (graphics.xlsx Tiles layer=overhead 만)")
+                bad, wrong = [], []
             if bad and tiles:
                 rep.warn(wm, f"그래픽 '{layer}' 층에 없는 타일 {', '.join(bad)} (기본 타일로 보임)")
-            wrong = sorted({k for k in cells.values() if k in tiles and tiles[k]["layer"] != layer})
             if wrong:
                 rep.warn(wm, f"그래픽 '{layer}' 층에 다른 층 타일 {', '.join(wrong)}")
             out = [c for c in cells if not _cell_in(c, wdt, h)]

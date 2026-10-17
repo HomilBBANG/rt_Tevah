@@ -5,6 +5,9 @@ extends Node2D
 ##   층: 검은 바탕 → 바닥 → 바닥 장식 → 벽 외형 (TileMapLayer, 픽셀아트 nearest, 그림 1칸 tile_art_px → 화면 tile)
 ##   지붕: 인물·오브젝트보다 위(z 50). 이어진 지붕 칸 묶음 = 집 한 채 = TileMapLayer 하나 → 플레이어가 그 아래에 들어가면
 ##         그 집 지붕만 서서히 사라짐 (set_roof_open, 필드가 부름). 에디터는 반투명(roof_alpha)으로 아래가 보이게.
+##   전경 가림(Overhead, 기획 tevah_foreground_occlusion_map_editor_spec_v1.0): 인물·지붕보다 위(z 60) TileMapLayer 하나.
+##         늘 불투명(게임). 보이기만 — 충돌(필드 벽은 논리 칸 #)·적 시야(물리 레이캐스트)·빛 그림자(occluder)와 무관.
+##         에디터만 overhead_alpha(미리보기 투명도)·set_overhead_visible·set_overhead_only(전경만 보기) — 맵 파일에 저장 안 됨
 ##   그림자: 그림자를 만드는 벽 타일(casts_shadow)과 닫힌 문에 LightOccluder2D
 ##   조명: CanvasModulate(환경광, 시간대·맵 환경 outdoor/indoor/underground) + 실외 햇빛(DirectionalLight2D, 그림자 없음)
 ##         + 광원(맵 물체 type=light → PointLight2D, 벽 그림자)
@@ -32,6 +35,8 @@ var props_root: Node2D           # 오브젝트 그림을 둘 Y 정렬 노드 (�
 var prop_sprites: Array = []
 var roof_regions: Array = []     # [{cells: {Vector2i: true}, layer: TileMapLayer, open: bool}]
 var roof_alpha := 1.0            # 덮었을 때 지붕 불투명도 (에디터 미리보기는 반투명)
+var overhead: TileMapLayer       # 전경 가림 층
+var overhead_alpha := 1.0        # 에디터 미리보기 투명도 (게임은 늘 1)
 var _roof_cell := {}             # Vector2i → 지붕 묶음 번호
 var markers := {}                # object_id → {sprite, kind: door/spark/window, key, frames, fps}
 var windows := {}                # object_id → {light: PointLight2D, curtain: bool}
@@ -74,6 +79,11 @@ func _init() -> void:
 	_roof_root.name = "Roofs"
 	_roof_root.z_index = 50   # 인물(필드 %World, z 0)보다 위
 	add_child(_roof_root)
+	overhead = TileMapLayer.new()
+	overhead.name = "Overhead"
+	overhead.z_index = 60     # 인물·지붕보다 위. HUD(CanvasLayer)는 따로라 덮지 않음
+	overhead.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	add_child(overhead)
 	_light_root = Node2D.new()
 	_light_root.name = "Lights"
 	add_child(_light_root)
@@ -120,6 +130,14 @@ func rebuild_tiles() -> void:
 			if keys.wall != "" and VisualData.tiles().get(keys.wall, {}).get("casts_shadow", false):
 				shadow_cells[Vector2i(x, y)] = true
 	_rebuild_roofs(ts, scale_k)
+	overhead.tile_set = ts
+	overhead.scale = Vector2(scale_k, scale_k)
+	overhead.clear()
+	var oc := VisualData.overhead_cells(map)
+	for c in oc:
+		if _keys.has(oc[c]):
+			overhead.set_cell(c, _keys[oc[c]][0], _keys[oc[c]][1])
+	overhead.modulate.a = overhead_alpha
 	for o in map.get("objects", []):
 		if o.get("type", "") == "window":
 			for c in VisualData.object_cells(o):
@@ -266,6 +284,26 @@ func set_roof_open(i: int, open: bool, instant := false) -> void:
 
 func set_roofs_visible(v: bool) -> void:
 	_roof_root.visible = v
+
+
+## 에디터: 전경 가림 보이기·숨기기 / 미리보기 투명도 (맵 데이터와 게임 출력에는 영향 없음)
+func set_overhead_visible(v: bool) -> void:
+	overhead.visible = v
+
+
+func set_overhead_alpha(a: float) -> void:
+	overhead_alpha = clampf(a, 0.0, 1.0)
+	overhead.modulate.a = overhead_alpha
+
+
+## 에디터 '전경만 보기': 전경 가림 말고 다른 그림(바닥·벽·지붕·오브젝트·표시 그림)을 숨김
+func set_overhead_only(on: bool) -> void:
+	for l in layers:
+		layers[l].visible = not on
+	_roof_root.visible = not on
+	props_root.visible = not on
+	_marker_root.visible = not on
+	_bg.visible = not on
 
 
 ## 타일셋: 그림 파일마다 아틀라스 하나 (tile_key 는 바뀌지 않는 이름, 그림·칸은 graphics.xlsx 에서)

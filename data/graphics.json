@@ -321,6 +321,20 @@
    "fps": 6.0,
    "face": "",
    "face_rows": 1
+  },
+  {
+   "tile_key": "overhead_black",
+   "name": "검은 가림막",
+   "layer": "overhead",
+   "file": "test_tiles.png",
+   "atlas_x": 2,
+   "atlas_y": 7,
+   "casts_shadow": false,
+   "note": "전경 가림 기본 타일 — 캐릭터 위에 그려지고 충돌·시야·빛 차단 없음",
+   "frames": 1,
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   }
  ],
  "light_presets": [
