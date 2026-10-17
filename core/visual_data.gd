@@ -9,8 +9,10 @@ extends RefCounted
 const DATA_PATH := "res://data/graphics.json"
 const TILES_DIR := "res://art/tiles/"
 const PROPS_DIR := "res://art/props/"
-const LAYERS := ["floor", "detail", "wall"]
-const LAYER_NAME := {"floor": "바닥", "detail": "바닥 장식", "wall": "벽 외형"}
+const LAYERS := ["floor", "detail", "wall"]   # 바닥 그림 층 (cell_keys)
+## 칠할 수 있는 층 = 바닥 그림 층 + 지붕 (지붕은 인물보다 위에 따로 — map_renderer 의 roof)
+const PAINT_LAYERS := ["floor", "detail", "wall", "roof"]
+const LAYER_NAME := {"floor": "바닥", "detail": "바닥 장식", "wall": "벽 외형", "roof": "지붕"}
 
 static var _data := {}
 static var _tiles := {}
@@ -143,6 +145,27 @@ static func cell_keys(map: Dictionary, x: int, y: int) -> Dictionary:
 			out.wall = "wall_default" if t.has("wall_default") else ""
 	elif out.floor == "":
 		out.floor = "floor_default" if t.has("floor_default") else ""
+	return out
+
+
+## 지붕 칸 {Vector2i: tile_key} — 맵 안, 있는 지붕 타일(layer=roof)만. 이어진 칸 묶음 하나 = 집 한 채
+static func roof_cells(map: Dictionary) -> Dictionary:
+	var out := {}
+	var cells = ((map.get("visual", {}) if map.get("visual") is Dictionary else {}).get("layers", {})).get("roof", {})
+	if not cells is Dictionary:
+		return out
+	var rows: Array = map.get("tiles", [])
+	var t := tiles()
+	for k in cells:
+		var xy := str(k).split(",")
+		if xy.size() != 2:
+			continue
+		var c := Vector2i(int(xy[0]), int(xy[1]))
+		if c.y < 0 or c.y >= rows.size() or c.x < 0 or c.x >= String(rows[c.y]).length():
+			continue
+		var key := str(cells[k])
+		if t.has(key) and str(t[key].get("layer", "")) == "roof":
+			out[c] = key
 	return out
 
 

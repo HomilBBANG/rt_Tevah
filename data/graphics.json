@@ -79,6 +79,26 @@
    "atlas_y": 1,
    "casts_shadow": false,
    "note": "테스트 타일 (투명 바탕)"
+  },
+  {
+   "tile_key": "roof_red",
+   "name": "빨간 지붕",
+   "layer": "roof",
+   "file": "test_tiles.png",
+   "atlas_x": 0,
+   "atlas_y": 2,
+   "casts_shadow": false,
+   "note": "테스트 타일 — 지붕 층: 인물보다 위, 집 안에 들어가면 그 집 지붕이 사라짐"
+  },
+  {
+   "tile_key": "roof_slate",
+   "name": "회색 지붕",
+   "layer": "roof",
+   "file": "test_tiles.png",
+   "atlas_x": 1,
+   "atlas_y": 2,
+   "casts_shadow": false,
+   "note": "테스트 타일 — 지붕 층"
   }
  ],
  "light_presets": [

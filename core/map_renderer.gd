@@ -3,6 +3,8 @@ extends Node2D
 ## 맵 그림 + 조명 (기획 tevah_pixelart_2d_lighting_map_editor_spec_v1.0). 탐험 필드와 맵 에디터가 같은 것을 쓴다.
 ## 논리(벽 충돌·문·시야·이동)는 건드리지 않는다 — 보이는 모습만.
 ##   층: 검은 바탕 → 바닥 → 바닥 장식 → 벽 외형 (TileMapLayer, 픽셀아트 nearest, 그림 1칸 tile_art_px → 화면 tile)
+##   지붕: 인물·오브젝트보다 위(z 50). 이어진 지붕 칸 묶음 = 집 한 채 = TileMapLayer 하나 → 플레이어가 그 아래에 들어가면
+##         그 집 지붕만 서서히 사라짐 (set_roof_open, 필드가 부름). 에디터는 반투명(roof_alpha)으로 아래가 보이게.
 ##   그림자: 그림자를 만드는 벽 타일(casts_shadow)과 닫힌 문에 LightOccluder2D
 ##   조명: CanvasModulate(환경광, 시간대·맵 환경 outdoor/indoor/underground) + 실외 햇빛(DirectionalLight2D, 그림자 없음)
 ##         + 광원(맵 물체 type=light → PointLight2D, 벽 그림자)
@@ -23,6 +25,10 @@ var doors := {}                  # object_id → LightOccluder2D
 var occluder_count := 0          # 벽 그림자 조각 수 (테스트·디버그)
 var props_root: Node2D           # 오브젝트 그림을 둘 Y 정렬 노드 (기본은 렌더러 안 — 필드는 인물이 있는 %World)
 var prop_sprites: Array = []
+var roof_regions: Array = []     # [{cells: {Vector2i: true}, layer: TileMapLayer, open: bool}]
+var roof_alpha := 1.0            # 덮었을 때 지붕 불투명도 (에디터 미리보기는 반투명)
+var _roof_cell := {}             # Vector2i → 지붕 묶음 번호
+var _roof_root: Node2D
 static var _cone_tex: Texture2D
 var _bg: ColorRect
 var _occ_root: Node2D
@@ -51,6 +57,10 @@ func _init() -> void:
 	props_root.name = "Props"
 	props_root.y_sort_enabled = true
 	add_child(props_root)
+	_roof_root = Node2D.new()
+	_roof_root.name = "Roofs"
+	_roof_root.z_index = 50   # 인물(필드 %World, z 0)보다 위
+	add_child(_roof_root)
 	_light_root = Node2D.new()
 	_light_root.name = "Lights"
 	add_child(_light_root)
@@ -95,11 +105,71 @@ func rebuild_tiles() -> void:
 					layers[l].set_cell(Vector2i(x, y), _keys[key][0], _keys[key][1])
 			if keys.wall != "" and VisualData.tiles().get(keys.wall, {}).get("casts_shadow", false):
 				shadow_cells[Vector2i(x, y)] = true
+	_rebuild_roofs(ts, scale_k)
 	var pc := VisualData.prop_cells(map)
 	for c in pc:
 		if pc[c].get("casts_shadow", false):
 			shadow_cells[c] = true   # 빛을 막는 오브젝트 (나무·상자) — 차지하는 칸
 	_build_occluders(shadow_cells, rows.size(), w)
+
+
+## 지붕: 이어진 칸(상하좌우)끼리 묶음 → 묶음마다 TileMapLayer
+func _rebuild_roofs(ts: TileSet, scale_k: float) -> void:
+	for c in _roof_root.get_children():
+		_roof_root.remove_child(c)
+		c.queue_free()
+	roof_regions = []
+	_roof_cell = {}
+	var cells := VisualData.roof_cells(map)
+	for start in cells:
+		if _roof_cell.has(start):
+			continue
+		var idx := roof_regions.size()
+		var region := {}
+		var todo := [start]
+		_roof_cell[start] = idx
+		while not todo.is_empty():
+			var c: Vector2i = todo.pop_back()
+			region[c] = true
+			for d in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+				var n: Vector2i = c + d
+				if cells.has(n) and not _roof_cell.has(n):
+					_roof_cell[n] = idx
+					todo.append(n)
+		var tl := TileMapLayer.new()
+		tl.name = "Roof_%d" % idx
+		tl.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		tl.tile_set = ts
+		tl.scale = Vector2(scale_k, scale_k)
+		for c in region:
+			if _keys.has(cells[c]):
+				tl.set_cell(c, _keys[cells[c]][0], _keys[cells[c]][1])
+		tl.modulate.a = roof_alpha
+		_roof_root.add_child(tl)
+		roof_regions.append({"cells": region, "layer": tl, "open": false})
+
+
+## 칸 c 를 덮는 지붕 묶음 번호 (없으면 -1)
+func roof_region_at(c: Vector2i) -> int:
+	return _roof_cell.get(c, -1)
+
+
+## 지붕 열기(사라짐)·닫기(덮음). instant = 바로 (맵을 처음 열 때)
+func set_roof_open(i: int, open: bool, instant := false) -> void:
+	if i < 0 or i >= roof_regions.size():
+		return
+	var r: Dictionary = roof_regions[i]
+	r.open = open
+	var to := 0.0 if open else roof_alpha
+	if instant or not is_inside_tree():
+		r.layer.modulate.a = to
+		return
+	var tw := create_tween()
+	tw.tween_property(r.layer, "modulate:a", to, 0.25)
+
+
+func set_roofs_visible(v: bool) -> void:
+	_roof_root.visible = v
 
 
 ## 타일셋: 그림 파일마다 아틀라스 하나 (tile_key 는 바뀌지 않는 이름, 그림·칸은 graphics.xlsx 에서)

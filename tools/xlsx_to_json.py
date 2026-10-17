@@ -117,7 +117,7 @@ OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "Statu
 FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop"}   # prop = 오브젝트 그림
 PROPS_DIR = ROOT / "art" / "props"
 LIGHT_SHAPES = {"", "point", "cone"}   # light = 광원 (그래픽만)
-TILE_LAYERS = {"floor", "detail", "wall"}   # 그래픽 층: 바닥 / 바닥 장식 / 벽 외형
+TILE_LAYERS = {"floor", "detail", "wall", "roof"}   # 그래픽 층: 바닥 / 바닥 장식 / 벽 외형 / 지붕 (인물 위 — 집 안에 들어가면 사라짐)
 TILES_DIR = ROOT / "art" / "tiles"
 LIGHT_NUMS = ("energy", "radius")   # event = 밟으면 대화(컷신)
 TRAVEL_TYPES = {"exit", "passage", "transit"}

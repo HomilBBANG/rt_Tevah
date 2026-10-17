@@ -341,8 +341,22 @@ func _ready() -> void:
 	ed._gfx_dirty = true
 	await _frames(2)
 	check(rnd.lights.size() == 1 and is_equal_approx(rnd.lights[0].texture_scale, 6.0 * 80.0 * 2.0 / 256.0), "광원마다 범위 고치기 → 그림에 반영")
-	# 오브젝트 그림: 팔레트를 '오브젝트'로 → 고르면 오브젝트 도구 → 클릭한 칸에
+	# 지붕 층: 팔레트 '지붕' → 칠하면 visual.layers.roof, 에디터에서는 반투명
 	ed.palette_layer.select(3)
+	ed.palette_layer.item_selected.emit(3)
+	check(c.tile_layer == "roof" and ed.palette.item_count == 2, "팔레트 '지붕': 지붕 타일 2개 (%d)" % ed.palette.item_count)
+	ed.set_tool("tile")
+	c.tile_key = "roof_red"
+	c.stroke_started.emit()
+	c.fill_rect(Rect2i(fl, Vector2i(2, 1)))
+	await _frames(2)
+	check(ed.map.visual.layers.roof.size() == 2 and rnd.roof_regions.size() == 1 and is_equal_approx(rnd.roof_regions[0].layer.modulate.a, 0.55),
+		"지붕 칠하기 → 이어진 칸 = 한 채, 에디터에서는 반투명 (아래가 보임)")
+	ed.undo()
+	await _frames(1)
+	check(not ed.map.visual.layers.has("roof"), "지붕도 실행 취소")
+	# 오브젝트 그림: 팔레트를 '오브젝트'로 → 고르면 오브젝트 도구 → 클릭한 칸에
+	ed.palette_layer.select(4)
 	ed._refresh_palette()
 	check(ed.palette.item_count == 4, "팔레트 '오브젝트': 나무·상자·탁자·가로등")
 	ed.palette.select(0)

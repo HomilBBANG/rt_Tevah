@@ -59,6 +59,7 @@ var spots: Array = []            # 상호작용 지점 [{ kind: "spot"/"camp"/"e
 var npcs: Array = []             # NPC [{ kind: "npc", data, pos, node, active }] — active: 지금 시간대에 있음
 var _path_grid: AStarGrid2D      # 벽을 돌아가는 길 찾기 (맵마다 한 번 만듦 — 컷신 걷기·BT 몬스터 이동)
 var _arrive_tile := Vector2i.ZERO  # 이 맵에 들어온 칸 (쫓아오는 몬스터가 여기로 들어옴)
+var _roof_open := -1             # 지금 열린(플레이어가 아래에 있는) 지붕 묶음
 var _follow_queue: Array = []    # 따라 들어올 몬스터 [{data, left(초)}] — Config ai_follow_delay
 var _noise_t := 0.0              # 달리는 소리 간격
 var ai_paused := false           # 디버거 일시정지 (몬스터만 멈춤)
@@ -179,6 +180,8 @@ func load_map(map_id: String) -> void:
 	renderer.minutes = GameState.minute_of_day()
 	renderer.build(map, tile)
 	renderer.build_props(%World)   # 오브젝트 그림은 인물과 같은 Y 정렬 노드에 (발 위치로 앞뒤)
+	_roof_open = -1
+	_update_roof(true)
 	_update_held_light()
 	# 자동 시작 '방 진입 후' (이 맵): 지금 대화가 끝나면 차례로
 	_cutscenes.append_array(Triggers.take("map_enter", map_id))
@@ -1029,6 +1032,22 @@ func _tick_followers(delta: float) -> void:
 		_spawn_enemy(o)
 
 
+## 지붕: 플레이어가 서 있는 칸을 덮는 지붕(집)만 열고, 나머지는 덮음 — 집 안에 들어가기 전에는 안이 안 보임
+func _update_roof(instant := false) -> void:
+	if renderer == null or player == null or renderer.roof_regions.is_empty():
+		return
+	var r: int = renderer.roof_region_at(Vector2i(floori(player.global_position.x / tile), floori(player.global_position.y / tile)))
+	if r == _roof_open and not instant:
+		return
+	if instant:
+		for i in renderer.roof_regions.size():
+			renderer.set_roof_open(i, i == r, true)
+	else:
+		renderer.set_roof_open(_roof_open, false)
+		renderer.set_roof_open(r, true)
+	_roof_open = r
+
+
 ## 맵 물체 bt = BT_ 자산 → Behavior Tree 로 움직임. 자산이 없거나 잘못되면 예전 AI (경고만)
 func _setup_enemy_bt(e: Node, o: Dictionary) -> void:
 	var bt_id := str(o.get("bt", ""))
@@ -1115,6 +1134,7 @@ func _update_held_light() -> void:
 func _process(delta: float) -> void:
 	if held_light and is_instance_valid(held_light) and player:
 		held_light.rotation = player.facing.angle()   # 바라보는 쪽을 비춤
+	_update_roof()
 	# 브레이크포인트에 걸린 몬스터가 있으면 모두 멈춤 (Unreal 처럼)
 	if not ai_paused:
 		for e in enemies:

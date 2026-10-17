@@ -280,6 +280,7 @@ func _init() -> void:
 	vp.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
 	gfx_view.add_child(vp)
 	renderer = MapRenderer.new()
+	renderer.roof_alpha = 0.55   # 에디터: 지붕 아래도 보이게 반투명
 	vp.add_child(renderer)
 	canvas.set_anchors_preset(PRESET_FULL_RECT)
 	stage.add_child(canvas)
@@ -1151,13 +1152,13 @@ func _build_left_panel() -> Control:
 	# 타일 팔레트
 	var pal_box := _fold(vb, "타일 팔레트", true)
 	palette_layer = OptionButton.new()
-	for l in VisualData.LAYERS:
+	for l in VisualData.PAINT_LAYERS:
 		palette_layer.add_item(VisualData.LAYER_NAME[l])
 	palette_layer.add_item("오브젝트 (나무·가구)")
-	palette_layer.tooltip_text = "칠할 그래픽 층 (바닥 → 바닥 장식 → 벽 외형 순서로 겹침), 또는 놓을 오브젝트 그림"
+	palette_layer.tooltip_text = "칠할 그래픽 층 (바닥 → 바닥 장식 → 벽 외형 순서로 겹침, 지붕은 인물 위 — 게임에서 집 안에 들어가면 그 집 지붕만 사라짐), 또는 놓을 오브젝트 그림"
 	palette_layer.item_selected.connect(func(i):
-		if i < VisualData.LAYERS.size():
-			canvas.tile_layer = VisualData.LAYERS[i]
+		if i < VisualData.PAINT_LAYERS.size():
+			canvas.tile_layer = VisualData.PAINT_LAYERS[i]
 		_refresh_palette())
 	pal_box.add_child(palette_layer)
 	palette_search = LineEdit.new()
@@ -1188,7 +1189,7 @@ func _build_left_panel() -> Control:
 	filt_box.add_child(grid)
 	for f in [["tiles", "타일"], ["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"],
 			["travel", "문·통로·이용"], ["arrive", "도착 P"], ["event", "이벤트"], ["sight", "순찰"], ["names", "이름표"], ["links", "연결"],
-			["graphics", "그래픽"], ["lighting", "조명"], ["props", "오브젝트"], ["light", "광원"], ["light_range", "광원 범위"], ["occluders", "그림자 차단"], ["logic", "벽 판정"]]:
+			["graphics", "그래픽"], ["lighting", "조명"], ["roof", "지붕"], ["props", "오브젝트"], ["light", "광원"], ["light_range", "광원 범위"], ["occluders", "그림자 차단"], ["logic", "벽 판정"]]:
 		var cb := CheckBox.new()
 		cb.text = f[1]
 		cb.button_pressed = not f[0] in ["occluders", "logic"]   # 그림자 차단·벽 판정 윤곽은 처음엔 끔 (canvas.filters 와 같게)
@@ -1480,6 +1481,7 @@ func _apply_gfx_filters() -> void:
 	canvas.graphics = canvas.filters.graphics
 	if renderer:
 		renderer.set_lighting(canvas.filters.lighting)
+		renderer.set_roofs_visible(canvas.filters.get("roof", true))
 
 
 ## 팔레트: 지금 층의 타일 (그림 + 이름), 찾기
@@ -1520,7 +1522,7 @@ func _refresh_palette() -> void:
 
 
 func _palette_props() -> bool:
-	return palette_layer != null and palette_layer.selected == VisualData.LAYERS.size()
+	return palette_layer != null and palette_layer.selected == VisualData.PAINT_LAYERS.size()
 
 
 ## 그래픽 경고 (게임에서는 기본 타일로 보이거나 빠짐 — 맵은 그대로 열림): 없는 타일·오브젝트·프리셋·환경, 맵 밖 칸

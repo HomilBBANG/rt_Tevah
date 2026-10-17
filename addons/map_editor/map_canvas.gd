@@ -49,7 +49,7 @@ var id_maker: Callable        # func(type) -> String
 var require_default := false  # 베이스캠프: ★ 기본 P 가 꼭 있어야 함 (첫 P 는 자동 기본, 기본 P 는 못 지움)
 ## 표시 필터 (false = 숨김, 숨긴 물체는 고를 수도 없음)
 var filters := {"tiles": true, "enemy": true, "investigate": true, "npc": true, "camp": true, "travel": true, "event": true, "light": true, "props": true,
-	"graphics": true, "lighting": true, "light_range": true, "occluders": false, "logic": false,
+	"graphics": true, "lighting": true, "roof": true, "light_range": true, "occluders": false, "logic": false,
 	"arrive": true, "sight": true, "names": true, "links": true}
 ## 연결 표시: object_id → [글자, 맞으면 true] (편집기가 채움). 가장자리는 "edge:방향"
 var link_labels := {}
