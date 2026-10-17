@@ -13,6 +13,7 @@ signal selection_changed(obj: Dictionary)
 signal stroke_started             # 한 번의 누름(칠하기·옮기기)이 시작됨 — 실행 취소 단위
 signal request(action: String)    # 단축키
 signal activated(obj: Dictionary) # 더블클릭
+signal notice(text: String)       # 상태 글자 (영역 옮기기를 못 할 때 등)
 
 const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop", "window", "furniture"]
 const VisualData = preload("res://core/visual_data.gd")
@@ -45,6 +46,8 @@ var sight_tiles := 5.0
 var selected := {}            # 마지막으로 고른 물체 (오른쪽 칸)
 var selection: Array = []     # 고른 물체들 (여러 개)
 var region := Rect2i()        # 영역 선택 (칸). size 0 = 없음
+var _region_moving := false   # 고른 영역 안을 잡고 끄는 중 → 놓으면 move_region
+var _region_d := Vector2i.ZERO
 var id_maker: Callable        # func(type) -> String
 var require_default := false  # 베이스캠프: ★ 기본 P 가 꼭 있어야 함 (첫 P 는 자동 기본, 기본 P 는 못 지움)
 ## 표시 필터 (false = 숨김, 숨긴 물체는 고를 수도 없음)
@@ -352,6 +355,8 @@ func _gui_input(event: InputEvent) -> void:
 			_hover = t
 			if _painting and tool in PAINT_TOOLS and not _rect_paint:
 				apply_tool(t, false)
+			elif _painting and _region_moving:
+				_region_d = t - _press_tile
 			elif _painting and _moving:
 				_move_selection(t - _press_tile)
 			queue_redraw()
@@ -373,6 +378,10 @@ func _press(t: Vector2i, shift: bool, double: bool) -> void:
 	var o := visible_object_at(t)
 	if double and not o.is_empty():
 		activated.emit(o)
+		return
+	if not shift and region.size != Vector2i.ZERO and region.has_point(t):
+		_region_moving = true   # 고른 영역 안을 잡음 → 끌어서 놓으면 벽·바닥·칠한 그림·물체를 통째로
+		_region_d = Vector2i.ZERO
 		return
 	if o.is_empty():
 		if not shift:
@@ -397,7 +406,11 @@ func _press(t: Vector2i, shift: bool, double: bool) -> void:
 
 
 func _release(t: Vector2i) -> void:
-	if _rect_paint:
+	if _region_moving:
+		_region_moving = false
+		if t - _press_tile != Vector2i.ZERO:
+			move_region(region, t - _press_tile)
+	elif _rect_paint:
 		fill_rect(_rect_from(_press_tile, t))
 	elif _band:
 		var r := _rect_from(_press_tile, t)
@@ -413,6 +426,72 @@ func _release(t: Vector2i) -> void:
 	_band = false
 	_moving = false
 	queue_redraw()
+
+
+## 영역 r 을 d 만큼 통째로 옮김: 논리 칸(벽·바닥·빈 공간) + 칠한 그림(바닥·장식·벽·지붕) + 그 안의 물체(숨긴 것도)·S.
+## 비운 자리는 바닥(.)에 칠한 그림 없음(맵 기본 그림). 맵 밖으로 나가거나 영역 밖 물체와 겹치면 안 옮김 → false
+func move_region(r: Rect2i, d: Vector2i) -> bool:
+	if map.is_empty() or r.size == Vector2i.ZERO or d == Vector2i.ZERO:
+		return false
+	var dest := Rect2i(r.position + d, r.size)
+	for y in range(dest.position.y, dest.end.y):
+		for x in range(dest.position.x, dest.end.x):
+			if not in_bounds(Vector2i(x, y)):
+				notice.emit("맵 밖으로는 옮길 수 없어요")
+				return false
+	var movers: Array = map.objects.filter(func(o): return r.has_point(Vector2i(int(o.x), int(o.y))))
+	for o in map.objects:
+		if o in movers:
+			continue
+		var cells: Array = VisualData.furniture_cells(o) if o.get("type", "") == "furniture" else [Vector2i(int(o.x), int(o.y))]
+		for c in cells:
+			if dest.has_point(c):
+				notice.emit("옮길 자리에 영역 밖 물체가 있어요: %s" % (o.name if str(o.get("name", "")) != "" else o.object_id))
+				return false
+	# 원래 내용 기억 → 원래 자리 비우기 → 새 자리에 쓰기 (겹쳐 옮겨도 맞게)
+	if not map.get("visual") is Dictionary:
+		map.visual = {}
+	if not map.visual.get("layers") is Dictionary:
+		map.visual.layers = {}
+	var layers: Dictionary = map.visual.layers
+	var chars := {}
+	var paint := {}
+	for y in range(r.position.y, r.end.y):
+		for x in range(r.position.x, r.end.x):
+			var c := Vector2i(x, y)
+			chars[c] = String(map.tiles[y])[x] if in_bounds(c) else "."
+			var k := "%d,%d" % [x, y]
+			for l in layers:
+				if layers[l] is Dictionary and layers[l].has(k):
+					paint[[l, c]] = layers[l][k]
+					layers[l].erase(k)
+			_set_char(c, ".")
+	for c in chars:
+		var to: Vector2i = c + d
+		_set_char(to, chars[c])
+		var k := "%d,%d" % [to.x, to.y]
+		for l in layers:
+			if layers[l] is Dictionary:
+				layers[l].erase(k)
+	for key in paint:
+		var to: Vector2i = key[1] + d
+		layers[key[0]]["%d,%d" % [to.x, to.y]] = paint[key]
+	for o in movers:
+		o.x = int(o.x) + d.x
+		o.y = int(o.y) + d.y
+	for key in ["start", "run_start"]:
+		var p = map.get(key)
+		if p is Array and p.size() == 2 and r.has_point(Vector2i(int(p[0]), int(p[1]))):
+			map[key] = [int(p[0]) + d.x, int(p[1]) + d.y]
+	select_many(movers.filter(is_visible_object), dest)
+	changed.emit()
+	return true
+
+
+func _set_char(t: Vector2i, ch: String) -> void:
+	if in_bounds(t):
+		var row := String(map.tiles[t.y])
+		map.tiles[t.y] = row.substr(0, t.x) + ch + row.substr(t.x + 1)
 
 
 ## 고른 물체들을 원래 자리 + d 로 (모두 바닥이고 다른 물체가 없을 때만)
@@ -603,6 +682,10 @@ func _draw() -> void:
 	# 영역 선택·사각형 칠하기 미리보기
 	if not region.size == Vector2i.ZERO:
 		draw_rect(Rect2(pan + Vector2(region.position) * s, Vector2(region.size) * s), Color(0.5, 0.8, 1.0), false, 2.0)
+		if _region_moving and _region_d != Vector2i.ZERO:   # 놓을 자리 미리보기
+			var pr := Rect2(pan + Vector2(region.position + _region_d) * s, Vector2(region.size) * s)
+			draw_rect(pr, Color(0.5, 0.8, 1.0, 0.18))
+			draw_rect(pr, Color(0.7, 0.9, 1.0), false, 3.0)
 	if (_band or _rect_paint) and in_bounds(_hover):
 		var pr := _rect_from(_press_tile, _hover)
 		var pcol := Color(0.5, 0.8, 1.0, 0.25) if _band else Color(1, 0.85, 0.4, 0.3)

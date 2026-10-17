@@ -25,7 +25,8 @@ const TOOL_GROUPS := [
 	["", [["erase", "지우개"]]],
 ]
 const TOOL_TIPS := {
-	"select": "선택·이동: 물체를 클릭하면 오른쪽 칸에 세부, 끌면 옮김.\nShift+클릭 = 여러 개, 빈 곳을 끌면 영역 선택, 빈 칸 클릭 = 맵 설정",
+	"select": "선택·이동: 물체를 클릭하면 오른쪽 칸에 세부, 끌면 옮김.\nShift+클릭 = 여러 개, 빈 곳을 끌면 영역 선택, 빈 칸 클릭 = 맵 설정.
+고른 영역(파란 테두리) 안을 잡고 끌면 벽·바닥·칠한 그림·물체를 통째로 옮김",
 	"wall": "벽: 누른 채 끌어서 칠함 (지나갈 수 없음)",
 	"floor": "바닥: 누른 채 끌어서 칠함 (걸어 다니는 곳)",
 	"void": "빈 공간: 누른 채 끌어서 칠함 (검게 보이고 지나갈 수 없음)",
@@ -71,6 +72,7 @@ const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
 
 [b]4. 고치기[/b]  (단축키는 맵을 한 번 누른 뒤)
   · 선택: 클릭 · Shift+클릭(여러 개) · 빈 곳 끌기(영역) · Ctrl+A(모두) · Esc(해제). 고른 것들을 함께 끌어 옮기고, 오른쪽 칸에서 한꺼번에 바꿉니다.
+  · [b]영역 통째로 옮기기[/b]: 빈 곳을 끌어 영역(파란 테두리)을 고른 뒤, 그 안을 잡고 끌어 놓으면 벽·바닥·칠한 그림(바닥·장식·벽·지붕)·물체가 함께 옮겨짐. 비운 자리는 바닥(기본 그림). 복사·붙여넣기도 칠한 그림까지.
   · ↶ ↷ 실행 취소·다시 실행 (Ctrl+Z / Ctrl+Y)  · [b]편집 ▾[/b]: 복사(Ctrl+C) · 붙여넣기(Ctrl+V, 마우스가 있는 칸) · 삭제(Delete)
 
 [b]5. 반영[/b]  [b]저장[/b] → [b]변환·검사[/b] (오류가 있으면 아래에 결과 칸이 열림) → [b]▶ 테스트 플레이[/b] (진짜 저장은 건드리지 않음)
@@ -268,6 +270,7 @@ func _init() -> void:
 		_last_ck = "")
 	canvas.request.connect(_on_canvas_request)
 	canvas.activated.connect(follow_link)
+	canvas.notice.connect(_status)
 	canvas.changed.connect(func(): _gfx_dirty = true)
 	# 맵 칸 = [게임과 같은 그림·조명 (SubViewport)] 위에 [편집 선·물체 표시 (canvas)]
 	var stage := Control.new()
@@ -1312,7 +1315,19 @@ func copy_selection() -> void:
 		c.x = int(o.x) - origin.x
 		c.y = int(o.y) - origin.y
 		rel.append(c)
-	_clip = {"size": r.size, "tiles": tiles, "objects": rel}
+	var paint := {}   # 영역의 칠한 그림 {층: {"dx,dy": tile_key}}
+	var layers = (map.get("visual", {}) if map.get("visual") is Dictionary else {}).get("layers", {})
+	if r.size != Vector2i.ZERO and layers is Dictionary:
+		for l in layers:
+			if not layers[l] is Dictionary:
+				continue
+			for k in layers[l]:
+				var xy := str(k).split(",")
+				if xy.size() == 2 and r.has_point(Vector2i(int(xy[0]), int(xy[1]))):
+					if not paint.has(l):
+						paint[l] = {}
+					paint[l]["%d,%d" % [int(xy[0]) - origin.x, int(xy[1]) - origin.y]] = layers[l][k]
+	_clip = {"size": r.size, "tiles": tiles, "objects": rel, "paint": paint}
 	_status("복사함: 물체 %d개%s" % [rel.size(), ", 타일 %dx%d" % [r.size.x, r.size.y] if not tiles.is_empty() else ""])
 
 
@@ -1332,6 +1347,28 @@ func paste_at(at: Vector2i) -> void:
 				var ch := row[x]
 				var ro := String(map.tiles[t.y])
 				map.tiles[t.y] = ro.substr(0, t.x) + ch + ro.substr(t.x + 1)
+	if not _clip.tiles.is_empty():   # 칠한 그림: 붙여넣는 영역은 복사한 그대로 (원래 칠한 것은 지움)
+		if not map.get("visual") is Dictionary:
+			map.visual = {}
+		if not map.visual.get("layers") is Dictionary:
+			map.visual.layers = {}
+		var layers: Dictionary = map.visual.layers
+		for l in layers:
+			if layers[l] is Dictionary:
+				for k in layers[l].keys():
+					var xy := str(k).split(",")
+					if xy.size() == 2 and Rect2i(at, _clip.size).has_point(Vector2i(int(xy[0]), int(xy[1]))):
+						layers[l].erase(k)
+		var paint: Dictionary = _clip.get("paint", {})
+		for l in paint:
+			if not layers.get(l) is Dictionary:
+				layers[l] = {}
+			for k in paint[l]:
+				var xy := str(k).split(",")
+				var t := at + Vector2i(int(xy[0]), int(xy[1]))
+				if canvas.in_bounds(t):
+					layers[l]["%d,%d" % [t.x, t.y]] = paint[l][k]
+		_gfx_dirty = true
 	var made := []
 	for c in _clip.objects:
 		var t := at + Vector2i(int(c.x), int(c.y))

@@ -475,6 +475,28 @@ func _ready() -> void:
 	cv._release(Vector2i(11, 5))
 	check(int(fur.x) == 4, "벽과 겹치는 곳으로는 안 옮겨짐")
 	ed.map.objects.erase(fur)
+	# 영역 통째로 옮기기: 벽·칠한 그림·물체가 함께, 비운 자리는 바닥
+	ed.map.visual = {"layers": {"floor": {"2,5": "floor_wood"}, "roof": {"3,5": "roof_red"}}}
+	cv._set_char(Vector2i(2, 6), "#")
+	var rm_obj := {"object_id": "rm_box", "type": "furniture", "x": 3, "y": 6, "w": 1, "h": 1, "ref": "", "name": "", "text": "",
+		"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}
+	ed.map.objects.append(rm_obj)
+	cv.select_many([rm_obj], Rect2i(2, 5, 2, 2))
+	cv._press(Vector2i(2, 5), false, false)
+	cv._region_d = Vector2i(1, 0)   # 원래 자리와 겹치게 한 칸 오른쪽
+	cv._release(Vector2i(3, 5))
+	check(cv.is_wall(Vector2i(3, 6)) and cv.is_floor(Vector2i(2, 6)) and ed.map.visual.layers.floor.get("3,5", "") == "floor_wood"
+		and ed.map.visual.layers.roof.get("4,5", "") == "roof_red" and not ed.map.visual.layers.floor.has("2,5") and not ed.map.visual.layers.roof.has("3,5")
+		and int(rm_obj.x) == 4 and int(rm_obj.y) == 6 and cv.region == Rect2i(3, 5, 2, 2), "영역 통째로 옮기기: 벽·칠한 그림·물체 함께, 비운 자리는 바닥")
+	ed.undo()
+	check(cv.is_wall(Vector2i(2, 6)) and ed.map.visual.layers.floor.get("2,5", "") == "floor_wood", "영역 옮기기 실행 취소")
+	cv.select_many([], Rect2i(2, 5, 2, 2))
+	check(not cv.move_region(Rect2i(2, 5, 2, 2), Vector2i(-5, 0)), "맵 밖으로는 안 옮김")
+	# 복사·붙여넣기도 칠한 그림까지
+	ed.copy_selection()
+	ed.paste_at(Vector2i(20, 5))
+	check(ed.map.visual.layers.floor.get("20,5", "") == "floor_wood" and ed.map.visual.layers.roof.get("21,5", "") == "roof_red", "복사·붙여넣기: 칠한 그림도")
+	ed.map.objects = ed.map.objects.filter(func(o): return not str(o.object_id).begins_with("rm_") and o.get("type", "") != "furniture")
 
 	# 맵 삭제: 쓰는 곳(다른 맵의 문) 목록 → 파일 지움, 베이스캠프는 못 지움
 	ed.new_map("test_del", 5, 5)
