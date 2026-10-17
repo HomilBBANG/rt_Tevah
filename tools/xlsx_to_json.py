@@ -1564,7 +1564,10 @@ def export_maps(d, maps):
                  for k, v in (m.get("edges") or {}).items() if v and v.get("ref")}
         out.append({"map_id": mid, "width": width, "height": len(tiles), "tiles": tiles, "start": start,
                     "run_start": m.get("run_start") or start, "objects": objects, "edges": edges,
-                    "visual": {"layers": {k: v for k, v in ((m.get("visual") or {}).get("layers") or {}).items() if k in TILE_LAYERS}},
+                    "visual": {"layers": {k: v for k, v in ((m.get("visual") or {}).get("layers") or {}).items() if k in TILE_LAYERS},
+                               # 칠하지 않은 칸의 그림 (맵마다, 비우면 floor_default / wall_default)
+                               "default_floor": (m.get("visual") or {}).get("default_floor", ""),
+                               "default_wall": (m.get("visual") or {}).get("default_wall", "")},
                     "environment": {"profile": (m.get("environment") or {}).get("profile", "") or "outdoor"}})
     return out
 

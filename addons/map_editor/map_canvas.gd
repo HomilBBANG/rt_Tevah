@@ -421,25 +421,33 @@ func _draw() -> void:
 	var s := cell * zoom
 	var tiles: Array = map.tiles
 	var dim: bool = not filters.tiles
-	for y in tiles.size():
+	# 화면에 보이는 칸만 (큰 맵에서도 빠르게)
+	var y0 := clampi(floori(-pan.y / s), 0, tiles.size())
+	var y1 := clampi(ceili((size.y - pan.y) / s), 0, tiles.size())
+	var x0 := maxi(0, floori(-pan.x / s))
+	var x1 := maxi(0, ceili((size.x - pan.x) / s))
+	var grid_lines := s >= 6.0   # 많이 줄이면 칸 선은 안 그림
+	for y in range(y0, y1):
 		var row := String(tiles[y])
-		for x in row.length():
+		for x in range(x0, mini(x1, row.length())):
 			var r := Rect2(pan + Vector2(x, y) * s, Vector2(s, s))
 			if graphics:
 				# 뒤에 픽셀아트 그림이 보임: 칸 선, '벽 판정' 을 켜면 벽(지나갈 수 없음)·빈 공간 표시
 				if filters.logic and row[x] != ".":
 					draw_rect(r, Color(1, 0.2, 0.2, 0.28) if row[x] == "#" else Color(0.4, 0.4, 1, 0.28))
-				draw_rect(r, Color(1, 1, 1, 0.06), false, 1.0)
+				if grid_lines:
+					draw_rect(r, Color(1, 1, 1, 0.06), false, 1.0)
 				continue
 			var col := Color.BLACK if row[x] == " " else (Color("16171d") if row[x] == "#" else Color("3a3e4a"))
 			if dim and row[x] != " ":
 				col = Color("202228")   # 타일 숨김: 벽·바닥 구분을 흐리게
 			draw_rect(r, col)
-			draw_rect(r, Color(1, 1, 1, 0.05), false, 1.0)
+			if grid_lines:
+				draw_rect(r, Color(1, 1, 1, 0.05), false, 1.0)
 	# 그림자 차단 윤곽: 빛을 막는 벽 타일·문 (그래픽 데이터 기준)
 	if filters.occluders:
-		for y in tiles.size():
-			for x in String(tiles[y]).length():
+		for y in range(y0, y1):
+			for x in range(x0, mini(x1, String(tiles[y]).length())):
 				var wk: String = VisualData.cell_keys(map, x, y).wall
 				if wk != "" and VisualData.tiles().get(wk, {}).get("casts_shadow", false):
 					draw_rect(Rect2(pan + Vector2(x, y) * s, Vector2(s, s)).grow(-2), Color(1, 0.85, 0.2, 0.8), false, 2.0)

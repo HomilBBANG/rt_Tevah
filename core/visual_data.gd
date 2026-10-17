@@ -131,7 +131,8 @@ static func cell_keys(map: Dictionary, x: int, y: int) -> Dictionary:
 	var ch := String(rows[y])[x]
 	if ch == " ":
 		return out   # 빈 공간: 검게
-	var layers: Dictionary = (map.get("visual", {}) if map.get("visual") is Dictionary else {}).get("layers", {})
+	var vis: Dictionary = map.get("visual", {}) if map.get("visual") is Dictionary else {}
+	var layers: Dictionary = vis.get("layers", {})
 	var k := "%d,%d" % [x, y]
 	var t := tiles()
 	for layer in LAYERS:
@@ -142,10 +143,19 @@ static func cell_keys(map: Dictionary, x: int, y: int) -> Dictionary:
 	if ch == "#":
 		out.floor = ""
 		if out.wall == "":
-			out.wall = "wall_default" if t.has("wall_default") else ""
+			out.wall = _map_default(vis, "default_wall", "wall", "wall_default")
 	elif out.floor == "":
-		out.floor = "floor_default" if t.has("floor_default") else ""
+		out.floor = _map_default(vis, "default_floor", "floor", "floor_default")
 	return out
+
+
+## 맵의 기본 그림 (visual.default_floor / default_wall — 칠하지 않은 칸). 없거나 틀리면 floor_default / wall_default
+static func _map_default(vis: Dictionary, field: String, layer: String, fallback: String) -> String:
+	var t := tiles()
+	var key := str(vis.get(field, ""))
+	if key != "" and t.has(key) and str(t[key].get("layer", "")) == layer:
+		return key
+	return fallback if t.has(fallback) else ""
 
 
 ## 물체 그림 기본값: 문 = layer door 중 _open 이 아닌 첫 타일, 조사 반짝이 = layer marker 첫 타일

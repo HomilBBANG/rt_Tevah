@@ -571,6 +571,23 @@ func _edit_map() -> void:
 		dirty = true
 		_gfx_dirty = true)
 	_hint("밝기·색은 엑셀 graphics.xlsx DayNight. 위 '시간 미리보기'로 시각마다 확인")
+	_section("기본 그림 (칠하지 않은 칸)")
+	for d in [["default_floor", "floor", "기본 바닥", "floor_default"], ["default_wall", "wall", "기본 벽", "wall_default"]]:
+		var field: String = d[0]
+		var layer: String = d[1]
+		var keys: Array = VisualData.tiles().keys().filter(func(k): return str(VisualData.tiles()[k].get("layer", "")) == layer)
+		var cur: String = str(map.get("visual", {}).get(field, "")) if map.get("visual") is Dictionary else ""
+		_option(d[2], [["", "기본 (%s)" % d[3]]] + keys.map(func(k): return [k, "%s  (%s)" % [VisualData.tiles()[k].name, k]]), cur, func(v):
+			checkpoint()
+			if not map.get("visual") is Dictionary:
+				map.visual = {}
+			if v == "":
+				map.visual.erase(field)
+			else:
+				map.visual[field] = v
+			dirty = true
+			_gfx_dirty = true)
+	_hint("넓은 맵은 풀밭·숲처럼 가장 많은 그림을 기본으로 두고, 다른 곳만 칠하면 파일이 작아요")
 	_section("가장자리로 나가면")
 	_hint("그쪽 맨 끝 바닥 칸에 닿으면 이동 (맵 끝에 바닥을 터 두세요)")
 	if not map.has("edges") or not map.edges is Dictionary:

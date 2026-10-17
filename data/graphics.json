@@ -155,6 +155,66 @@
    "note": "테스트 — 조사 지점(아직 안 한 곳) 표시. atlas_x 부터 오른쪽으로 frames 장, 초당 fps 장. 어두워도 보임",
    "frames": 4,
    "fps": 6.0
+  },
+  {
+   "tile_key": "water",
+   "name": "물",
+   "layer": "wall",
+   "file": "test_tiles.png",
+   "atlas_x": 0,
+   "atlas_y": 5,
+   "casts_shadow": false,
+   "note": "테스트 — 연못·물 (논리는 벽 # = 못 지나감, 그림자 없음)",
+   "frames": 1,
+   "fps": 6.0
+  },
+  {
+   "tile_key": "fence_wood",
+   "name": "나무 울타리",
+   "layer": "wall",
+   "file": "test_tiles.png",
+   "atlas_x": 1,
+   "atlas_y": 5,
+   "casts_shadow": false,
+   "note": "테스트 — 울타리 (논리 벽 #, 빛은 지나감)",
+   "frames": 1,
+   "fps": 6.0
+  },
+  {
+   "tile_key": "roof_brown",
+   "name": "갈색 지붕",
+   "layer": "roof",
+   "file": "test_tiles.png",
+   "atlas_x": 2,
+   "atlas_y": 5,
+   "casts_shadow": false,
+   "note": "테스트 — 창고·부속 건물",
+   "frames": 1,
+   "fps": 6.0
+  },
+  {
+   "tile_key": "roof_green",
+   "name": "초록 지붕",
+   "layer": "roof",
+   "file": "test_tiles.png",
+   "atlas_x": 3,
+   "atlas_y": 5,
+   "casts_shadow": false,
+   "note": "테스트 — 점포",
+   "frames": 1,
+   "fps": 6.0
+  },
+  {
+   "tile_key": "forest",
+   "name": "숲",
+   "layer": "wall",
+   "file": "test_tiles.png",
+   "atlas_x": 0,
+   "atlas_y": 6,
+   "casts_shadow": false,
+   "note": "테스트 — 빽빽한 숲 (논리 벽 #). 맵 기본 벽 그림으로 쓰기 좋음",
+   "frames": 1,
+   "fps": 6.0
   }
  ],
  "light_presets": [

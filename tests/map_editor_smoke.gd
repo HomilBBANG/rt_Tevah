@@ -345,7 +345,7 @@ func _ready() -> void:
 	# 지붕 층: 팔레트 '지붕' → 칠하면 visual.layers.roof, 에디터에서는 반투명
 	ed.palette_layer.select(3)
 	ed.palette_layer.item_selected.emit(3)
-	check(c.tile_layer == "roof" and ed.palette.item_count == 2, "팔레트 '지붕': 지붕 타일 2개 (%d)" % ed.palette.item_count)
+	check(c.tile_layer == "roof" and ed.palette.item_count == 4, "팔레트 '지붕': 지붕 타일 4개 (빨강·회색·갈색·초록) (%d)" % ed.palette.item_count)
 	ed.set_tool("tile")
 	c.tile_key = "roof_red"
 	c.stroke_started.emit()
