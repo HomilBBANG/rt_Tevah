@@ -264,14 +264,50 @@ static func daylight(minutes: float) -> Dictionary:
 	return {"color": a.sun, "k": clampf((a.sun_energy - lo) / (hi - lo), 0.0, 1.0) if hi > lo else 1.0}
 
 
-## 창문 칸에서 빛이 들어갈 쪽 (옆의 바닥 칸 — 아래·위·왼쪽·오른쪽 순서). 없으면 ZERO
-static func window_dir(map: Dictionary, x: int, y: int) -> Vector2i:
+const WINDOW_SCAN := 12   # 뒷벽 창문: 창문 아래로 벽(#)만 이어지다 바닥이 나오기까지 볼 칸 수
+
+
+## 창문 빛: 창문 사각형(x, y, w × h 칸) 바로 옆의 바닥 쪽(아래 → 위 → 왼쪽 → 오른쪽), 없으면 비스듬한 탑뷰의 뒷벽 —
+## 창문 아래로 벽만 이어지다 나오는 바닥 쪽(아래). → {dir, origin(빛이 시작하는 칸 좌표, 바닥 가장자리 가운데), reach_y(바닥 줄)}. 못 찾으면 dir ZERO
+static func window_light(map: Dictionary, o: Dictionary) -> Dictionary:
 	var rows: Array = map.get("tiles", [])
-	for d in [Vector2i.DOWN, Vector2i.UP, Vector2i.LEFT, Vector2i.RIGHT]:
-		var c: Vector2i = Vector2i(x, y) + d
-		if c.y >= 0 and c.y < rows.size() and c.x >= 0 and c.x < String(rows[c.y]).length() and String(rows[c.y])[c.x] == ".":
-			return d
-	return Vector2i.ZERO
+	var x := int(o.get("x", 0))
+	var y := int(o.get("y", 0))
+	var w := maxi(1, int(o.get("w", 1)))
+	var h := maxi(1, int(o.get("h", 1)))
+	var ch := func(cx: int, cy: int) -> String:
+		return String(rows[cy])[cx] if cy >= 0 and cy < rows.size() and cx >= 0 and cx < String(rows[cy]).length() else " "
+	for cx in range(x, x + w):
+		if ch.call(cx, y + h) == ".":
+			return {"dir": Vector2i.DOWN, "origin": Vector2(x + w / 2.0, y + h), "reach_y": y + h}
+	for cx in range(x, x + w):
+		if ch.call(cx, y - 1) == ".":
+			return {"dir": Vector2i.UP, "origin": Vector2(x + w / 2.0, y), "reach_y": y}
+	for cy in range(y, y + h):
+		if ch.call(x - 1, cy) == ".":
+			return {"dir": Vector2i.LEFT, "origin": Vector2(x, y + h / 2.0), "reach_y": y + h}
+	for cy in range(y, y + h):
+		if ch.call(x + w, cy) == ".":
+			return {"dir": Vector2i.RIGHT, "origin": Vector2(x + w, y + h / 2.0), "reach_y": y + h}
+	for cy in range(y + h, y + h + WINDOW_SCAN):   # 뒷벽: 아래로 벽만 이어지다 바닥
+		var c: String = ch.call(x + (w >> 1), cy)
+		if c == ".":
+			return {"dir": Vector2i.DOWN, "origin": Vector2(x + w / 2.0, cy), "reach_y": cy}
+		if c != "#":
+			break
+	return {"dir": Vector2i.ZERO, "origin": Vector2.ZERO, "reach_y": y + h}
+
+
+## 창문 칸에서 빛이 들어갈 쪽 (1칸 창문, 예전 이름)
+static func window_dir(map: Dictionary, x: int, y: int) -> Vector2i:
+	return window_light(map, {"x": x, "y": y}).dir
+
+
+## 크기가 있는 물체(가구·창문)가 차지하는 칸, 나머지는 놓은 칸 하나
+static func object_cells(o: Dictionary) -> Array:
+	if str(o.get("type", "")) in ["furniture", "window"]:
+		return furniture_cells(o)
+	return [Vector2i(int(o.get("x", 0)), int(o.get("y", 0)))]
 
 
 static func _row(r: Array) -> Dictionary:

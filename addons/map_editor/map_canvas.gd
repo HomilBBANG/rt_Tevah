@@ -110,8 +110,13 @@ func fits(type: String, t: Vector2i, o: Dictionary = {}) -> bool:
 			if not is_floor(c) or (not there.is_empty() and there != o):
 				return false
 		return true
-	if type == "window":
-		return is_wall(t) and (is_floor(t + Vector2i.DOWN) or is_floor(t + Vector2i.UP) or is_floor(t + Vector2i.LEFT) or is_floor(t + Vector2i.RIGHT))
+	if type == "window":   # 창문: w × h 칸이 모두 벽 + 옆에 바닥이 있거나, 뒷벽(아래로 벽만 이어지다 바닥)
+		var wo := {"x": t.x, "y": t.y, "w": o.get("w", 1), "h": o.get("h", 1)}
+		for c in VisualData.furniture_cells(wo):
+			var there := object_at(c)
+			if not is_wall(c) or (not there.is_empty() and there != o):
+				return false
+		return VisualData.window_light(map, wo).dir != Vector2i.ZERO
 	return is_floor(t)
 
 
@@ -132,8 +137,8 @@ func object_at(t: Vector2i) -> Dictionary:
 	for o in map.get("objects", []):
 		if int(o.x) == t.x and int(o.y) == t.y:
 			return o
-		if o.get("type", "") == "furniture" and t.x >= int(o.x) and t.y >= int(o.y) 				and t.x < int(o.x) + maxi(1, int(o.get("w", 1))) and t.y < int(o.y) + maxi(1, int(o.get("h", 1))):
-			return o   # 큰 가구는 차지하는 칸 어디서나
+		if o.get("type", "") in ["furniture", "window"] and t.x >= int(o.x) and t.y >= int(o.y) 				and t.x < int(o.x) + maxi(1, int(o.get("w", 1))) and t.y < int(o.y) + maxi(1, int(o.get("h", 1))):
+			return o   # 큰 가구·창문은 차지하는 칸 어디서나
 	return {}
 
 
@@ -443,7 +448,7 @@ func move_region(r: Rect2i, d: Vector2i) -> bool:
 	for o in map.objects:
 		if o in movers:
 			continue
-		var cells: Array = VisualData.furniture_cells(o) if o.get("type", "") == "furniture" else [Vector2i(int(o.x), int(o.y))]
+		var cells: Array = VisualData.object_cells(o)
 		for c in cells:
 			if dest.has_point(c):
 				notice.emit("옮길 자리에 영역 밖 물체가 있어요: %s" % (o.name if str(o.get("name", "")) != "" else o.object_id))
@@ -644,6 +649,12 @@ func _draw() -> void:
 	# 물체
 	for o in map.objects:
 		if not is_visible_object(o):
+			continue
+		if o.type == "window" and (int(o.get("w", 1)) > 1 or int(o.get("h", 1)) > 1):   # 큰 창문: 차지하는 칸만큼 하늘색 테두리
+			var wr := Rect2(pan + Vector2(o.x, o.y) * s, Vector2(maxi(1, int(o.get("w", 1))), maxi(1, int(o.get("h", 1)))) * s).grow(-2)
+			draw_rect(wr, Color(0.55, 0.75, 0.88, 0.35))
+			draw_rect(wr, Color.WHITE if o in selection else COLORS.window, false, 3.0 if o in selection else 2.0)
+			_label(LETTER.window, wr.get_center(), Color.WHITE, s * 0.42)
 			continue
 		if o.type == "furniture":   # 기타 가구: 차지하는 칸만큼 색 사각형 + 표시 메모
 			var fr := Rect2(pan + Vector2(o.x, o.y) * s, Vector2(maxi(1, int(o.get("w", 1))), maxi(1, int(o.get("h", 1)))) * s).grow(-2)

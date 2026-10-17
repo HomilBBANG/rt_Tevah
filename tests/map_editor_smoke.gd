@@ -449,6 +449,10 @@ func _ready() -> void:
 	ed.set_tool("floor")
 	cv.apply_tool(Vector2i(5, 0))
 	check(cv.is_wall(Vector2i(5, 0)), "창문 칸은 바닥으로 칠해지지 않음")
+	var tall := {"object_id": "tw_tall", "type": "window", "x": 5, "y": 3, "w": 1, "h": 2}
+	check(cv.fits("window", Vector2i(5, 3), tall), "1×2 창문: 두 칸 모두 벽이면 놓임")
+	tall.h = 3
+	check(not cv.fits("window", Vector2i(5, 3), tall), "창문에 바닥 칸이 들어가면 안 됨")
 	ed.map.objects.erase(win)
 	ed.map.objects.erase(wall_door)
 	# 기타 가구: 흰 사각형, 크기만큼 칸을 차지 (어느 칸을 눌러도 그 가구), 벽과 겹치는 크기는 안 됨

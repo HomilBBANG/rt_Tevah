@@ -121,7 +121,8 @@ func rebuild_tiles() -> void:
 	_rebuild_roofs(ts, scale_k)
 	for o in map.get("objects", []):
 		if o.get("type", "") == "window":
-			shadow_cells.erase(Vector2i(int(o.x), int(o.y)))   # 창문 칸으로 빛이 지나감
+			for c in VisualData.object_cells(o):
+				shadow_cells.erase(c)   # 창문 칸으로 빛이 지나감
 	var pc := VisualData.prop_cells(map)
 	for c in pc:
 		if pc[c].get("casts_shadow", false):
@@ -199,6 +200,11 @@ func build_markers() -> void:
 		s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		s.position = Vector2((float(o.x) + 0.5) * tile, (float(o.y) + 0.5) * tile)
 		s.scale = Vector2.ONE * (tile / px) * (0.9 if kind == "spark" else 1.0)
+		if kind == "window":   # 창문 크기 w × h 칸 (그림을 늘림)
+			var ww := maxi(1, int(o.get("w", 1)))
+			var wh := maxi(1, int(o.get("h", 1)))
+			s.position = (Vector2(float(o.x), float(o.y)) + Vector2(ww, wh) / 2.0) * tile
+			s.scale = Vector2(ww, wh) * (tile / px)
 		if kind == "spark":
 			var mat := CanvasItemMaterial.new()
 			mat.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED   # 어두워도 보이는 반짝임
@@ -423,15 +429,17 @@ func rebuild_lights() -> void:
 	for o in map.get("objects", []):
 		if o.get("type", "") != "window":
 			continue
-		var d := VisualData.window_dir(map, int(o.x), int(o.y))
+		var wl := VisualData.window_light(map, o)
+		var d: Vector2i = wl.dir
 		if d == Vector2i.ZERO:
 			continue
 		var p := PointLight2D.new()
 		p.texture = window_texture()
 		p.texture_scale = float(VisualData.data().get("window_light_radius", 6)) * tile * 2.0 / LIGHT_TEX_SIZE
+		p.texture_scale *= sqrt(float(maxi(1, int(o.get("w", 1)) if d.y != 0 else int(o.get("h", 1)))))   # 넓은 창문은 조금 더 멀리
 		p.shadow_enabled = true
 		p.shadow_filter = Light2D.SHADOW_FILTER_NONE
-		p.position = (Vector2(int(o.x), int(o.y)) + Vector2(0.5, 0.5) + Vector2(d) * 0.52) * tile
+		p.position = (wl.origin + Vector2(d) * 0.04) * tile   # 바닥 가장자리 바로 안쪽 (벽 그림자에 묻히지 않게)
 		p.rotation = Vector2(d).angle()
 		p.set_meta("object_id", o.get("object_id", ""))
 		_light_root.add_child(p)

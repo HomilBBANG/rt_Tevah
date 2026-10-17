@@ -307,7 +307,12 @@ func _build_actors() -> void:
 				if not GameState.field_has(map.map_id, "removed", o.object_id):
 					_spawn_furniture(o)
 			"window":   # 창문: E 로 커튼 치기·걷기. 맵 처음 상태(curtain)에서 바꾼 것은 field_state "curtain" 에 (회차 저장)
-				spots.append({"kind": "window", "data": o, "pos": pos,
+				# 닿는 곳 = 창문 사각형 + (뒷벽이면) 그 아래 벽 — 바닥에서 창문 밑에 서면 E
+				var wl := VisualData.window_light(map, o)
+				var wr := Rect2(Vector2(int(o.x), int(o.y)) * tile, Vector2(maxi(1, int(o.get("w", 1))), maxi(1, int(o.get("h", 1)))) * tile)
+				if wl.dir == Vector2i.DOWN:
+					wr.size.y = (int(wl.reach_y) - int(o.y)) * tile
+				spots.append({"kind": "window", "data": o, "pos": wr.get_center(), "rect": wr,
 					"curtain": bool(o.get("curtain", false)) != GameState.field_has(map.map_id, "curtain", o.object_id)})
 			"npc":
 				var n := StaticBody2D.new()

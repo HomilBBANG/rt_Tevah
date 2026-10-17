@@ -203,6 +203,31 @@ func _ready() -> void:
 	check(not wr.windows.tw_win.light.enabled, "밤엔 창문 빛 없음")
 	wf.queue_free()
 	await _wait(0.1)
+	# ---- 뒷벽 창문 (비스듬한 탑뷰): 2×2 창문 아래로 벽 한 줄 더, 그 밑이 바닥 → 빛은 바닥 가장자리에서 아래로
+	var bm := _map("indoor")
+	bm.map_id = "tback"
+	bm.tiles = ["##############", "##############", "##############", "#......#....# ", "#......#....# ", "#............ ", "##############"]
+	bm.objects = [{"object_id": "tb_win", "type": "window", "ref": "", "name": "높은 창", "text": "", "condition": "", "arrive": "", "from": [],
+		"default": false, "once": false, "map_id": "tback", "x": 3, "y": 0, "w": 2, "h": 2, "patrol_dir": "", "patrol_len": 0, "schedule": [], "look": "", "curtain": false}]
+	bm.start = [3, 4]
+	bm.run_start = [3, 4]
+	DataLoader.maps["tback"] = bm
+	GameState.clock = 12 * 60.0
+	FieldScript.next_map_id = "tback"
+	var bf: Node = load("res://scenes/field/field.tscn").instantiate()
+	add_child(bf)
+	await _wait(0.3)
+	var br: Node2D = bf.renderer
+	check(br.windows.has("tb_win") and br.windows.tb_win.light.enabled and is_equal_approx(br.windows.tb_win.light.rotation, PI / 2)
+		and absf(br.windows.tb_win.light.position.y - 3.04 * bf.tile) < 1.0 and absf(br.windows.tb_win.light.position.x - 4.0 * bf.tile) < 1.0,
+		"뒷벽 창문: 빛이 창문 아래 바닥 가장자리(가운데)에서 아래로")
+	check(is_equal_approx(br.markers.tb_win.sprite.scale.x, 2.0 * bf.tile / 16.0), "2×2 창문 그림은 2칸 크기")
+	bf.player.position = bf._tile_center(4, 3)
+	await _wait(0.1)
+	check("커튼 치기: 높은 창" in bf.get_node("%Prompt").text, "뒷벽 창문 밑 바닥에서 '커튼 치기' 안내")
+	await _snap("window_back_wall")
+	bf.queue_free()
+	await _wait(0.1)
 	# ---- 기타 가구: 흰 사각형·막힘·사용 조건·줍기(사라짐)·사용(여러 번)
 	var fm := _map("indoor")
 	fm.map_id = "tfur"
@@ -248,6 +273,7 @@ func _ready() -> void:
 	check(is_equal_approx(float(GameState.survival.thirst), 70.0) and tap in ff.furniture, "사용 가구는 여러 번 (사라지지 않음)")
 	ff.queue_free()
 	DataLoader.maps.erase("tfur")
+	DataLoader.maps.erase("tback")
 	DataLoader.maps.erase("twin")
 	DataLoader.maps.erase("tgfx")
 	SaveManager.delete_all()

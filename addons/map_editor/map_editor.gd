@@ -45,7 +45,7 @@ const TOOL_TIPS := {
 	"tile_erase": "타일 지우개: 지금 층의 칠한 타일을 지움 (그 칸은 기본 타일로 보임)",
 	"prop": "오브젝트 그림 (나무·가구): 왼쪽 '타일 팔레트'를 '오브젝트'로 바꿔 고르고 클릭한 칸(= 왼쪽 아래 칸)에 놓기. 인물과 앞뒤는 저절로",
 	"furniture": "기타 가구: 그림 대신 흰 사각형. 클릭한 칸 = 왼쪽 위, 오른쪽 칸에서 크기·표시 메모(예: 철제 서랍)·색·역할(조사·줍기·사용·대화)·사용 조건",
-	"window": "창문: 벽 칸(옆에 바닥이 있는)에 놓기. 낮에는 바닥 쪽으로 햇빛이 들어오고 밤엔 어두움. 게임에서 E 로 커튼을 치면 빛이 막힘",
+	"window": "창문: 벽 칸에 놓기 — 옆에 바닥이 있거나, 비스듬한 탑뷰의 뒷벽(아래로 벽만 이어지다 바닥). 크기는 오른쪽 칸 너비·높이. 낮에는 바닥 쪽으로 햇빛이 들어오고 밤엔 어두움. 게임에서 E 로 커튼을 치면 빛이 막힘",
 	"light": "광원: 클릭한 칸에 놓기 (오른쪽 칸에서 프리셋·색·밝기·범위·그림자). 고르면 끌어서 옮기기, Ctrl+C/V 복제",
 }
 const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
@@ -779,13 +779,14 @@ func _edit_object(o: Dictionary) -> void:
 			var wins: Array = VisualData.tiles().keys().filter(func(k): return str(VisualData.tiles()[k].get("layer", "")) == "window" and not str(k).ends_with("_curtain"))
 			_option("창문 모양", [["", "기본 (%s)" % VisualData.default_art("window")]] + wins.map(func(k): return [k, "%s  (%s)" % [VisualData.tiles()[k].name, k]]), o.get("look", ""), func(v):
 				set_field(o, "look", v))
+			_size_spins(o)
 			var cur := CheckBox.new()
 			cur.text = "처음에 커튼을 쳐 둠"
 			cur.tooltip_text = "켜면 맵에 처음 들어왔을 때 커튼이 쳐져 있어 빛이 안 들어옴. 게임에서 E 로 치고 걷기 (회차 저장에 남음)"
 			cur.button_pressed = bool(o.get("curtain", false))
 			cur.toggled.connect(func(on): set_field(o, "curtain", on))
 			inspector.add_child(cur)
-			_hint("빛은 옆의 바닥 쪽(아래 → 위 → 왼쪽 → 오른쪽 순서로 처음 찾은 쪽)으로 들어옵니다. 밝기·거리는 엑셀 Config window_light_energy · window_light_radius, 시간대는 '시간 미리보기'로 확인")
+			_hint("놓은 칸 = 왼쪽 위. 빛은 옆의 바닥 쪽(아래 → 위 → 왼쪽 → 오른쪽 순서로 처음 찾은 쪽), 없으면 뒷벽 창문 — 아래로 벽만 이어지다 나오는 바닥으로 들어옵니다 (게임에서는 그 바닥에서 창문 밑에 서서 E). 밝기·거리는 엑셀 Config window_light_energy · window_light_radius, 시간대는 '시간 미리보기'로 확인")
 		"arrive":
 			_section("도착 P")
 			var dcb := CheckBox.new()
@@ -961,25 +962,30 @@ func set_field(o: Dictionary, key: String, v: Variant) -> void:
 	canvas.queue_redraw()
 
 
-## 기타 가구 세부: 크기·표시 메모·색·막힘 / 역할(조사·줍기·사용·대화)과 역할별 칸 / 사용 조건·못 쓸 때 문구
-func _edit_furniture(o: Dictionary) -> void:
-	_section("가구")
-	_line("표시 메모", o.get("label", ""), func(v):
-		set_field(o, "label", v)
-		canvas.queue_redraw(), "사각형 위에 보이는 글 (예: 철제 서랍, 거대한 시계)")
+## 너비·높이 (칸) — 가구·창문. 못 놓는 크기(가구: 벽·다른 물체와 겹침 / 창문: 벽이 아닌 칸·빛이 들어갈 바닥 없음)면 되돌림
+func _size_spins(o: Dictionary) -> void:
 	for f in [["w", "너비 (칸)"], ["h", "높이 (칸)"]]:
 		var key: String = f[0]
 		var sp := _spin(f[1], maxi(1, int(o.get(key, 1))), 1, 50)
 		sp.value_changed.connect(func(v):
 			var old := int(o.get(key, 1))
 			o[key] = int(v)
-			if not canvas.fits("furniture", Vector2i(int(o.x), int(o.y)), o):   # 벽·다른 물체와 겹치면 되돌림
-				o[key] = old
-				sp.set_value_no_signal(old)
-				_status("그 크기는 벽이나 다른 물체와 겹쳐요")
-				return
+			var ok: bool = canvas.fits(str(o.type), Vector2i(int(o.x), int(o.y)), o)
 			o[key] = old
+			if not ok:
+				sp.set_value_no_signal(old)
+				_status("그 크기는 놓을 수 없어요 (가구: 벽·다른 물체와 겹침 / 창문: 벽이 아닌 칸이 들어감)")
+				return
 			set_field(o, key, int(v)))
+
+
+## 기타 가구 세부: 크기·표시 메모·색·막힘 / 역할(조사·줍기·사용·대화)과 역할별 칸 / 사용 조건·못 쓸 때 문구
+func _edit_furniture(o: Dictionary) -> void:
+	_section("가구")
+	_line("표시 메모", o.get("label", ""), func(v):
+		set_field(o, "label", v)
+		canvas.queue_redraw(), "사각형 위에 보이는 글 (예: 철제 서랍, 거대한 시계)")
+	_size_spins(o)
 	var cp := ColorPickerButton.new()
 	cp.color = Color.html(str(o.get("color", "#FFFFFF"))) if Color.html_is_valid(str(o.get("color", ""))) else Color.WHITE
 	cp.edit_alpha = false

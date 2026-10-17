@@ -1468,11 +1468,20 @@ def validate_field(d, maps, rep, enemies):
                         parse_condition(o["use_condition"])
                     except ExprError as e:
                         rep.err(w, f"가구 사용 조건 문법 오류: {e}")
-            if o.get("type") == "window":   # 창문은 벽 칸에, 바로 옆(상하좌우)에 바닥이 있어야 (빛이 들어갈 쪽)
-                if not (0 <= y < len(m["tiles"]) and 0 <= x < len(m["tiles"][y]) and m["tiles"][y][x] == "#"):
-                    rep.err(w, f"창문 위치 ({x}, {y}) 가 벽이 아님")
-                elif not any(floor(x + dx, y + dy) for dx, dy in ((0, 1), (0, -1), (-1, 0), (1, 0))):
-                    rep.err(w, f"창문 ({x}, {y}) 옆에 바닥이 없음 (빛이 들어갈 곳)")
+            if o.get("type") == "window":   # 창문: w × h 칸이 모두 벽, 옆에 바닥이 있거나 뒷벽(아래로 벽만 이어지다 바닥)
+                ww, wh = max(1, int(o.get("w", 1) or 1)), max(1, int(o.get("h", 1) or 1))
+                wall = lambda cx, cy: 0 <= cy < len(m["tiles"]) and 0 <= cx < len(m["tiles"][cy]) and m["tiles"][cy][cx] == "#"
+                bad = [(cx, cy) for cy in range(y, y + wh) for cx in range(x, x + ww) if not wall(cx, cy)]
+                if bad:
+                    rep.err(w, f"창문 칸 {bad[0]} 가 벽이 아님")
+                elif not window_reaches_floor(floor, wall, x, y, ww, wh):
+                    rep.err(w, f"창문 ({x}, {y}) 옆에 바닥이 없고 뒷벽도 아님 (빛이 들어갈 곳)")
+                for cy in range(y, y + wh):
+                    for cx in range(x, x + ww):
+                        if (cx, cy) != (x, y):
+                            if (cx, cy) in occupied:
+                                rep.err(w, f"창문 칸 ({cx}, {cy}) 에 이미 {occupied[(cx, cy)]} 가 있음")
+                            occupied[(cx, cy)] = oid
             elif not floor(x, y):
                 rep.err(w, f"위치 ({x}, {y}) 가 바닥이 아님")
             elif (x, y) in occupied and occupied[(x, y)] != oid:
@@ -1525,6 +1534,24 @@ def validate_field(d, maps, rep, enemies):
                     parse_condition(o["condition"])
                 except ExprError as e:
                     rep.err(w, f"condition 문법 오류: {e}")
+
+
+WINDOW_SCAN = 12   # core/visual_data.gd 와 같게
+
+
+def window_reaches_floor(floor, wall, x, y, w, h):
+    """창문 빛이 들어갈 바닥: 사각형 바로 옆(상하좌우), 없으면 뒷벽 — 가운데 열 아래로 벽만 이어지다 바닥 (VisualData.window_light 와 같은 규칙)"""
+    if any(floor(cx, y + h) or floor(cx, y - 1) for cx in range(x, x + w)):
+        return True
+    if any(floor(x - 1, cy) or floor(x + w, cy) for cy in range(y, y + h)):
+        return True
+    cx = x + w // 2
+    for cy in range(y + h, y + h + WINDOW_SCAN):
+        if floor(cx, cy):
+            return True
+        if not wall(cx, cy):
+            return False
+    return False
 
 
 TIME_RANGE_RE = re.compile(r"^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$")
@@ -1605,8 +1632,8 @@ def export_maps(d, maps):
                          color=o.get("color", "") or "#FFFFFF", solid=o.get("solid", True) is not False,
                          use_condition=o.get("use_condition", ""), use_fail_text=o.get("use_fail_text", ""),
                          role=o.get("role", ""), effects=o.get("effects", ""))
-            if o.get("type") == "window":           # 창문: 처음에 커튼을 쳐 두었나
-                e["curtain"] = bool(o.get("curtain"))
+            if o.get("type") == "window":           # 창문: 처음에 커튼을 쳐 두었나, 크기
+                e.update(curtain=bool(o.get("curtain")), w=max(1, int(o.get("w", 1) or 1)), h=max(1, int(o.get("h", 1) or 1)))
             if o.get("type") == "light":            # 광원: 놓을 때 프리셋에서 복사한 값 (광원마다 고칠 수 있음)
                 e.update(preset=o.get("preset", ""), color=o.get("color", "") or "#FFFFFF",
                          energy=float(o.get("energy", 1.0)), radius=float(o.get("radius", 4.0)),
