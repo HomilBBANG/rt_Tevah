@@ -431,6 +431,19 @@ func _ready() -> void:
 	ed.undo()
 	check(ed.map.objects.size() == clr_n and ed.map.tiles == clr_tiles, "실행 취소로 모두 되돌림")
 
+	# 맵 삭제: 쓰는 곳(다른 맵의 문) 목록 → 파일 지움, 베이스캠프는 못 지움
+	ed.new_map("test_del", 5, 5)
+	ed.new_map("test_del_src", 5, 5)
+	ed.map.objects.append({"object_id": "del_door", "type": "exit", "x": 1, "y": 1, "ref": "test_del", "name": "", "text": "",
+		"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""})
+	ed.save()
+	var refs: Array = ed.map_references("test_del")
+	check(refs.size() == 1 and "test_del_src" in str(refs[0]), "맵 삭제: 이 맵으로 오는 문을 찾음 %s" % [refs])
+	check(ed.map_references("test_del_src").is_empty(), "맵 삭제: 쓰는 곳 없음")
+	check(ed.delete_map("test_del") and not FileAccess.file_exists(TEST_DIR + "test_del.json") and not "test_del" in ed.map_ids, "맵 삭제: 파일·목록에서 빠짐")
+	check(ed.delete_map("test_del_src") and not "test_del_src" in ed.map_ids and not ed.map.is_empty() and ed.map.map_id != "test_del_src", "지금 연 맵 삭제 → 다른 맵이 열림")
+	check(not ed.delete_map(ed.basecamp_id), "베이스캠프는 못 지움")
+
 	# 변환·검사 (실제 프로젝트 데이터 — 원본 tools/maps 는 안 건드림)
 	check(ed.run_convert() and "변환 완료" in ed.log_view.text, "변환·검사 실행")
 

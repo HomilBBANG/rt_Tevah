@@ -92,6 +92,7 @@ const TYPE_NAME :={"enemy": "적", "investigate": "조사 지점", "npc": "NPC",
 const EDGES := [["up", "위"], ["down", "아래"], ["left", "왼쪽"], ["right", "오른쪽"]]
 
 var dir := MAP_DIR                   # 테스트에서 바꿔 쓴다
+var dialogue_dir := "res://tools/dialogues/"   # 맵 삭제 때 move: 를 찾는 곳
 var map := {}
 var path := ""
 var dirty := false
@@ -151,6 +152,7 @@ func _init() -> void:
 	bar.add_child(files)
 	bar.add_child(VSeparator.new())
 	_bar_btn(bar, "새 맵", _ask_new, "새 맵 파일 만들기 (맵 ID: 영문·숫자·_, 너비·높이)")
+	_bar_btn(bar, "맵 삭제", _ask_delete_map, "지금 맵 파일을 지우기 (휴지통으로). 이 맵을 쓰는 곳이 있으면 먼저 보여 줌")
 	_bar_btn(bar, "저장", save, "지금 맵을 파일로 저장")
 	bar.add_child(VSeparator.new())
 	_bar_btn(bar, "↶", undo, "실행 취소 (Ctrl+Z)")
@@ -1088,6 +1090,105 @@ func clear_all() -> void:
 		"environment": map.environment.duplicate(true) if map.get("environment") is Dictionary else null})
 	canvas.select({})
 	_status("모두 지움 (%d×%d) — Ctrl+Z 로 되돌리기, 저장해야 파일에 반영" % [w, h])
+
+
+## 맵 삭제: 이 맵을 쓰는 곳 [설명] — 다른 맵의 문·통로·이용·가장자리, 효과 move:맵 (대화·거점·부활·아이템), Config
+func map_references(id: String) -> Array:
+	var out := []
+	for e in _entrances_to(id):
+		if not str(e[1]).begins_with(id + " — "):   # 자기 맵 안의 연결은 같이 사라지므로 빼고
+			out.append("맵 " + str(e[1]))
+	var re := RegEx.create_from_string("move:" + id + "(?![A-Za-z0-9_])")
+	var seen := {}
+	var srcs := []
+	var d := DirAccess.open(dialogue_dir)
+	if d:
+		for f in d.get_files():
+			if f.ends_with(".json") and not f.begins_with("_"):
+				var dlg_file: Dictionary = ToolCommon.read_json(dialogue_dir + f, {})
+				srcs.append(["대화 " + f.get_basename(), dlg_file.get("nodes", []) + dlg_file.get("choices", [])])
+	for f in ["nodes", "choices", "camp_actions", "revivals", "items"]:   # 엑셀에서 온 것
+		srcs.append([f, ToolCommon.read_json("res://data/%s.json" % f, [])])
+	for src in srcs:
+		for row in src[1]:
+			if not row is Dictionary:
+				continue
+			for v in row.values():
+				if v is String and re.search(v):
+					var rid := str(row.get("choice_id", row.get("node_id", row.get("action_id", row.get("revival_id", row.get("item_id", "?"))))))
+					var line := "%s — %s: %s" % [src[0], rid, v]
+					if not seen.has(rid):
+						seen[rid] = true
+						out.append(line)
+					break
+	var cfg: Dictionary = ToolCommon.read_json("res://data/config.json", {})
+	for k in ["start_map", "basecamp_map"]:
+		if str(cfg.get(k, "")) == id:
+			out.append("Config %s (엑셀 content.xlsx)" % k)
+	return out
+
+
+## 맵 파일을 지움 (휴지통으로 — 안 되면 그냥 지움). Config start_map·basecamp_map 인 맵은 못 지움. 다른 연결은 지운 뒤 변환 오류로 남음
+func delete_map(id: String) -> bool:
+	var cfg: Dictionary = ToolCommon.read_json("res://data/config.json", {})
+	if id == basecamp_id or id == str(cfg.get("start_map", "")):
+		_status("'%s' 는 베이스캠프·시작 맵이라 지울 수 없음 (엑셀 Config 를 먼저 바꾸세요)" % id)
+		return false
+	var p := dir + id + ".json"
+	if not FileAccess.file_exists(p):
+		_status("없는 맵: " + id)
+		return false
+	var full := ProjectSettings.globalize_path(p)
+	if OS.move_to_trash(full) != OK and DirAccess.remove_absolute(full) != OK:
+		_status("지울 수 없음: " + p)
+		return false
+	if map.get("map_id", "") == id:
+		map = {}
+		path = ""
+		dirty = false
+		_undo.clear()
+		_redo.clear()
+	refresh_file_list()
+	_load_all_maps()
+	_status("맵 삭제: %s (휴지통) — '변환·검사' 를 눌러야 게임에서도 빠짐" % id)
+	return true
+
+
+func _ask_delete_map() -> void:
+	if map.is_empty():
+		return
+	var id: String = map.map_id
+	var cfg: Dictionary = ToolCommon.read_json("res://data/config.json", {})
+	if id == basecamp_id or id == str(cfg.get("start_map", "")):
+		_status("'%s' 는 베이스캠프·시작 맵이라 지울 수 없음 (엑셀 Config 를 먼저 바꾸세요)" % id)
+		return
+	var refs := map_references(id)
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "맵 삭제"
+	var t := "'%s' 맵 파일을 지울까요? (tools/maps/%s.json → 휴지통)
+
+실행 취소(Ctrl+Z)로는 되돌릴 수 없어요. 휴지통에서 꺼내면 돌아옵니다." % [id, id]
+	if refs.is_empty():
+		t += "
+
+이 맵을 쓰는 곳은 없습니다."
+	else:
+		t += "
+
+⚠ 이 맵을 쓰는 곳 %d개 — 지우면 변환 오류가 나니 먼저 고치세요:
+  " % refs.size() + "
+  ".join(refs.slice(0, 15))
+		if refs.size() > 15:
+			t += "
+  … 외 %d개" % (refs.size() - 15)
+	dlg.dialog_text = t
+	dlg.ok_button_text = "삭제" if refs.is_empty() else "그래도 삭제"
+	dlg.confirmed.connect(func():
+		delete_map(id)
+		dlg.queue_free())
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
 
 
 func _ask_clear_all() -> void:
