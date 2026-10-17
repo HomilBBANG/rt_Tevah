@@ -77,6 +77,14 @@ static func furniture_cells(o: Dictionary) -> Array:
 	return out
 
 
+## 가구의 막힌 칸: 위쪽 top_rows 줄은 '뒤로 지나갈 수 있는 윗부분'(키 큰 장롱·시계 — 그 뒤에 서면 가구가 인물을 가림, Y 정렬)
+static func furniture_solid_cells(o: Dictionary) -> Array:
+	if o.get("solid", true) == false:
+		return []
+	var top := clampi(int(o.get("top_rows", 0)), 0, maxi(1, int(o.get("h", 1))) - 1)
+	return furniture_cells(o).filter(func(c): return c.y >= int(o.y) + top)
+
+
 ## 지나갈 수 없는 오브젝트 칸 (solid) — 필드 충돌·컷신 길 찾기
 static func solid_cells(map: Dictionary) -> Array:
 	var out := []

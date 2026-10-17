@@ -141,6 +141,7 @@ var palette_search: LineEdit
 var time_label: Label
 var _gfx_dirty := true
 var overhead_slider: HSlider         # 전경 가림 편집용 투명도 (미리보기 전용)
+var lock_box: CheckBox               # 지금 팔레트 층 잠금
 
 
 func _init() -> void:
@@ -1000,6 +1001,14 @@ func _edit_furniture(o: Dictionary) -> void:
 	sol.button_pressed = o.get("solid", true) != false
 	sol.toggled.connect(func(on): set_field(o, "solid", on))
 	inspector.add_child(sol)
+	var tr := _spin("뒤로 지나가는 윗줄", clampi(int(o.get("top_rows", 0)), 0, 49), 0, 49)
+	tr.tooltip_text = "위쪽 몇 줄은 막지 않고 뒤로 지나갈 수 있게 (키 큰 장롱·시계). 그 뒤에 서면 가구 그림이 캐릭터를 가림. 0 = 전부 막힘"
+	tr.value_changed.connect(func(v):
+		var h := maxi(1, int(o.get("h", 1)))
+		if int(v) >= h:
+			tr.set_value_no_signal(h - 1)
+			v = h - 1
+		set_field(o, "top_rows", int(v)))
 	_section("역할")
 	_option("E 를 누르면", [["", "(없음 — 장식)"], ["investigate", "조사 — 문구 + 얻는 것(Loot) 한 번"], ["pickup", "줍기 — 효과(아이템 얻기 등) 후 사라짐"],
 		["use", "사용 — 효과, 여러 번"], ["talk", "대화 — 대화 시작"]], o.get("role", ""), func(v):
@@ -1363,13 +1372,13 @@ func paste_at(at: Vector2i) -> void:
 			map.visual.layers = {}
 		var layers: Dictionary = map.visual.layers
 		for l in layers:
-			if layers[l] is Dictionary:
+			if layers[l] is Dictionary and not canvas.locked_layers.has(l):   # 잠근 층은 그대로
 				for k in layers[l].keys():
 					var xy := str(k).split(",")
 					if xy.size() == 2 and Rect2i(at, _clip.size).has_point(Vector2i(int(xy[0]), int(xy[1]))):
 						layers[l].erase(k)
 		var paint: Dictionary = _clip.get("paint", {})
-		for l in paint:
+		for l in paint.keys().filter(func(k): return not canvas.locked_layers.has(k)):
 			if not layers.get(l) is Dictionary:
 				layers[l] = {}
 			for k in paint[l]:
@@ -1454,8 +1463,21 @@ func _build_left_panel() -> Control:
 	palette_layer.item_selected.connect(func(i):
 		if i < VisualData.PAINT_LAYERS.size():
 			canvas.tile_layer = VisualData.PAINT_LAYERS[i]
+		_sync_lock_box()
 		_refresh_palette())
 	pal_box.add_child(palette_layer)
+	# 층 잠금: 잠근 층은 칠하기·지우기·영역 옮기기·붙여넣기에서 건드리지 않음 (편집 상태라 저장 안 됨)
+	lock_box = CheckBox.new()
+	lock_box.text = "🔒 이 층 잠금"
+	lock_box.tooltip_text = "잠그면 이 층은 타일 붓·지우개·영역 옮기기·붙여넣기로 바뀌지 않음 (예: 바닥을 고칠 때 전경 가림 잠그기). 저장되지 않는 편집 설정"
+	lock_box.toggled.connect(func(on):
+		var l: String = canvas.tile_layer
+		if on:
+			canvas.locked_layers[l] = true
+		else:
+			canvas.locked_layers.erase(l)
+		_status("'%s' 층 %s" % [VisualData.LAYER_NAME.get(l, l), "잠금" if on else "잠금 풂"]))
+	pal_box.add_child(lock_box)
 	palette_search = LineEdit.new()
 	palette_search.placeholder_text = "타일 찾기"
 	palette_search.clear_button_enabled = true
@@ -1792,6 +1814,14 @@ func set_preview_time(m: float) -> void:
 		slider.set_value_no_signal(preview_minutes)
 	if renderer:
 		renderer.set_time(preview_minutes)
+
+
+func _sync_lock_box() -> void:
+	if lock_box == null:
+		return
+	var objects := _palette_props()
+	lock_box.disabled = objects
+	lock_box.set_pressed_no_signal(not objects and canvas.locked_layers.has(canvas.tile_layer))
 
 
 func _apply_gfx_filters() -> void:

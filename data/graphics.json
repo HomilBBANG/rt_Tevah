@@ -335,6 +335,20 @@
    "fps": 6.0,
    "face": "",
    "face_rows": 1
+  },
+  {
+   "tile_key": "lintel_wood",
+   "name": "나무 문틀 상단",
+   "layer": "overhead",
+   "file": "test_tiles.png",
+   "atlas_x": 3,
+   "atlas_y": 7,
+   "casts_shadow": false,
+   "note": "문 위 칸에 칠하는 전경 — 문틀 윗부분이 캐릭터 머리 위로 (투명한 위쪽은 벽이 보임)",
+   "frames": 1,
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   }
  ],
  "light_presets": [

@@ -540,6 +540,23 @@ func _ready() -> void:
 	ed.open_map("test_overhead")
 	check(ed.map.visual.layers.overhead.get("9,3", "") == "overhead_black", "다시 열기: 전경 유지")
 	ed.overhead_slider.value = 100
+	# 층 잠금: 잠근 전경은 칠하기·영역 옮기기에서 그대로
+	cv.tile_layer = "overhead"
+	ed._sync_lock_box()
+	ed.lock_box.button_pressed = true
+	ed.set_tool("tile")
+	cv.tile_key = "overhead_black"
+	cv._press(Vector2i(2, 2), false, false)
+	cv._release(Vector2i(2, 2))
+	check(not ed.map.visual.layers.overhead.has("2,2") and cv.locked_layers.has("overhead"), "잠근 층은 칠해지지 않음")
+	ed.map.visual.layers.floor = {"8,3": "floor_wood"}
+	ed.set_tool("select")
+	cv.select_many([], Rect2i(8, 3, 1, 1))
+	cv.move_region(Rect2i(8, 3, 1, 1), Vector2i(0, 1))
+	check(ed.map.visual.layers.overhead.get("8,3", "") == "overhead_black" and ed.map.visual.layers.floor.get("8,4", "") == "floor_wood"
+		and not ed.map.visual.layers.floor.has("8,3"), "영역 옮기기: 바닥 그림은 옮겨지고 잠근 전경은 제자리")
+	ed.lock_box.button_pressed = false
+	check(not cv.locked_layers.has("overhead"), "잠금 풀기")
 	cv.tile_layer = "floor"
 
 	# 맵 삭제: 쓰는 곳(다른 맵의 문) 목록 → 파일 지움, 베이스캠프는 못 지움

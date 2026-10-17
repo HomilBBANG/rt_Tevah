@@ -36,6 +36,8 @@ var tool := "select"
 var rect_mode := false        # 벽·바닥·빈 공간·타일을 사각형으로 채우기
 var tile_key := ""            # 타일 붓: 칠할 타일 (graphics.xlsx Tiles)
 var tile_layer := "floor"     # 타일 붓·지우개가 칠하는 그래픽 층 (floor / detail / wall)
+var locked_layers := {}       # 잠근 그래픽 층 {층: true} — 칠하기·지우기·영역 옮기기에서 건드리지 않음 (편집 설정, 저장 안 됨)
+var _lock_noticed := false
 var graphics := false         # 뒤에 픽셀아트 그림(core/map_renderer)이 보이는 중 → 바닥·벽 색칠은 하지 않고 칸 선만
 var light_defaults := {}      # 광원을 놓을 때 복사할 값 (프리셋)
 var prop_id := ""             # 오브젝트 도구: 놓을 오브젝트 그림 (graphics.xlsx Props)
@@ -243,6 +245,11 @@ func _paint(t: Vector2i, ch: String) -> void:
 func _paint_tile(t: Vector2i, erase: bool) -> void:
 	if not erase and tile_key == "":
 		return
+	if locked_layers.has(tile_layer):
+		if not _lock_noticed:
+			notice.emit("'%s' 층이 잠겨 있어요 (타일 팔레트의 🔒 잠금을 풀면 칠할 수 있음)" % VisualData.LAYER_NAME.get(tile_layer, tile_layer))
+			_lock_noticed = true
+		return
 	if not map.get("visual") is Dictionary:
 		map.visual = {}
 	if not map.visual.get("layers") is Dictionary:
@@ -372,6 +379,7 @@ func _gui_input(event: InputEvent) -> void:
 
 func _press(t: Vector2i, shift: bool, double: bool) -> void:
 	_painting = true
+	_lock_noticed = false
 	_press_tile = t
 	stroke_started.emit()
 	if tool in PAINT_TOOLS and (rect_mode or shift):
@@ -467,7 +475,7 @@ func move_region(r: Rect2i, d: Vector2i) -> bool:
 			chars[c] = String(map.tiles[y])[x] if in_bounds(c) else "."
 			var k := "%d,%d" % [x, y]
 			for l in layers:
-				if layers[l] is Dictionary and layers[l].has(k):
+				if layers[l] is Dictionary and layers[l].has(k) and not locked_layers.has(l):   # 잠근 층은 제자리
 					paint[[l, c]] = layers[l][k]
 					layers[l].erase(k)
 			_set_char(c, ".")
@@ -476,7 +484,7 @@ func move_region(r: Rect2i, d: Vector2i) -> bool:
 		_set_char(to, chars[c])
 		var k := "%d,%d" % [to.x, to.y]
 		for l in layers:
-			if layers[l] is Dictionary:
+			if layers[l] is Dictionary and not locked_layers.has(l):
 				layers[l].erase(k)
 	for key in paint:
 		var to: Vector2i = key[1] + d
@@ -571,8 +579,8 @@ func _draw() -> void:
 		for c in VisualData.solid_cells(map):
 			draw_rect(Rect2(pan + Vector2(c) * s, Vector2(s, s)), Color(1, 0.2, 0.2, 0.28))
 		for o in map.get("objects", []):
-			if o.get("type", "") == "furniture" and o.get("solid", true) != false:
-				for c in VisualData.furniture_cells(o):
+			if o.get("type", "") == "furniture":
+				for c in VisualData.furniture_solid_cells(o):
 					draw_rect(Rect2(pan + Vector2(c) * s, Vector2(s, s)), Color(1, 0.2, 0.2, 0.28))
 			elif o.get("type", "") == "exit":
 				draw_rect(Rect2(pan + Vector2(int(o.x), int(o.y)) * s, Vector2(s, s)).grow(-3), Color(1, 0.6, 0.1, 0.9), false, 2.0)
@@ -676,6 +684,13 @@ func _draw() -> void:
 			if fl != "" and s >= 10.0:
 				var fsz := int(clampf(s * 0.3, 9.0, 22.0))
 				draw_string(_font, Vector2(fr.position.x + 2, fr.get_center().y + fsz * 0.35), fl, HORIZONTAL_ALIGNMENT_CENTER, fr.size.x - 4, fsz, ink)
+			var top_rows := clampi(int(o.get("top_rows", 0)), 0, maxi(1, int(o.get("h", 1))) - 1)
+			if top_rows > 0 and o.get("solid", true) != false:   # 뒤로 지나가는 윗부분: 점선 경계
+				var yb := fr.position.y + top_rows * s
+				var xx := fr.position.x
+				while xx < fr.end.x:
+					draw_line(Vector2(xx, yb), Vector2(minf(xx + 6, fr.end.x), yb), fc.darkened(0.6), 2.0)
+					xx += 12
 			if str(o.get("role", "")) != "":   # 쓸 수 있는 가구: 오른쪽 위 작은 점
 				draw_circle(fr.position + Vector2(fr.size.x - s * 0.15, s * 0.15), maxf(2.0, s * 0.08), Color("e8a33a"))
 			continue

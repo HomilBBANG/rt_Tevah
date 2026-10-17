@@ -352,14 +352,15 @@ func _spawn_furniture(o: Dictionary) -> void:
 	%World.add_child(view)
 	var body: StaticBody2D = null
 	if o.get("solid", true):
+		var top := clampi(int(o.get("top_rows", 0)), 0, fh - 1)   # 위쪽 top_rows 줄은 뒤로 지나감 (그림이 인물을 가림)
 		body = StaticBody2D.new()
 		body.collision_layer = WALL_LAYER   # 벽처럼 막고 적 시야도 가림
 		body.collision_mask = 0
 		var shape := CollisionShape2D.new()
 		var rect := RectangleShape2D.new()
-		rect.size = Vector2(fw, fh) * tile
+		rect.size = Vector2(fw, fh - top) * tile
 		shape.shape = rect
-		body.position = top_left + rect.size / 2.0
+		body.position = top_left + Vector2(0, top * tile) + rect.size / 2.0
 		body.add_child(shape)
 		%World.add_child(body)
 	var s := {"kind": "furniture", "data": o, "pos": top_left + Vector2(fw, fh) * tile / 2.0, "rect": Rect2(top_left, Vector2(fw, fh) * tile),
@@ -1038,7 +1039,7 @@ func path_grid() -> AStarGrid2D:
 			grid.set_point_solid(c)
 	for s in furniture:   # 막힌 가구 (주운 것은 빠짐)
 		if s.body != null:
-			for c in VisualData.furniture_cells(s.data):
+			for c in VisualData.furniture_solid_cells(s.data):
 				if grid.region.has_point(c):
 					grid.set_point_solid(c)
 	_path_grid = grid

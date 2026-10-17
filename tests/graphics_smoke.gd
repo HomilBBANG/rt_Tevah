@@ -238,7 +238,7 @@ func _ready() -> void:
 			"w": 1, "h": 1, "label": "", "color": "#FFFFFF", "solid": true, "role": "", "use_condition": "", "use_fail_text": "", "effects": ""}
 		o.merge(extra, true)
 		return o
-	fm.objects = [fobj.call("tf_clock", 4, 1, {"w": 2, "h": 3, "label": "거대한 시계"}),
+	fm.objects = [fobj.call("tf_clock", 4, 1, {"w": 2, "h": 3, "label": "거대한 시계", "top_rows": 1}),
 		fobj.call("tf_drawer", 1, 1, {"label": "철제 서랍", "role": "pickup", "effects": "item:+bandage", "use_condition": "has:knife", "use_fail_text": "잠겨 있다."}),
 		fobj.call("tf_tap", 1, 5, {"label": "수도", "role": "use", "effects": "surv:thirst+10", "solid": false})]
 	DataLoader.maps["tfur"] = fm
@@ -250,6 +250,10 @@ func _ready() -> void:
 	check(ff.path_grid().is_point_solid(Vector2i(5, 3)) and not ff.path_grid().is_point_solid(Vector2i(1, 5)), "막힌 가구 칸은 길 찾기에서 막힘 (2×3 전체), 안 막힌 가구는 지나감")
 	var clock: Dictionary = ff.furniture.filter(func(x): return x.data.object_id == "tf_clock")[0]
 	check(not clock in ff.spots, "역할 없는 가구(장식)는 상호작용 없음")
+	check(not ff.path_grid().is_point_solid(Vector2i(4, 1)) and ff.path_grid().is_point_solid(Vector2i(4, 2)), "키 큰 가구: 윗줄(top_rows 1)은 뒤로 지나감, 아래는 막힘")
+	ff.player.position = ff._tile_center(4, 1)
+	await get_tree().physics_frame
+	check(ff.player.position.y < clock.node.position.y and clock.node.get_parent() == ff.player.get_parent(), "시계 뒤에 서면 시계 그림이 캐릭터를 가림 (Y 정렬: 시계 발이 더 아래)")
 	ff.player.position = ff._tile_center(2, 1)
 	await _wait(0.1)
 	await _snap("furniture")
@@ -331,7 +335,45 @@ func _overhead_test() -> void:
 		await get_tree().physics_frame
 	Input.action_release("move_up")
 	check(of.player.position.y > 2.9 * t, "04 전경 아래 벽(#)은 계속 막힘 (y = %.2f칸)" % (of.player.position.y / t))
+	# 16 카메라가 소수점 위치로 움직여도 전경 칸 사이에 틈(밝은 줄)이 없음
+	var seam := 0
+	for step in 6:
+		of.player.position = of._tile_center(9, 3) + Vector2(0.37 * step * 7.0, 0.23 * step * 5.0)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var img := get_viewport().get_texture().get_image()
+		var xf := get_viewport().get_canvas_transform()
+		for gx in [8.0, 9.0, 10.0, 11.0]:
+			for gy in [1.5, 2.0, 2.5, 5.0, 5.5, 6.0]:
+				for d in [-1.0, 0.0, 1.0]:
+					var sp: Vector2 = xf * (Vector2(gx, gy) * t) + Vector2(d, 0)
+					if Rect2(Vector2.ZERO, Vector2(img.get_size())).has_point(sp) and img.get_pixelv(Vector2i(sp)).v > 0.12:
+						seam += 1
+	check(seam == 0, "16 카메라가 소수점 위치여도 전경 칸 경계에 틈 없음 (밝은 점 %d)" % seam)
 	of.queue_free()
+	await _wait(0.1)
+	# 18 여러 NPC 가 전경 아래·밖을 지날 때: 서로는 Y 정렬, 전경은 늘 위
+	var nm: Dictionary = om.duplicate(true)
+	nm.map_id = "tover2"
+	var npc := func(id: String, x: int, y: int) -> Dictionary:
+		return {"object_id": id, "type": "npc", "ref": "", "name": id, "text": "", "condition": "", "arrive": "", "from": [], "default": false, "once": false,
+			"map_id": "tover2", "x": x, "y": y, "patrol_dir": "", "patrol_len": 0, "schedule": [], "face": ""}
+	nm.objects = [npc.call("n_under_a", 9, 3), npc.call("n_under_b", 9, 4), npc.call("n_room", 4, 4)]
+	DataLoader.maps["tover2"] = nm
+	FieldScript.next_map_id = "tover2"
+	var nf: Node = load("res://scenes/field/field.tscn").instantiate()
+	add_child(nf)
+	await _wait(0.3)
+	var world: Node2D = nf.get_node("%World")
+	var ns: Array = nf.npcs.map(func(n): return n.node)
+	check(ns.size() == 3 and world.y_sort_enabled and ns.all(func(n): return n.get_parent() == world and n.z_index < nf.renderer.overhead.z_index),
+		"18 NPC 셋 모두 Y 정렬 노드(World)에, 전경(z %d)보다 아래" % nf.renderer.overhead.z_index)
+	nf.player.position = nf._tile_center(9, 5)
+	await _wait(0.2)
+	await _snap("overhead_npcs")
+	nf.queue_free()
+	DataLoader.maps.erase("tover2")
+	of = null
 	DataLoader.maps.erase("tover")
 
 

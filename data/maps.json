@@ -1958,6 +1958,7 @@
     "use_fail_text": "",
     "role": "",
     "effects": "",
+    "top_rows": 0,
     "map_id": "new_america_in_church",
     "x": 8,
     "y": 6,

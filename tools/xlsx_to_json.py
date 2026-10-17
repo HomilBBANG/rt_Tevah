@@ -1186,7 +1186,7 @@ def read_maps(rep):
         m["file"] = f.name
         m["tiles"] = [str(r) for r in m.get("tiles", [])]
         m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len", "from", "default", "once", "energy", "radius", "shadow", "enabled", "bb_overrides",
-                                                                         "curtain", "solid", "w", "h") else v for k, v in o.items()}
+                                                                         "curtain", "solid", "w", "h", "top_rows") else v for k, v in o.items()}
                         for o in m.get("objects", [])]
         maps[f.stem] = m
     for f in sorted(MAPS_DIR.glob("*.txt")):
@@ -1453,6 +1453,8 @@ def validate_field(d, maps, rep, enemies):
                             rep.err(w, f"가구가 차지하는 칸 ({cx}, {cy}) 에 이미 {occupied[(cx, cy)]} 가 있음")
                         else:
                             occupied[(cx, cy)] = oid
+                if not 0 <= int(o.get("top_rows", 0) or 0) < max(fh, 1):
+                    rep.err(w, f"가구 top_rows(뒤로 지나가는 윗줄)는 0 ~ 높이-1: {o.get('top_rows')}")
                 role = o.get("role", "")
                 if role not in FURNITURE_ROLES:
                     rep.err(w, f"가구 역할(role)은 비움(장식) / investigate / pickup / use / talk: '{role}'")
@@ -1639,7 +1641,8 @@ def export_maps(d, maps):
                 e.update(w=max(1, int(o.get("w", 1) or 1)), h=max(1, int(o.get("h", 1) or 1)), label=o.get("label", ""),
                          color=o.get("color", "") or "#FFFFFF", solid=o.get("solid", True) is not False,
                          use_condition=o.get("use_condition", ""), use_fail_text=o.get("use_fail_text", ""),
-                         role=o.get("role", ""), effects=o.get("effects", ""))
+                         role=o.get("role", ""), effects=o.get("effects", ""),
+                         top_rows=max(0, int(o.get("top_rows", 0) or 0)))   # 위쪽 몇 줄은 뒤로 지나감
             if o.get("type") == "window":           # 창문: 처음에 커튼을 쳐 두었나, 크기
                 e.update(curtain=bool(o.get("curtain")), w=max(1, int(o.get("w", 1) or 1)), h=max(1, int(o.get("h", 1) or 1)))
             if o.get("type") == "light":            # 광원: 놓을 때 프리셋에서 복사한 값 (광원마다 고칠 수 있음)
