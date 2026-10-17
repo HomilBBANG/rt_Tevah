@@ -7,6 +7,7 @@
   "flee_chance": 50.0,
   "walk_speed": 2.0,
   "run_speed": 3.2,
+  "battle_bt": "",
   "abilities": {
    "strength": 0,
    "endurance": 0,

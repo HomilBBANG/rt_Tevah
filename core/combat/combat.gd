@@ -11,6 +11,8 @@ extends RefCounted
 ##  - 일반 회피의 추가 자원 소모(스태미나) 없음
 ##  - 부위 HP·명중률·피해량은 엑셀 데이터 값
 
+const Runner = preload("res://core/ai/bt_runner.gd")
+const AIAssets = preload("res://core/ai/ai_assets.gd")
 const DODGE_PERFECT := "perfect"
 const DODGE_NORMAL := "normal"
 const DODGE_FAIL := "fail"
@@ -29,6 +31,11 @@ var last_flee := {}          # 마지막 도주 굴림 { roll(1~100), chance(%),
 
 ## 테스트용: 비어 있지 않으면 0~100 난수 대신 앞에서부터 꺼내 쓴다 (명중·도주·공격 선택)
 var forced_rolls: Array[float] = []
+## 전투 BT (Npcs battle_bt — 몬스터 AI 탭에서 domain=battle 로 만든 BT_). 있으면 적 공격을 이 트리가 고른다.
+## Blackboard 에 (있는 키만) 차례마다 씀: SelfHpRatio·PlayerHpRatio(0~1) · Turn(적 차례 번호) ·
+## Self_<부위>_Broken · Player_<부위>_Broken (예: Self_right_arm_Broken, Player_left_leg_Broken)
+var battle_bt: Runner = null
+var enemy_turns := 0
 
 
 ## player_state: 이전 전투에서 이어지는 플레이어 부위 상태 (비우면 새 몸). 복사해서 쓴다.
@@ -51,7 +58,55 @@ func setup(enemy_id: String, player_state := {}) -> bool:
 	attacks = data.attacks
 	defending = false
 	outcome = ""
+	enemy_turns = 0
+	_setup_battle_bt(str(data.get("battle_bt", "")))
 	return true
+
+
+func _setup_battle_bt(bt_id: String) -> void:
+	battle_bt = null
+	if bt_id == "":
+		return
+	var bt: Dictionary = DataLoader.ai_assets.get(bt_id, {})
+	var errs := AIAssets.validate_bt(bt, DataLoader.ai_assets) if not bt.is_empty() else [{"msg": "없는 BT"}]
+	if not errs.is_empty() or AIAssets.bt_domain(bt) != "battle":
+		push_warning("[Combat] 전투 BT '%s' 를 쓸 수 없어 가중치로 고름: %s" % [bt_id, errs[0].msg if not errs.is_empty() else "domain 이 battle 이 아님"])
+		return
+	battle_bt = Runner.new()
+	battle_bt.setup(bt, DataLoader.ai_assets.get(str(bt.get("blackboard_id", "")), {}), self)
+
+
+# 전투 BT 어댑터 (bt_tasks.gd UseAttack·UseRandomAttack)
+func ai_attacks() -> Array:
+	return available_attacks()
+
+
+func ai_all_attacks() -> Array:
+	return attacks
+
+
+## 전투 BT 에 지금 전투 상태를 알려 줌 (Blackboard 에 그 키가 있을 때만)
+func _write_battle_bb() -> void:
+	var bb = battle_bt.bb
+	var put := func(k: String, v):
+		if bb.has_key(k):
+			bb.set_value(k, v, "Sensor")
+	put.call("SelfHpRatio", _hp_ratio(enemy_parts))
+	put.call("PlayerHpRatio", _hp_ratio(player_parts))
+	put.call("Turn", enemy_turns)
+	for p in enemy_parts:
+		put.call("Self_%s_Broken" % p, bool(enemy_parts[p].broken))
+	for p in player_parts:
+		put.call("Player_%s_Broken" % p, bool(player_parts[p].broken))
+
+
+static func _hp_ratio(parts: Dictionary) -> float:
+	var hp := 0.0
+	var mx := 0.0
+	for p in parts.values():
+		hp += float(p.hp)
+		mx += float(p.max_hp)
+	return hp / mx if mx > 0.0 else 0.0
 
 
 ## 다친 곳 없는 플레이어 부위 상태
@@ -135,11 +190,22 @@ func available_attacks() -> Array:
 	return attacks.filter(func(a): return a.part == "" or not enemy_parts.get(a.part, {}).get("broken", false))
 
 
-## 가중치로 공격 하나 고르기. 쓸 수 있는 공격이 없으면 {}.
+## 가중치로 공격 하나 고르기 (전투 BT 가 있으면 트리가 고름). 쓸 수 있는 공격이 없으면 {}.
 func choose_enemy_attack() -> Dictionary:
 	var pool := available_attacks()
 	if pool.is_empty():
 		return {}
+	enemy_turns += 1
+	if battle_bt != null:
+		_write_battle_bb()
+		battle_bt.memory.erase("chosen_attack")
+		battle_bt.stop("새 차례")   # 차례마다 처음부터 한 바퀴 (공격 고르기는 즉시 끝나는 Task 들)
+		battle_bt.tick(0.0)
+		var id := str(battle_bt.memory.get("chosen_attack", ""))
+		for a in pool:
+			if str(a.attack_id) == id:
+				return a
+		# 트리가 아무것도 못 고르면 아래 가중치로
 	var total := 0
 	for a in pool:
 		total += maxi(1, int(a.weight))

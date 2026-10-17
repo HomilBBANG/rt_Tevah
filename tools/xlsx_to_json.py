@@ -137,7 +137,8 @@ OPTIONAL = {
                "traits"],           # 능력(trait:) 쉼표로 여러 개
     # walk_speed·run_speed: 필드 이동 속도(칸/초) — 순찰은 걷기, 추격은 달리기. 부위·공격(NpcParts·NpcAttacks)이 있으면 전투 가능
     # kind: monster(몬스터, 맵에서 마주치면 전투부터) / npc (비우면 npc)
-    "Npcs": ["kind", "name_color", "traits", "image", "flee_chance", "walk_speed", "run_speed"] + ABILITY_COLS,
+    # battle_bt: 전투 BT (tools/ai 의 BT_, domain=battle) — 있으면 적 공격을 그 트리가 고름, 비우면 NpcAttacks weight
+    "Npcs": ["kind", "name_color", "traits", "image", "flee_chance", "walk_speed", "run_speed", "battle_bt"] + ABILITY_COLS,
     "Items": ["dice_bonus",         # 소지 시 판정 보정 "strength+2, all+1"
               "weight",             # 무게 (개당). 들고 있는 무게가 Config carry_* 를 넘으면 느려지고, 최대면 못 움직임
               "equip_slot",         # 장착 종류 (EquipSlots 의 kind). 비워도 손(kind=hand)에는 들 수 있음
@@ -625,6 +626,25 @@ def validate(d, rep):
 
     # 전투
     validate_combat(d, rep, pparts, enemies, eparts)
+    # 전투 BT: 있는 BT_·domain battle·트리의 UseAttack 공격이 그 NPC 의 것
+    for e in d["Npcs"]:
+        bid = e.get("battle_bt", "")
+        if not bid:
+            continue
+        w = loc("Npcs", e)
+        bt = d.get("_ai", {}).get(bid)
+        if not bt or bt.get("asset_type") != "behavior_tree":
+            rep.err(w, f"battle_bt 는 tools/ai 의 Behavior Tree (BT_): '{bid}'")
+            continue
+        if bt.get("domain", "field") != "battle":
+            rep.err(w, f"battle_bt '{bid}' 의 domain 이 battle 이 아님 (몬스터 AI 탭 Root 에서 전투로)")
+        if e["npc_id"] not in enemies:
+            rep.err(w, "battle_bt 는 싸울 수 있는 NPC(NpcParts·NpcAttacks 가 있는)만")
+            continue
+        own = {a["attack_id"] for a in d["NpcAttacks"] if a["npc_id"] == e["npc_id"]}
+        for n in bt.get("nodes", []):
+            if n.get("task_type") == "UseAttack" and n.get("params", {}).get("attack_id") not in own:
+                rep.err(w, f"battle_bt '{bid}' 의 {n.get('id')} 공격 '{n.get('params', {}).get('attack_id')}' 는 이 NPC 의 공격이 아님")
 
     # 생존·베이스캠프
     for sv in d["Survival"]:
@@ -1594,7 +1614,7 @@ def export(d, maps):
         # 싸울 수 있는 NPC (부위·공격이 있는 것). enemy_id = npc_id
         "enemies": [{"enemy_id": e["npc_id"], "name": e["name"], "image": e["image"], "kind": e["kind"] or "npc",
                      "flee_chance": float(e["flee_chance"]) if e["flee_chance"] else None,
-                     "walk_speed": e["walk_speed"], "run_speed": e["run_speed"],
+                     "walk_speed": e["walk_speed"], "run_speed": e["run_speed"], "battle_bt": e["battle_bt"],
                      "abilities": {a: e[a] for a in ABILITY_COLS},
                      "parts": [dict(p, vital=is_true(p["vital"])) for p in clean(d["NpcParts"])
                                if p["npc_id"] == e["npc_id"]],

@@ -11,6 +11,10 @@ extends RefCounted
 ##   ai_entity_tile(id: String) -> Variant     그 ID 의 위치 (칸, 없으면 null)
 ##   ai_noise() -> Dictionary                  들린 소리 {pos} 또는 {} (TODO: 소리 시스템 없음 — 지금은 늘 {})
 ##   ai_request_battle() -> bool               턴제 전투 시작 요청 (필드가 띄움). 못 하면 false (도주 직후 유예 등)
+## 전투 BT(domain = battle)의 어댑터는 전투 화면 쪽 (core/combat/combat.gd):
+##   ai_attacks() -> Array                     지금 쓸 수 있는 공격 (쓰는 부위가 파괴·절단되지 않은 것 — 절단에 따른 행동 불가)
+##   ai_all_attacks() -> Array                 이 적의 모든 공격
+## 각 Task 의 domain: field(탐험 필드) / battle(턴제 전투) / any — 검사기가 트리 domain 과 맞는지 본다.
 ##
 ## 시간 값(seconds 등)은 모두 '실제 초' — 필드가 멈춘 동안(전투·대화·메뉴)은 흐르지 않는다.
 
@@ -32,7 +36,15 @@ const TASKS := {
 		"params": [["destination_key", "key:vector2", "LastKnownLocation", "갈 곳"], ["seconds_key", "key:float", "SearchDuration", "둘러보는 시간 (Blackboard)"],
 			["seconds", "number", 2.0, "키가 없을 때 둘러보는 시간"], ["clear_key", "key:bool", "HasLastKnownLocation", "다 보면 지울 키"]]},
 	"ReturnToOrigin": {"ue": "(테바 전용 — MoveTo 처음 자리)", "desc": "처음 놓인 자리로 걸어서 돌아감", "params": []},
-	"EnterTurnBattle": {"ue": "(테바 전용 — 턴제 전투 시작)", "desc": "플레이어와 턴제 전투 시작. 전투가 끝날 때까지 다시 부르지 않음 (중복 방지)", "params": []},
+	"EnterTurnBattle": {"ue": "(테바 전용 — 턴제 전투 시작)", "desc": "플레이어와 턴제 전투 시작. 전투가 끝날 때까지 다시 부르지 않음 (중복 방지)", "params": [], "domain": "field"},
+	"RunBehavior": {"ue": "BTTask_RunBehavior (Subtree)", "domain": "any",
+		"desc": "다른 Behavior Tree 를 이 자리에서 실행 (같은 Blackboard 자산이어야 함). 그 트리가 끝나면 그 결과로.",
+		"params": [["bt_id", "bt", "", "실행할 BT_ (같은 Blackboard)"]]},
+	"UseAttack": {"ue": "(테바 전용 — 전투 BT) 공격 고르기", "domain": "battle",
+		"desc": "이번 적 턴에 이 공격을 씀 → SUCCESS. 쓰는 부위가 파괴·절단돼 못 쓰면 FAILURE (Selector 의 다음 자식으로).",
+		"params": [["attack_id", "attack", "", "NpcAttacks 의 attack_id"]]},
+	"UseRandomAttack": {"ue": "(테바 전용 — 전투 BT) 가중치로 공격 고르기", "domain": "battle",
+		"desc": "쓸 수 있는 공격 중 NpcAttacks weight 로 하나 → SUCCESS, 하나도 없으면 FAILURE. (전투 BT 가 없을 때와 같은 방식)", "params": []},
 	"SetBlackboardValue": {"ue": "BTTask_SetBlackboardValue (Blueprint 로 만드는 경우가 많음)", "desc": "키에 값 쓰기",
 		"params": [["key", "key_any", "", "키"], ["value", "value", null, "값"]]},
 	"ClearBlackboardValue": {"ue": "Clear Value (Blueprint)", "desc": "키를 비움 (bool false, 위치 없음)",
@@ -59,6 +71,9 @@ static func make(node: Dictionary, runner: Object) -> Object:
 		"SearchLastPosition": return SearchTask.new(runner, p)
 		"ReturnToOrigin": return OriginTask.new(runner, p)
 		"EnterTurnBattle": return BattleTask.new(runner, p)
+		"RunBehavior": return RunBehaviorTask.new(runner, p)
+		"UseAttack": return UseAttackTask.new(runner, p)
+		"UseRandomAttack": return RandomAttackTask.new(runner, p)
 		"SetBlackboardValue": return SetTask.new(runner, p)
 		"ClearBlackboardValue": return ClearTask.new(runner, p)
 		"TaskGraph":
@@ -224,6 +239,64 @@ class BattleTask extends BaseTask:
 		if not r.agent.ai_request_battle():
 			return FAILURE
 		r.memory["battle_pending"] = true
+		return SUCCESS
+
+
+## 다른 BT 를 같은 몬스터·같은 Blackboard 로 실행 (Unreal Run Behavior). 끝나면 그 트리의 결과.
+class RunBehaviorTask extends BaseTask:
+	var sub: RefCounted = null
+
+	func enter() -> int:
+		var all: Dictionary = r.assets if not r.assets.is_empty() else DataLoader.ai_assets
+		var bt: Dictionary = all.get(str(p.get("bt_id", "")), {})
+		if bt.is_empty():
+			return FAILURE
+		sub = r.get_script().new()
+		sub.setup_sub(bt, str(bt.get("root_id", "")), r)
+		if sub.error != "":
+			r._log("task", r.task_node, "FAILURE", "Run Behavior: " + sub.error)
+			return FAILURE
+		return tick(0.0)
+
+	func tick(delta: float) -> int:
+		sub.tick(delta)
+		if sub.passes > 0:
+			var res: int = sub.last_pass_result
+			sub.stop("Run Behavior 끝")
+			return res
+		return RUNNING if sub.error == "" else FAILURE
+
+	func abort() -> void:
+		if sub:
+			sub.stop("Run Behavior 중단")
+
+
+## 전투 BT: 이 공격을 씀 (못 쓰면 실패 — 절단에 따른 행동 불가)
+class UseAttackTask extends BaseTask:
+	func enter() -> int:
+		var id := str(p.get("attack_id", ""))
+		for a in r.agent.ai_attacks():
+			if str(a.attack_id) == id:
+				r.memory["chosen_attack"] = id
+				return SUCCESS
+		return FAILURE
+
+
+class RandomAttackTask extends BaseTask:
+	func enter() -> int:
+		var pool: Array = r.agent.ai_attacks()
+		if pool.is_empty():
+			return FAILURE
+		var total := 0
+		for a in pool:
+			total += maxi(1, int(a.get("weight", 1)))
+		var pick := randf() * total
+		for a in pool:
+			pick -= maxi(1, int(a.get("weight", 1)))
+			if pick < 0:
+				r.memory["chosen_attack"] = str(a.attack_id)
+				return SUCCESS
+		r.memory["chosen_attack"] = str(pool.back().attack_id)
 		return SUCCESS
 
 

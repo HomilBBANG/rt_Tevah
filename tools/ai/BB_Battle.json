@@ -1,0 +1,73 @@
+{
+ "schema_version": 2,
+ "asset_type": "blackboard",
+ "id": "BB_Battle",
+ "description": "전투 BT 용 Blackboard — 전투가 차례마다 씀 (있는 키만): SelfHpRatio·PlayerHpRatio·Turn·Self_<부위>_Broken·Player_<부위>_Broken",
+ "keys": [
+  {
+   "name": "SelfHpRatio",
+   "type": "float",
+   "default": 1.0
+  },
+  {
+   "name": "PlayerHpRatio",
+   "type": "float",
+   "default": 1.0
+  },
+  {
+   "name": "Turn",
+   "type": "int",
+   "default": 0
+  },
+  {
+   "name": "Self_head_Broken",
+   "type": "bool",
+   "default": false
+  },
+  {
+   "name": "Self_torso_Broken",
+   "type": "bool",
+   "default": false
+  },
+  {
+   "name": "Self_left_arm_Broken",
+   "type": "bool",
+   "default": false
+  },
+  {
+   "name": "Self_right_arm_Broken",
+   "type": "bool",
+   "default": false
+  },
+  {
+   "name": "Player_head_Broken",
+   "type": "bool",
+   "default": false
+  },
+  {
+   "name": "Player_torso_Broken",
+   "type": "bool",
+   "default": false
+  },
+  {
+   "name": "Player_left_arm_Broken",
+   "type": "bool",
+   "default": false
+  },
+  {
+   "name": "Player_right_arm_Broken",
+   "type": "bool",
+   "default": false
+  },
+  {
+   "name": "Player_left_leg_Broken",
+   "type": "bool",
+   "default": false
+  },
+  {
+   "name": "Player_right_leg_Broken",
+   "type": "bool",
+   "default": false
+  }
+ ]
+}

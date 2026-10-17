@@ -15,7 +15,9 @@ const Tasks = preload("res://core/ai/bt_tasks.gd")
 const SRC_DIR := "res://tools/ai/"
 const OUT_PATH := "res://data/ai.json"
 const SCHEMA := 2
-const KINDS := ["Root", "Selector", "Sequence", "Task"]
+const KINDS := ["Root", "Selector", "Sequence", "SimpleParallel", "Task"]
+const DOMAINS := ["field", "battle"]   # field = 탐험 필드 몬스터, battle = 턴제 전투에서 적이 공격 고르기
+const FINISH_MODES := ["Immediate", "Delayed"]
 const ABORTS := ["None", "Self", "LowerPriority", "Both"]
 const OPERATORS := ["is_set", "is_not_set", "==", "!=", "<", "<=", ">", ">="]
 const DECORATORS := {
@@ -74,6 +76,9 @@ static func validate_bb(bb: Dictionary) -> Array:
 static func validate_bt(bt: Dictionary, all: Dictionary) -> Array:
 	var errs := []
 	var nodes := {}
+	var domain := bt_domain(bt)
+	if not domain in DOMAINS:
+		errs.append({"node": str(bt.get("root_id", "")), "msg": "domain 은 field / battle: '%s'" % domain})
 	for n in bt.get("nodes", []):
 		var id := str(n.get("id", ""))
 		if nodes.has(id):
@@ -94,20 +99,32 @@ static func validate_bt(bt: Dictionary, all: Dictionary) -> Array:
 		var kind := str(n.get("kind", ""))
 		var kids: Array = n.get("children", [])
 		if not kind in KINDS:
-			errs.append({"node": id, "msg": "종류는 Root / Selector / Sequence / Task: '%s'" % kind})
+			errs.append({"node": id, "msg": "종류는 Root / Selector / Sequence / SimpleParallel / Task: '%s'" % kind})
 		if kind == "Root" and id != root:
 			errs.append({"node": id, "msg": "Root 는 하나만"})
 		if kind == "Root":
 			if kids.size() != 1:
-				errs.append({"node": id, "msg": "Root 의 자식은 정확히 하나 (Selector 또는 Sequence)"})
-			elif nodes.has(str(kids[0])) and not str(nodes[str(kids[0])].get("kind")) in ["Selector", "Sequence"]:
-				errs.append({"node": id, "msg": "Root 의 자식은 Selector 또는 Sequence"})
+				errs.append({"node": id, "msg": "Root 의 자식은 정확히 하나 (Selector·Sequence·Simple Parallel)"})
+			elif nodes.has(str(kids[0])) and not str(nodes[str(kids[0])].get("kind")) in ["Selector", "Sequence", "SimpleParallel"]:
+				errs.append({"node": id, "msg": "Root 의 자식은 Selector·Sequence·Simple Parallel"})
 		if kind in ["Selector", "Sequence"] and kids.is_empty():
 			errs.append({"node": id, "msg": "%s 에 자식이 없음" % kind})
+		if kind == "SimpleParallel":
+			if kids.size() != 2:
+				errs.append({"node": id, "msg": "Simple Parallel 의 자식은 둘 (0 = 주 Task, 1 = 배경 분기)"})
+			elif nodes.has(str(kids[0])) and str(nodes[str(kids[0])].get("kind")) != "Task":
+				errs.append({"node": id, "msg": "Simple Parallel 의 첫 자식(주)은 Task 여야 함 (Unreal 과 같음)"})
+			if not str(n.get("finish_mode", "Immediate")) in FINISH_MODES:
+				errs.append({"node": id, "msg": "finish_mode 는 Immediate / Delayed"})
 		if kind == "Task":
 			if not kids.is_empty():
 				errs.append({"node": id, "msg": "Task 는 자식을 가질 수 없음"})
 			_check_task(n, keys, all, errs)
+			var td := task_domain(str(n.get("task_type", "")))
+			if td != "any" and Tasks.TASKS.has(str(n.get("task_type", ""))) and td != domain:
+				errs.append({"node": id, "msg": "%s 는 %s BT 용 Task (이 트리는 %s)" % [n.task_type, td, domain]})
+			if str(n.get("task_type", "")) == "RunBehavior":
+				_check_run_behavior(bt, n, all, errs)
 		for c in kids:
 			c = str(c)
 			if not nodes.has(c):
@@ -120,6 +137,8 @@ static func validate_bt(bt: Dictionary, all: Dictionary) -> Array:
 			errs.append({"node": id, "msg": "Root 에는 Decorator 를 붙일 수 없음"})
 		for d in n.get("decorators", []):
 			_check_decorator(id, d, keys, errs)
+		if domain == "battle" and not n.get("services", []).is_empty():
+			errs.append({"node": id, "msg": "전투 BT 에는 Service 를 쓸 수 없음 (전투는 차례마다 한 번에 판정)"})
 		for s in n.get("services", []):
 			if not Tasks.SERVICES.has(str(s.get("type", ""))):
 				errs.append({"node": id, "msg": "없는 Service '%s'" % s.get("type", "")})
@@ -186,12 +205,67 @@ static func _check_task(n: Dictionary, keys: Dictionary, all: Dictionary, errs: 
 				continue
 			if kind.begins_with("key:") and not keys[key] in kind.substr(4).split("|"):
 				errs.append({"node": id, "msg": "%s: 키 타입이 맞지 않음 (%s 은(는) %s, 필요: %s)" % [spec[0], key, keys[key], kind.substr(4)]})
+		elif kind == "attack":
+			if str(v) == "":
+				errs.append({"node": id, "msg": "공격(attack_id)을 고르세요"})
+			elif not attack_ids().has(str(v)):
+				errs.append({"node": id, "msg": "없는 공격 '%s' (npc.xlsx NpcAttacks)" % v})
 		elif kind == "graph":
 			var g: Dictionary = all.get(str(v), {})
 			if g.is_empty() or kind_of(g) != "task_graph":
 				errs.append({"node": id, "msg": "없는 Task Graph '%s'" % v})
 			elif keys.size() > 0 and not _same_bb(g, keys, all):
 				errs.append({"node": id, "msg": "Task Graph '%s' 의 Blackboard(%s)가 이 트리의 것과 다름" % [v, g.get("blackboard_id", "")]})
+
+
+## Task 의 domain (field / battle / any). 정하지 않은 Task 는 Blackboard 쓰기·지우기만 any, 나머지는 field
+static func task_domain(tt: String) -> String:
+	var d: Dictionary = Tasks.TASKS.get(tt, {})
+	if d.has("domain"):
+		return str(d.domain)
+	return "any" if tt in ["SetBlackboardValue", "ClearBlackboardValue"] else "field"
+
+
+static func bt_domain(bt: Dictionary) -> String:
+	return str(bt.get("domain", "field"))
+
+
+## 모든 적의 attack_id (data/enemies.json — 변환기가 만듦)
+static func attack_ids() -> Dictionary:
+	var out := {}
+	var v = JSON.parse_string(FileAccess.get_file_as_string("res://data/enemies.json")) if FileAccess.file_exists("res://data/enemies.json") else []
+	if v is Array:
+		for e in v:
+			for a in e.get("attacks", []):
+				out[str(a.attack_id)] = "%s · %s" % [e.get("name", ""), a.get("name", a.attack_id)]
+	return out
+
+
+## Run Behavior: 있는 BT·같은 Blackboard·같은 domain·자기 자신을 다시 부르지 않음
+static func _check_run_behavior(bt: Dictionary, n: Dictionary, all: Dictionary, errs: Array) -> void:
+	var target := str(n.get("params", {}).get("bt_id", ""))
+	var t: Dictionary = all.get(target, {})
+	if t.is_empty() or kind_of(t) != "behavior_tree":
+		errs.append({"node": str(n.id), "msg": "없는 Behavior Tree '%s'" % target})
+		return
+	if str(t.get("blackboard_id", "")) != str(bt.get("blackboard_id", "")):
+		errs.append({"node": str(n.id), "msg": "Run Behavior 는 같은 Blackboard 자산이어야 함 (%s ≠ %s)" % [t.get("blackboard_id", ""), bt.get("blackboard_id", "")]})
+	if bt_domain(t) != bt_domain(bt):
+		errs.append({"node": str(n.id), "msg": "Run Behavior 는 같은 domain 이어야 함 (%s ≠ %s)" % [bt_domain(t), bt_domain(bt)]})
+	# 순환: target 에서 Run Behavior 를 따라가다 이 트리로 돌아오면
+	var seen := {}
+	var todo := [target]
+	while not todo.is_empty():
+		var cur: String = todo.pop_back()
+		if cur == str(bt.get("id", "")):
+			errs.append({"node": str(n.id), "msg": "Run Behavior 가 순환함 (%s → … → %s)" % [target, cur]})
+			return
+		if seen.has(cur):
+			continue
+		seen[cur] = true
+		for m in all.get(cur, {}).get("nodes", []):
+			if str(m.get("task_type", "")) == "RunBehavior":
+				todo.append(str(m.get("params", {}).get("bt_id", "")))
 
 
 ## 그래프가 쓰는 Blackboard 의 키가 이 트리의 Blackboard 에 같은 타입으로 다 있나

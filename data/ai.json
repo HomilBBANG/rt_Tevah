@@ -4,6 +4,79 @@
   {
    "schema_version": 2,
    "asset_type": "blackboard",
+   "id": "BB_Battle",
+   "description": "전투 BT 용 Blackboard — 전투가 차례마다 씀 (있는 키만): SelfHpRatio·PlayerHpRatio·Turn·Self_<부위>_Broken·Player_<부위>_Broken",
+   "keys": [
+    {
+     "name": "SelfHpRatio",
+     "type": "float",
+     "default": 1.0
+    },
+    {
+     "name": "PlayerHpRatio",
+     "type": "float",
+     "default": 1.0
+    },
+    {
+     "name": "Turn",
+     "type": "int",
+     "default": 0
+    },
+    {
+     "name": "Self_head_Broken",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "name": "Self_torso_Broken",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "name": "Self_left_arm_Broken",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "name": "Self_right_arm_Broken",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "name": "Player_head_Broken",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "name": "Player_torso_Broken",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "name": "Player_left_arm_Broken",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "name": "Player_right_arm_Broken",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "name": "Player_left_leg_Broken",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "name": "Player_right_leg_Broken",
+     "type": "bool",
+     "default": false
+    }
+   ]
+  },
+  {
+   "schema_version": 2,
+   "asset_type": "blackboard",
    "id": "BB_Infected",
    "description": "감염자 기본 Blackboard (기획 v2.0 §4.2 예시 키)",
    "keys": [
@@ -425,6 +498,118 @@
      "task_type": "Patrol",
      "name": "Patrol",
      "params": {}
+    }
+   ],
+   "editor_layout": {}
+  },
+  {
+   "schema_version": 2,
+   "asset_type": "behavior_tree",
+   "id": "BT_Battle_Test",
+   "domain": "battle",
+   "blackboard_id": "BB_Battle",
+   "description": "전투 BT 예시 (적 A 테스트): 플레이어가 다리를 잃으면 연속 공격 > 내 오른팔이 잘리면 속공(왼팔) > 첫 차례는 기만 > 나머지는 가중치",
+   "root_id": "root",
+   "nodes": [
+    {
+     "id": "root",
+     "kind": "Root",
+     "children": [
+      "choose"
+     ]
+    },
+    {
+     "id": "choose",
+     "kind": "Selector",
+     "name": "공격 고르기",
+     "children": [
+      "finish_off",
+      "arm_lost",
+      "opener",
+      "default"
+     ]
+    },
+    {
+     "id": "finish_off",
+     "kind": "Sequence",
+     "name": "다리 잃은 플레이어 몰아치기",
+     "children": [
+      "use_combo"
+     ],
+     "decorators": [
+      {
+       "type": "Blackboard",
+       "key": "Player_left_leg_Broken",
+       "operator": "is_set",
+       "observer_aborts": "None",
+       "name": "왼다리 잘림"
+      }
+     ]
+    },
+    {
+     "id": "use_combo",
+     "kind": "Task",
+     "task_type": "UseAttack",
+     "params": {
+      "attack_id": "atk_combo"
+     }
+    },
+    {
+     "id": "arm_lost",
+     "kind": "Sequence",
+     "name": "오른팔 잘림 → 왼팔로",
+     "children": [
+      "use_quick"
+     ],
+     "decorators": [
+      {
+       "type": "Blackboard",
+       "key": "Self_right_arm_Broken",
+       "operator": "is_set",
+       "observer_aborts": "None",
+       "name": "내 오른팔 잘림"
+      }
+     ]
+    },
+    {
+     "id": "use_quick",
+     "kind": "Task",
+     "task_type": "UseAttack",
+     "params": {
+      "attack_id": "atk_quick"
+     }
+    },
+    {
+     "id": "opener",
+     "kind": "Sequence",
+     "name": "첫 차례",
+     "children": [
+      "use_feint"
+     ],
+     "decorators": [
+      {
+       "type": "Blackboard",
+       "key": "Turn",
+       "operator": "==",
+       "observer_aborts": "None",
+       "value": 1,
+       "name": "첫 차례"
+      }
+     ]
+    },
+    {
+     "id": "use_feint",
+     "kind": "Task",
+     "task_type": "UseAttack",
+     "params": {
+      "attack_id": "atk_feint"
+     }
+    },
+    {
+     "id": "default",
+     "kind": "Task",
+     "task_type": "UseRandomAttack",
+     "name": "그 외: 가중치"
     }
    ],
    "editor_layout": {}

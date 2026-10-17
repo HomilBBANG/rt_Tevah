@@ -21,6 +21,7 @@ const Tasks = preload("res://core/ai/bt_tasks.gd")
 enum { SUCCESS, FAILURE, RUNNING }
 const RESULT_NAME := ["SUCCESS", "FAILURE", "RUNNING"]
 const COMPOSITES := ["Selector", "Sequence"]
+const MAX_SUB_DEPTH := 8      # Run Behavior·Simple Parallel 안의 실행기 깊이 보호
 const ENTERING := -1
 const MAX_STEPS := 512        # 한 번에 진행할 수 있는 단계 수 (무한 반복 보호)
 const MAX_ABORT_ROUNDS := 16  # 한 tick 의 연쇄 중단 횟수 보호
@@ -48,12 +49,46 @@ var error := ""            # 실행을 멈춘 오류 (자산 오류 등)
 var _dirty := {}           # 바뀐 Blackboard 키 (다음 안전한 때에 Observer Aborts 처리)
 var _observers := {}       # key -> [그 키를 보는 Decorator 가 붙은 node id]
 var _order := {}           # node id -> 트리 순서 (왼쪽·위가 작음)
+var root_override := ""    # 하위 실행기: 이 노드부터 (Simple Parallel 의 배경 분기·Run Behavior 의 Root)
+var depth := 0             # 하위 실행기 깊이
+var passes := 0            # 시작 노드가 끝난 횟수 (한 바퀴)
+var last_pass_result := -1
+var parallel_subs := {}    # Simple Parallel 노드 id -> 배경 분기를 돌리는 하위 실행기
+var breakpoints := {}      # node id -> true: 그 노드에 들어가면 멈춤 (디버거)
+var paused := false
+var bp_hit := ""           # 마지막으로 걸린 브레이크포인트
 
 
 ## bt: BT_ 자산, bb_asset: BB_ 자산, overrides: 이 개체만의 Blackboard 시작값 (맵 에디터의 인스턴스 override)
 func setup(bt: Dictionary, bb_asset: Dictionary, agent_obj: Object, overrides := {}) -> void:
-	asset = bt
+	_index(bt)
 	agent = agent_obj
+	bb = Blackboard.new()
+	bb.setup(bb_asset, overrides)
+	bb.changed.connect(_on_bb_changed)
+	if not nodes.has(str(bt.get("root_id", ""))):
+		error = "Root 가 없음"
+
+
+## 하위 실행기 (같은 몬스터·같은 Blackboard·같은 기억): Simple Parallel 배경 분기, Run Behavior 의 다른 트리
+func setup_sub(bt: Dictionary, start: String, parent: RefCounted) -> void:
+	_index(bt)
+	agent = parent.agent
+	bb = parent.bb
+	memory = parent.memory
+	assets = parent.assets
+	breakpoints = parent.breakpoints
+	depth = parent.depth + 1
+	root_override = start
+	bb.changed.connect(_on_bb_changed)
+	if depth > MAX_SUB_DEPTH:
+		error = "Run Behavior·Simple Parallel 이 너무 깊음 (순환?)"
+	elif not nodes.has(start):
+		error = "없는 시작 노드 '%s'" % start
+
+
+func _index(bt: Dictionary) -> void:
+	asset = bt
 	nodes.clear()
 	parent_of.clear()
 	_observers.clear()
@@ -71,11 +106,6 @@ func setup(bt: Dictionary, bb_asset: Dictionary, agent_obj: Object, overrides :=
 					_observers[key].append(id)
 	_order.clear()
 	_number(str(bt.get("root_id", "")), [0])
-	bb = Blackboard.new()
-	bb.setup(bb_asset, overrides)
-	bb.changed.connect(_on_bb_changed)
-	if not nodes.has(str(bt.get("root_id", ""))):
-		error = "Root 가 없음"
 
 
 func _number(id: String, n: Array) -> void:
@@ -89,15 +119,25 @@ func _number(id: String, n: Array) -> void:
 
 ## 한 번 진행 (몬스터의 _physics_process 에서). delta = 실제 초.
 func tick(delta: float) -> void:
-	if error != "":
+	if error != "" or paused:
 		return
 	time += delta
 	bb.clock = time
 	if stack.is_empty():
-		_log("tree", str(asset.get("root_id", "")), "", "트리 처음부터")
-		_push(str(asset.get("root_id", "")))
-		_run(ENTERING)
+		var start := root_override if root_override != "" else str(asset.get("root_id", ""))
+		_log("tree", start, "", "트리 처음부터")
+		if str(nodes[start].kind) == "Root":
+			_push(start)
+			_run(ENTERING)
+		else:
+			var r := _enter(start)
+			if r == ENTERING:
+				_run(ENTERING)
+			else:
+				passes += 1
+				last_pass_result = r
 	_tick_services(delta)
+	_tick_parallel(delta)
 	_process_aborts()
 	if task != null:
 		var r: int = task.tick(delta)
@@ -110,6 +150,36 @@ func tick(delta: float) -> void:
 func stop(reason := "정지") -> void:
 	_abort_to(0, reason)
 	_dirty.clear()
+	if bb and bb.changed.is_connected(_on_bb_changed) and root_override != "":
+		bb.changed.disconnect(_on_bb_changed)   # 하위 실행기: 공유 Blackboard 에서 떼어 냄 (끝난 뒤 콜백 없음)
+
+
+## 디버거 '한 단계': 멈춰 있어도 한 번 진행하고 다시 멈춤
+func step(delta: float) -> void:
+	set_paused(false)
+	tick(delta)
+	set_paused(true)
+
+
+## 멈춤·재개 (배경 분기·Run Behavior 하위 실행기까지)
+func set_paused(v: bool) -> void:
+	paused = v
+	if not v:
+		bp_hit = ""
+	for id in parallel_subs:
+		parallel_subs[id].set_paused(v)
+	if task != null and "sub" in task and task.sub != null:
+		task.sub.set_paused(v)
+
+
+## 어디선가 멈췄나 (브레이크포인트가 하위 실행기에서 걸려도)
+func is_paused() -> bool:
+	if paused:
+		return true
+	for id in parallel_subs:
+		if parallel_subs[id].is_paused():
+			return true
+	return task != null and "sub" in task and task.sub != null and task.sub.is_paused()
 
 
 ## 회차 재시작: 멈추고 Blackboard 를 기본값으로
@@ -165,6 +235,22 @@ func _run(result: int) -> void:
 					result = _pop(FAILURE if n.kind == "Selector" else SUCCESS)
 					continue
 				result = _enter(str(kids[f.child_i]))
+			"SimpleParallel":
+				# Unreal Simple Parallel: 첫 자식 = 주 Task, 둘째 = 배경 분기(주 Task 가 도는 동안 반복).
+				# 주 Task 가 끝나면 Immediate = 배경을 바로 중단, Delayed = 배경이 지금 한 바퀴를 마칠 때까지 기다림. 결과 = 주 Task 결과.
+				if result == ENTERING:
+					if kids.size() >= 2:
+						var sub = get_script().new()
+						sub.setup_sub(asset, str(kids[1]), self)
+						parallel_subs[f.id] = sub
+					result = _enter(str(kids[0])) if not kids.is_empty() else FAILURE
+					continue
+				var sub = parallel_subs.get(f.id)
+				if str(n.get("finish_mode", "Immediate")) == "Delayed" and sub != null and not sub.stack.is_empty():
+					f["waiting"] = result
+					_log("parallel", f.id, "", "주 Task 끝 — 배경 분기가 끝나길 기다림 (Delayed)")
+					return
+				result = _pop(result)
 			"Task":
 				if result != ENTERING:
 					result = _pop(result)
@@ -208,6 +294,10 @@ func _enter(id: String) -> int:
 func _push(id: String, child_i := 0) -> void:
 	stack.append({"id": id, "child_i": child_i})
 	_log("enter", id, "", "")
+	if breakpoints.has(id):
+		paused = true
+		bp_hit = id
+		_log("breakpoint", id, "", "브레이크포인트 — 멈춤")
 	for s in nodes[id].get("services", []):
 		var e := {"node": id, "def": s, "left": _interval(s)}
 		services.append(e)
@@ -219,6 +309,10 @@ func _push(id: String, child_i := 0) -> void:
 func _pop(result: int) -> int:
 	var f: Dictionary = stack.pop_back()
 	_stop_services(f.id)
+	_stop_parallel(f.id)
+	if stack.is_empty():
+		passes += 1
+		last_pass_result = result
 	last_result[f.id] = RESULT_NAME[result]
 	last_exit_time[f.id] = time
 	_log("exit", f.id, RESULT_NAME[result], "")
@@ -245,6 +339,7 @@ func _abort_to(i: int, reason: String) -> void:
 			t.abort()
 			_log("abort", f.id, "ABORTED", reason)
 		_stop_services(f.id)
+		_stop_parallel(f.id)
 		last_result[f.id] = "ABORTED"
 		last_exit_time[f.id] = time
 
@@ -408,6 +503,29 @@ func _stack_index(id: String) -> int:
 	return -1
 
 
+# ---------------------------------------------------------------- Simple Parallel
+func _tick_parallel(delta: float) -> void:
+	for id in parallel_subs.keys():
+		var sub = parallel_subs.get(id)
+		if sub == null:
+			continue
+		var at := _stack_index(id)
+		var waiting: bool = at >= 0 and stack[at].has("waiting")
+		if not waiting or not sub.stack.is_empty():
+			sub.tick(delta)
+		if waiting and sub.stack.is_empty() and at == stack.size() - 1:
+			var r: int = stack[at].waiting
+			_log("parallel", id, "", "배경 분기도 끝남")
+			_run(_pop(r))
+
+
+func _stop_parallel(id: String) -> void:
+	var sub = parallel_subs.get(id)
+	if sub != null:
+		parallel_subs.erase(id)
+		sub.stop("Simple Parallel 끝")
+
+
 # ---------------------------------------------------------------- Service
 func _interval(s: Dictionary) -> float:
 	var base := maxf(0.01, float(s.get("interval", 0.5)))
@@ -451,7 +569,11 @@ func debug_snapshot(log_count := 40) -> Dictionary:
 	for k in bb.defs:
 		keys.append([k, Blackboard.show(bb.get_value(k)), str(bb.last_source.get(k, "")), str(bb.defs[k].type)])
 	var trace: Array = task.trace.slice(-20) if task != null and "trace" in task else []
-	return {"bt": str(asset.get("id", "")), "bb": bb.asset_id, "active": active_path(), "task": task_node,
+	var active := active_path()
+	for id in parallel_subs:   # 배경 분기도 같은 트리라 함께 표시
+		active.append_array(parallel_subs[id].active_path())
+	return {"bt": str(asset.get("id", "")), "bb": bb.asset_id, "active": active, "task": task_node, "paused": paused, "bp_hit": bp_hit,
+		"subtree": task.sub.debug_snapshot(10) if task != null and "sub" in task and task.sub != null else {},
 		"results": last_result.duplicate(), "decorators": last_decorator.duplicate(), "keys": keys,
 		"log": log.slice(-log_count), "error": error, "time": snappedf(time, 0.01), "graph_trace": trace,
 		"graph": str(task.p.get("graph_id", "")) if task != null and "trace" in task else ""}
