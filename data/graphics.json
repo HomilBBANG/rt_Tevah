@@ -10,7 +10,9 @@
    "casts_shadow": false,
    "note": "그래픽을 안 칠한 바닥 칸(.)에 쓰임 — 꼭 있어야 함",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "floor_grass",
@@ -22,7 +24,9 @@
    "casts_shadow": false,
    "note": "테스트 타일",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "floor_dirt",
@@ -34,7 +38,9 @@
    "casts_shadow": false,
    "note": "테스트 타일",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "floor_wood",
@@ -46,31 +52,37 @@
    "casts_shadow": false,
    "note": "테스트 타일",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "wall_default",
    "name": "기본 벽",
    "layer": "wall",
    "file": "test_tiles.png",
-   "atlas_x": 0,
-   "atlas_y": 1,
+   "atlas_x": 1,
+   "atlas_y": 6,
    "casts_shadow": true,
-   "note": "그래픽을 안 칠한 벽 칸(#)에 쓰임 — 꼭 있어야 함",
+   "note": "그래픽을 안 칠한 벽 칸(#)에 쓰임 — 꼭 있어야 함. 윗면(어두움), 아래가 바닥이면 앞면 wall_default_face",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "wall_default_face",
+   "face_rows": 1
   },
   {
    "tile_key": "wall_wood",
    "name": "나무 벽",
    "layer": "wall",
    "file": "test_tiles.png",
-   "atlas_x": 1,
-   "atlas_y": 1,
+   "atlas_x": 2,
+   "atlas_y": 6,
    "casts_shadow": true,
-   "note": "테스트 타일",
+   "note": "나무 벽 윗면. 아래 2칸 안에 바닥이 있으면 앞면 wall_wood_face (건물 정면)",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "wall_wood_face",
+   "face_rows": 2
   },
   {
    "tile_key": "decal_crack",
@@ -82,7 +94,9 @@
    "casts_shadow": false,
    "note": "테스트 타일 (투명 바탕)",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "decal_blood",
@@ -94,7 +108,9 @@
    "casts_shadow": false,
    "note": "테스트 타일 (투명 바탕)",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "roof_red",
@@ -106,7 +122,9 @@
    "casts_shadow": false,
    "note": "테스트 타일 — 지붕 층: 인물보다 위, 집 안에 들어가면 그 집 지붕이 사라짐",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "roof_slate",
@@ -118,7 +136,9 @@
    "casts_shadow": false,
    "note": "테스트 타일 — 지붕 층",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "door_wood",
@@ -130,7 +150,9 @@
    "casts_shadow": false,
    "note": "테스트 — 문(exit) 그림, 닫힘. 열린 그림 = 같은 이름 + _open",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "door_wood_open",
@@ -142,7 +164,9 @@
    "casts_shadow": false,
    "note": "테스트 — door_wood 가 열렸을 때",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "sparkle",
@@ -154,7 +178,9 @@
    "casts_shadow": false,
    "note": "테스트 — 조사 지점(아직 안 한 곳) 표시. atlas_x 부터 오른쪽으로 frames 장, 초당 fps 장. 어두워도 보임",
    "frames": 4,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "water",
@@ -166,7 +192,9 @@
    "casts_shadow": false,
    "note": "테스트 — 연못·물 (논리는 벽 # = 못 지나감, 그림자 없음)",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "fence_wood",
@@ -178,7 +206,9 @@
    "casts_shadow": false,
    "note": "테스트 — 울타리 (논리 벽 #, 빛은 지나감)",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "roof_brown",
@@ -190,7 +220,9 @@
    "casts_shadow": false,
    "note": "테스트 — 창고·부속 건물",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "roof_green",
@@ -202,7 +234,9 @@
    "casts_shadow": false,
    "note": "테스트 — 점포",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   },
   {
    "tile_key": "forest",
@@ -214,7 +248,51 @@
    "casts_shadow": false,
    "note": "테스트 — 빽빽한 숲 (논리 벽 #). 맵 기본 벽 그림으로 쓰기 좋음",
    "frames": 1,
-   "fps": 6.0
+   "fps": 6.0,
+   "face": "forest_face",
+   "face_rows": 1
+  },
+  {
+   "tile_key": "wall_default_face",
+   "name": "돌벽 앞면",
+   "layer": "wall",
+   "file": "test_tiles.png",
+   "atlas_x": 0,
+   "atlas_y": 1,
+   "casts_shadow": true,
+   "note": "벽 앞면 (비스듬한 탑뷰: 남쪽을 향한 면) — wall_default 의 face",
+   "frames": 1,
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
+  },
+  {
+   "tile_key": "wall_wood_face",
+   "name": "나무 벽 앞면",
+   "layer": "wall",
+   "file": "test_tiles.png",
+   "atlas_x": 1,
+   "atlas_y": 1,
+   "casts_shadow": true,
+   "note": "건물 정면 — wall_wood 의 face",
+   "frames": 1,
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
+  },
+  {
+   "tile_key": "forest_face",
+   "name": "숲 앞면",
+   "layer": "wall",
+   "file": "test_tiles.png",
+   "atlas_x": 3,
+   "atlas_y": 6,
+   "casts_shadow": false,
+   "note": "숲 가장자리 앞면 (줄기) — forest 의 face",
+   "frames": 1,
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   }
  ],
  "light_presets": [

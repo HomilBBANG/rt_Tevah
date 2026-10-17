@@ -144,9 +144,29 @@ static func cell_keys(map: Dictionary, x: int, y: int) -> Dictionary:
 		out.floor = ""
 		if out.wall == "":
 			out.wall = _map_default(vis, "default_wall", "wall", "wall_default")
+		out.wall = _face_of(out.wall, rows, x, y)
 	elif out.floor == "":
 		out.floor = _map_default(vis, "default_floor", "floor", "floor_default")
 	return out
+
+
+## 비스듬한 탑뷰 (피어앤헝거·RPG Maker 식): 벽 타일에 face(앞면 타일)가 있고, 아래(남쪽) face_rows 칸 안에 바닥이 있으면
+## 그 칸은 앞면 그림 (벽 사이에 끼인 칸도 — 건물 정면 2줄 등). 아니면 윗면(원래 타일). 보이는 모습만, 판정은 그대로.
+static func _face_of(key: String, rows: Array, x: int, y: int) -> String:
+	var t: Dictionary = tiles().get(key, {})
+	var face := str(t.get("face", "")) if t.get("face") != null else ""
+	if face == "" or not tiles().has(face):
+		return key
+	var n := maxi(1, int(t.get("face_rows", 1)) if t.get("face_rows") != null else 1)
+	for d in range(1, n + 1):
+		if y + d >= rows.size() or x >= String(rows[y + d]).length():
+			return key
+		var c := String(rows[y + d])[x]
+		if c == ".":
+			return face
+		if c != "#":
+			return key
+	return key
 
 
 ## 맵의 기본 그림 (visual.default_floor / default_wall — 칠하지 않은 칸). 없거나 틀리면 floor_default / wall_default

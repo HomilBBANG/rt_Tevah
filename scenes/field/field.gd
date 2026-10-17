@@ -247,6 +247,7 @@ func _build_actors() -> void:
 	var me: Dictionary = DataLoader.characters.get(GameState.protagonist_id, {})
 	player.speed = float(me.get("walk_speed", 4)) * tile
 	player.run_speed = float(me.get("run_speed", me.get("walk_speed", 4))) * tile
+	player.setup_sprite.call_deferred()   # 캐릭터 그림 (Config player_sprite)
 	player.collision_layer = ACTOR_LAYER
 	player.collision_mask = WALL_LAYER | NPC_LAYER | DOOR_LAYER
 	# 새 회차는 맵 한복판(S)에서 깨어나고, 이동해 왔으면 고른 도착 지점(arrive), 그 밖에는 P

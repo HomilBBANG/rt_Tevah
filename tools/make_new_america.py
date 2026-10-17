@@ -119,7 +119,7 @@ for name, bx, by, bw, bh, rk in BUILDINGS:
             grid[y][x] = "#"
             floor.pop(f"{x},{y}", None)
             footprints.add((x, y))
-            if y >= by + bh - 3:
+            if y >= by + bh - 2:   # 앞벽 2줄 (나무 벽 face_rows 2)
                 wall[f"{x},{y}"] = "wall_wood"
             else:
                 wall[f"{x},{y}"] = "wall_wood"

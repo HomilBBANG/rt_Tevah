@@ -45,5 +45,9 @@
  "ai_follow_delay": 3,
  "combat_max_enemies": 3,
  "combat_join_radius": 8,
+ "player_sprite": "res://art/characters/player.png",
+ "player_sprite_frames": 2,
+ "player_sprite_frame_time": 0.6,
+ "character_scale": 0,
  "opening_dialogue": ""
 }
