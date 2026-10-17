@@ -25,6 +25,7 @@ const DialogueScene = preload("res://scenes/main_play.tscn")
 const ChoiceButton = preload("res://ui/choice_button.gd")
 const SlotPicker = preload("res://ui/save_slot_picker.gd")
 const NpcScript = preload("res://scenes/field/field_npc.gd")
+const FurnitureScript = preload("res://scenes/field/field_furniture.gd")
 const PlayerScript = preload("res://scenes/field/field_player.gd")
 const EnemyScript = preload("res://scenes/field/field_enemy.gd")
 
@@ -55,6 +56,7 @@ var _cutscenes: Array = []       # 차례를 기다리는 자동 시작 컷신 (
 var held_light: PointLight2D     # 손에 든 아이템의 빛 (Items.light, 예: 손전등) — 플레이어를 따라가며 바라보는 쪽을 비춤   # 연출 중인 걷기·카메라 (건너뛰기 때 바로 끝냄)
 var player: CharacterBody2D
 var enemies: Array = []
+var furniture: Array = []        # 기타 가구 [{kind: "furniture", data, pos, rect, node, body, done}] (역할이 있으면 spots 에도)
 var spots: Array = []            # 상호작용 지점 [{ kind: "spot"/"camp"/"exit", data, pos, done }]
 var npcs: Array = []             # NPC [{ kind: "npc", data, pos, node, active }] — active: 지금 시간대에 있음
 var _path_grid: AStarGrid2D      # 벽을 돌아가는 길 찾기 (맵마다 한 번 만듦 — 컷신 걷기·BT 몬스터 이동)
@@ -155,6 +157,7 @@ func load_map(map_id: String) -> void:
 		c.queue_free()
 	enemies.clear()
 	spots.clear()
+	furniture.clear()
 	npcs.clear()
 	events.clear()
 	_path_grid = null
@@ -300,6 +303,9 @@ func _build_actors() -> void:
 				if o.type == "exit":
 					spots.back().open = false
 					spots.back().body = _add_door_body(pos)
+			"furniture":   # 기타 가구 (흰 사각형): 막힘·역할(조사·줍기·사용·대화). 주운 것은 field_state removed
+				if not GameState.field_has(map.map_id, "removed", o.object_id):
+					_spawn_furniture(o)
 			"window":   # 창문: E 로 커튼 치기·걷기. 맵 처음 상태(curtain)에서 바꾼 것은 field_state "curtain" 에 (회차 저장)
 				spots.append({"kind": "window", "data": o, "pos": pos,
 					"curtain": bool(o.get("curtain", false)) != GameState.field_has(map.map_id, "curtain", o.object_id)})
@@ -319,6 +325,72 @@ func _build_actors() -> void:
 				events.append({"kind": "event", "data": o, "pos": pos, "tile": Vector2i(int(o.x), int(o.y)),
 					"done": GameState.field_has(map.map_id, "done", o.object_id)})
 	_refresh_presence()
+
+
+## 기타 가구: 사각형(Y 정렬 — 발 = 아래 모서리) + 막힘 + 역할이 있으면 상호작용 지점
+func _spawn_furniture(o: Dictionary) -> void:
+	var fw := maxi(1, int(o.get("w", 1)))
+	var fh := maxi(1, int(o.get("h", 1)))
+	var top_left := Vector2(int(o.x), int(o.y)) * tile
+	var view := Node2D.new()
+	view.set_script(FurnitureScript)
+	view.size_px = Vector2(fw, fh) * tile
+	view.color = Color.html(str(o.get("color", ""))) if Color.html_is_valid(str(o.get("color", ""))) else Color.WHITE
+	view.label = str(o.get("label", ""))
+	view.position = top_left + Vector2(0, fh * tile)
+	%World.add_child(view)
+	var body: StaticBody2D = null
+	if o.get("solid", true):
+		body = StaticBody2D.new()
+		body.collision_layer = WALL_LAYER   # 벽처럼 막고 적 시야도 가림
+		body.collision_mask = 0
+		var shape := CollisionShape2D.new()
+		var rect := RectangleShape2D.new()
+		rect.size = Vector2(fw, fh) * tile
+		shape.shape = rect
+		body.position = top_left + rect.size / 2.0
+		body.add_child(shape)
+		%World.add_child(body)
+	var s := {"kind": "furniture", "data": o, "pos": top_left + Vector2(fw, fh) * tile / 2.0, "rect": Rect2(top_left, Vector2(fw, fh) * tile),
+		"node": view, "body": body, "done": GameState.field_has(map.map_id, "done", o.object_id)}
+	furniture.append(s)
+	if str(o.get("role", "")) != "":
+		spots.append(s)
+
+
+## 가구 쓰기: 사용 조건 → 역할 (조사 = 문구 + Loot 한 번 / 줍기 = 효과 후 사라짐 / 사용 = 효과, 여러 번 / 대화)
+func _use_furniture(s: Dictionary) -> void:
+	var o: Dictionary = s.data
+	var cond := str(o.get("use_condition", ""))
+	if cond != "" and not Expr.evaluate(cond, GameState):
+		frozen = true
+		show_message(str(o.get("use_fail_text", "")) if str(o.get("use_fail_text", "")) != "" else "지금은 쓸 수 없다.")
+		return
+	match str(o.get("role", "")):
+		"investigate":
+			await _investigate(s)
+		"talk":
+			_start_dialogue(s)
+		"pickup", "use":
+			frozen = true
+			var lines := PackedStringArray()
+			if str(o.get("text", "")) != "":
+				lines.append(str(o.text))
+			lines.append_array(await _run_effects(str(o.get("effects", ""))))
+			if o.role == "pickup":   # 주우면 맵에서 사라짐 (회차 동안)
+				GameState.field_mark(map.map_id, "removed", o.object_id)
+				s.node.queue_free()
+				if s.body:
+					s.body.queue_free()
+				spots.erase(s)
+				furniture.erase(s)
+				_path_grid = null
+			_near_spot = {}
+			if lines.is_empty():
+				frozen = false
+			else:
+				show_message("
+".join(lines))
 
 
 ## 시간대(schedule)에 맞춰 NPC 를 보이거나 숨긴다. 숨은 NPC 는 부딪히지도, 말을 걸 수도 없다.
@@ -496,6 +568,9 @@ func _update_near_spot() -> void:
 	var best_d := INF
 	for s in spots + npcs.filter(func(n): return n.active):
 		var d: float = s.pos.distance_to(player.global_position)
+		if s.has("rect"):   # 큰 가구: 사각형 가장자리까지 거리 (+ 반 칸 = 옆 칸 가운데에서 닿음)
+			var p: Vector2 = player.global_position
+			d = p.distance_to(Vector2(clampf(p.x, s.rect.position.x, s.rect.end.x), clampf(p.y, s.rect.position.y, s.rect.end.y))) + tile * 0.5
 		if d <= INTERACT_RANGE * tile and d < best_d:
 			best = s
 			best_d = d
@@ -504,14 +579,18 @@ func _update_near_spot() -> void:
 		%Prompt.visible = not best.is_empty()
 		if not best.is_empty():
 			var verb: String = {"npc": "대화", "camp": "거점", "exit": "문 열기", "spot": "조사", "transit": "이용",
-				"passage": "통로", "window": "커튼 걷기" if best.get("curtain", false) else "커튼 치기"}[best.kind]
-			var extra := "  (조사함)" if best.kind == "spot" and best.done else ""
+				"passage": "통로", "furniture": {"investigate": "조사", "pickup": "줍기", "use": "사용", "talk": "대화"}.get(str(best.data.get("role", "")), "사용"),
+				"window": "커튼 걷기" if best.get("curtain", false) else "커튼 치기"}[best.kind]
+			var extra := "  (조사함)" if (best.kind == "spot" or (best.kind == "furniture" and best.data.get("role", "") == "investigate")) and best.done else ""
 			if best.kind == "exit" and best.open:
 				verb = "문 닫기"
 				extra = "   —   열린 문으로 걸어가면 나감"
 			if best.kind == "passage":
 				extra = "   —   걸어 들어가면 이동"
-			%Prompt.text = "[E / Space]  %s: %s%s" % [verb, best.data.name, extra]
+			var nm: String = str(best.data.get("name", ""))
+			if nm == "":
+				nm = str(best.data.get("label", ""))   # 가구는 이름이 없으면 표시 메모
+			%Prompt.text = "[E / Space]  %s: %s%s" % [verb, nm, extra]
 
 
 # ---------------------------------------------------------------- 상호작용
@@ -524,6 +603,7 @@ func interact() -> void:
 		"camp": _open_camp()
 		"exit": toggle_door(s)
 		"window": toggle_curtain(s)
+		"furniture": await _use_furniture(s)
 		"transit": travel(s.data.ref, s.data.get("arrive", ""), s.data.object_id)
 		"spot": await _investigate(s)
 
@@ -945,6 +1025,11 @@ func path_grid() -> AStarGrid2D:
 	for c in VisualData.solid_cells(map):
 		if grid.region.has_point(c):
 			grid.set_point_solid(c)
+	for s in furniture:   # 막힌 가구 (주운 것은 빠짐)
+		if s.body != null:
+			for c in VisualData.furniture_cells(s.data):
+				if grid.region.has_point(c):
+					grid.set_point_solid(c)
 	_path_grid = grid
 	return grid
 

@@ -115,7 +115,8 @@ OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "Statu
                    "Survival", "CampActions", "Revivals", "DeathCauses"}
 # 맵 물체: exit 문(E 로 열고 걸어 들어가면 이동) / passage 통로(밟으면 이동) / transit 이용(사다리 등, E 로 이동) /
 #         arrive 도착 지점 (이동할 때 arrive 로 고르면 P 대신 여기 도착)
-FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop", "window"}   # prop = 오브젝트 그림, window = 창문 (벽 칸 위)
+FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop", "window", "furniture"}   # prop = 오브젝트 그림, window = 창문 (벽 칸 위), furniture = 기타 가구 (흰 사각형)
+FURNITURE_ROLES = {"", "investigate", "pickup", "use", "talk"}   # 장식 / 조사 / 줍기 / 사용 / 대화
 PROPS_DIR = ROOT / "art" / "props"
 LIGHT_SHAPES = {"", "point", "cone"}   # light = 광원 (그래픽만)
 # 칠하지 않고 물체에 씀: door = 문(exit) 그림 (닫힘 key, 열림 key_open), marker = 조사 지점 반짝이, window = 창문 (커튼 key_curtain)
@@ -1344,6 +1345,7 @@ def _cell_in(key, w, h):
 
 def validate_field(d, maps, rep, enemies):
     spots = {r["spot_id"] for r in d["Loot"] if r["spot_id"]}
+    items = {r["item_id"] for r in d["Items"]}
     basecamp = next((str(r["value"]) for r in d["Config"] if r["key"] == "basecamp_map"), "")
     nodes = {n["node_id"]: n for n in d["Nodes"]}
     seen = {}
@@ -1431,6 +1433,41 @@ def validate_field(d, maps, rep, enemies):
             else:
                 seen[oid] = m["file"]
             x, y = int(o.get("x", -1)), int(o.get("y", -1))
+            if o.get("type") == "furniture":   # 기타 가구: 놓은 칸 = 왼쪽 위, w × h 칸이 모두 바닥이고 비어 있어야
+                fw, fh = int(o.get("w", 1) or 1), int(o.get("h", 1) or 1)
+                if fw < 1 or fh < 1:
+                    rep.err(w, f"가구 크기 w·h 는 1 이상: {fw}×{fh}")
+                for cy in range(y, y + max(fh, 1)):
+                    for cx in range(x, x + max(fw, 1)):
+                        if (cx, cy) != (x, y) and not floor(cx, cy):
+                            rep.err(w, f"가구가 차지하는 칸 ({cx}, {cy}) 가 바닥이 아님")
+                        elif (cx, cy) != (x, y) and (cx, cy) in occupied:
+                            rep.err(w, f"가구가 차지하는 칸 ({cx}, {cy}) 에 이미 {occupied[(cx, cy)]} 가 있음")
+                        else:
+                            occupied[(cx, cy)] = oid
+                role = o.get("role", "")
+                if role not in FURNITURE_ROLES:
+                    rep.err(w, f"가구 역할(role)은 비움(장식) / investigate / pickup / use / talk: '{role}'")
+                elif role == "investigate" and o.get("ref") and o["ref"] not in spots:
+                    rep.err(w, f"조사 가구의 ref 는 Loot 의 spot_id (없으면 비움): '{o['ref']}'")
+                elif role == "talk" and (o.get("ref") not in nodes or nodes[o["ref"]]["episode_id"] != ""):
+                    rep.err(w, f"대화 가구의 ref 는 필드 대화 노드: '{o.get('ref')}'")
+                elif role in ("pickup", "use") and not o.get("effects"):
+                    rep.warn(w, f"{'줍기' if role == 'pickup' else '사용'} 가구에 효과(effects)가 없음")
+                if o.get("color") and not COLOR_RE.match(str(o["color"])):
+                    rep.err(w, f"가구 색(color)은 #RRGGBB: '{o['color']}'")
+                if o.get("effects"):
+                    try:
+                        for kind, rid in parse_effects(o["effects"]):
+                            if kind == "item" and rid not in items:
+                                rep.err(w, f"가구 효과의 없는 아이템 '{rid}'")
+                    except ExprError as e:
+                        rep.err(w, f"가구 효과(effects) 문법 오류: {e}")
+                if o.get("use_condition"):
+                    try:
+                        parse_condition(o["use_condition"])
+                    except ExprError as e:
+                        rep.err(w, f"가구 사용 조건 문법 오류: {e}")
             if o.get("type") == "window":   # 창문은 벽 칸에, 바로 옆(상하좌우)에 바닥이 있어야 (빛이 들어갈 쪽)
                 if not (0 <= y < len(m["tiles"]) and 0 <= x < len(m["tiles"][y]) and m["tiles"][y][x] == "#"):
                     rep.err(w, f"창문 위치 ({x}, {y}) 가 벽이 아님")
@@ -1438,7 +1475,7 @@ def validate_field(d, maps, rep, enemies):
                     rep.err(w, f"창문 ({x}, {y}) 옆에 바닥이 없음 (빛이 들어갈 곳)")
             elif not floor(x, y):
                 rep.err(w, f"위치 ({x}, {y}) 가 바닥이 아님")
-            elif (x, y) in occupied:
+            elif (x, y) in occupied and occupied[(x, y)] != oid:
                 rep.err(w, f"위치 ({x}, {y}) 에 이미 {occupied[(x, y)]} 가 있음")
             occupied[(x, y)] = oid
             t = o.get("type", "")
@@ -1563,6 +1600,11 @@ def export_maps(d, maps):
             if o.get("type") == "enemy":            # 몬스터 AI: Behavior Tree 와 개체별 Blackboard 시작값 (비우면 예전 AI)
                 e.update(bt=o.get("bt", ""), bb_overrides=o.get("bb_overrides") or {},
                          touch_battle=o.get("touch_battle", ""), follow=o.get("follow", ""))   # follow off = 다른 맵까지 안 따라옴   # 닿으면 바로 전투: "" = BT 설정(없으면 켬) / on / off
+            if o.get("type") == "furniture":        # 기타 가구 (흰 사각형): 크기·표시 메모·색·막힘·사용 조건·역할
+                e.update(w=max(1, int(o.get("w", 1) or 1)), h=max(1, int(o.get("h", 1) or 1)), label=o.get("label", ""),
+                         color=o.get("color", "") or "#FFFFFF", solid=o.get("solid", True) is not False,
+                         use_condition=o.get("use_condition", ""), use_fail_text=o.get("use_fail_text", ""),
+                         role=o.get("role", ""), effects=o.get("effects", ""))
             if o.get("type") == "window":           # 창문: 처음에 커튼을 쳐 두었나
                 e["curtain"] = bool(o.get("curtain"))
             if o.get("type") == "light":            # 광원: 놓을 때 프리셋에서 복사한 값 (광원마다 고칠 수 있음)

@@ -12,6 +12,7 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute("user://field_smoke")
 	seed(3)
 	DataLoader.config["text_speed_default"] = "instant"   # 대사가 한 자씩 나오지 않게 (타이핑은 script_play_smoke)
+	DataLoader.config["basecamp_map"] = "basecamp"   # 엑셀 Config 에서 베이스캠프를 바꿔도 테스트는 basecamp 맵으로
 	SaveManager.save_dir = "user://test_saves/"
 	SaveManager.delete_all()
 	SaveManager.begin_run()

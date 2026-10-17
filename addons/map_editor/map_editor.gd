@@ -19,7 +19,7 @@ const TOOL_GROUPS := [
 	["", [["select", "선택"]]],
 	["칠하기", [["wall", "벽"], ["floor", "바닥"], ["void", "빈 공간"]]],
 	["위치", [["arrive", "도착 P"], ["run_start", "시작 S"]]],
-	["물체", [["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["event", "이벤트"]]],
+	["물체", [["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["event", "이벤트"], ["furniture", "가구"]]],
 	["이동", [["exit", "문"], ["passage", "통로"], ["transit", "이용"]]],
 	["그래픽", [["tile", "타일"], ["tile_erase", "타일 지우기"], ["prop", "오브젝트"], ["light", "광원"], ["window", "창문"]]],
 	["", [["erase", "지우개"]]],
@@ -43,6 +43,7 @@ const TOOL_TIPS := {
 	"tile": "타일 붓: 왼쪽 '타일 팔레트'에서 층·타일을 고르고 끌어서 칠함 (보이는 모습만 — 벽·바닥 판정은 그대로). □ 사각형·Shift 로 채우기",
 	"tile_erase": "타일 지우개: 지금 층의 칠한 타일을 지움 (그 칸은 기본 타일로 보임)",
 	"prop": "오브젝트 그림 (나무·가구): 왼쪽 '타일 팔레트'를 '오브젝트'로 바꿔 고르고 클릭한 칸(= 왼쪽 아래 칸)에 놓기. 인물과 앞뒤는 저절로",
+	"furniture": "기타 가구: 그림 대신 흰 사각형. 클릭한 칸 = 왼쪽 위, 오른쪽 칸에서 크기·표시 메모(예: 철제 서랍)·색·역할(조사·줍기·사용·대화)·사용 조건",
 	"window": "창문: 벽 칸(옆에 바닥이 있는)에 놓기. 낮에는 바닥 쪽으로 햇빛이 들어오고 밤엔 어두움. 게임에서 E 로 커튼을 치면 빛이 막힘",
 	"light": "광원: 클릭한 칸에 놓기 (오른쪽 칸에서 프리셋·색·밝기·범위·그림자). 고르면 끌어서 옮기기, Ctrl+C/V 복제",
 }
@@ -89,7 +90,7 @@ const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
 [b]지도 표시[/b]  [color=#3fae5f]● P[/color] 도착 P (★ 기본) · [color=#b89a2a]S[/color] 회차 시작 · [color=#d05050]● 적[/color] · [color=#e8c35a]● 조[/color] 조사 · [color=#5a8fd0]● N[/color] NPC · [color=#5fae6a]● 거[/color] 거점 · [color=#c070d0]● !![/color] 이벤트 (밟으면 컷신) · [color=#a07850]● 문[/color] · [color=#6fa8dc]● 통[/color] 통로 · [color=#c8a060]● 이[/color] 이용 · 맵 바깥 푸른 띠 = 가장자리 이동
 """
 const TYPE_NAME :={"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구(문)",
-	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P", "event": "이벤트 칸", "light": "광원", "prop": "오브젝트 그림", "window": "창문"}
+	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P", "event": "이벤트 칸", "light": "광원", "prop": "오브젝트 그림", "window": "창문", "furniture": "기타 가구"}
 const EDGES := [["up", "위"], ["down", "아래"], ["left", "왼쪽"], ["right", "오른쪽"]]
 
 var dir := MAP_DIR                   # 테스트에서 바꿔 쓴다
@@ -768,6 +769,8 @@ func _edit_object(o: Dictionary) -> void:
 				_option("문 모양", [["", "기본 (%s)" % VisualData.default_art("door")]] + doors.map(func(k): return [k, "%s  (%s)" % [VisualData.tiles()[k].name, k]]), o.get("look", ""), func(v):
 					set_field(o, "look", v)
 					_gfx_dirty = true)
+		"furniture":
+			_edit_furniture(o)
 		"window":
 			_section("창문")
 			var wins: Array = VisualData.tiles().keys().filter(func(k): return str(VisualData.tiles()[k].get("layer", "")) == "window" and not str(k).ends_with("_curtain"))
@@ -953,6 +956,70 @@ func set_field(o: Dictionary, key: String, v: Variant) -> void:
 	if key in ["ref", "arrive", "from", "object_id", "name"]:
 		_refresh_links()
 	canvas.queue_redraw()
+
+
+## 기타 가구 세부: 크기·표시 메모·색·막힘 / 역할(조사·줍기·사용·대화)과 역할별 칸 / 사용 조건·못 쓸 때 문구
+func _edit_furniture(o: Dictionary) -> void:
+	_section("가구")
+	_line("표시 메모", o.get("label", ""), func(v):
+		set_field(o, "label", v)
+		canvas.queue_redraw(), "사각형 위에 보이는 글 (예: 철제 서랍, 거대한 시계)")
+	for f in [["w", "너비 (칸)"], ["h", "높이 (칸)"]]:
+		var key: String = f[0]
+		var sp := _spin(f[1], maxi(1, int(o.get(key, 1))), 1, 50)
+		sp.value_changed.connect(func(v):
+			var old := int(o.get(key, 1))
+			o[key] = int(v)
+			if not canvas.fits("furniture", Vector2i(int(o.x), int(o.y)), o):   # 벽·다른 물체와 겹치면 되돌림
+				o[key] = old
+				sp.set_value_no_signal(old)
+				_status("그 크기는 벽이나 다른 물체와 겹쳐요")
+				return
+			o[key] = old
+			set_field(o, key, int(v)))
+	var cp := ColorPickerButton.new()
+	cp.color = Color.html(str(o.get("color", "#FFFFFF"))) if Color.html_is_valid(str(o.get("color", ""))) else Color.WHITE
+	cp.edit_alpha = false
+	cp.custom_minimum_size.y = 28
+	cp.color_changed.connect(func(c): set_field(o, "color", "#" + c.to_html(false).to_upper()))
+	_row("색", cp)
+	var sol := CheckBox.new()
+	sol.text = "지나갈 수 없음 (벽처럼 막고 적 시야도 가림)"
+	sol.button_pressed = o.get("solid", true) != false
+	sol.toggled.connect(func(on): set_field(o, "solid", on))
+	inspector.add_child(sol)
+	_section("역할")
+	_option("E 를 누르면", [["", "(없음 — 장식)"], ["investigate", "조사 — 문구 + 얻는 것(Loot) 한 번"], ["pickup", "줍기 — 효과(아이템 얻기 등) 후 사라짐"],
+		["use", "사용 — 효과, 여러 번"], ["talk", "대화 — 대화 시작"]], o.get("role", ""), func(v):
+			set_field(o, "role", v)
+			canvas.queue_redraw()
+			_edit_object.call_deferred(o))
+	var role := str(o.get("role", ""))
+	if role == "":
+		_hint("장식은 보이기만 합니다 (막힘은 위 체크).")
+		return
+	if role == "talk":
+		_option("대화", dialogue_starts, o.get("ref", ""), func(v): set_field(o, "ref", v))
+	if role == "investigate":
+		_option("얻는 것", [["", "(없음)"]] + loot_spots, o.get("ref", ""), func(v): set_field(o, "ref", v))
+	if role in ["investigate", "pickup", "use"]:
+		var te := TextEdit.new()
+		te.text = o.get("text", "")
+		te.placeholder_text = "쓸 때 나오는 문구 (비워도 됨)" if role != "investigate" else "조사할 때 나오는 문구"
+		te.custom_minimum_size.y = 70
+		te.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+		te.text_changed.connect(func(): set_field(o, "text", te.text))
+		inspector.add_child(te)
+	if role in ["pickup", "use"]:
+		_note("효과 (예: 아이템 얻기)", Color(0.8, 0.8, 0.8))
+		var eff: Node = ExprRows.new().setup("effect", o.get("effects", ""), lookups)
+		eff.changed.connect(func(v): set_field(o, "effects", v))
+		inspector.add_child(eff)
+	_section("사용 조건")
+	var cond: Node = ExprRows.new().setup("cond", o.get("use_condition", ""), lookups)
+	cond.changed.connect(func(v): set_field(o, "use_condition", v))
+	inspector.add_child(cond)
+	_line("못 쓸 때 문구", o.get("use_fail_text", ""), func(v): set_field(o, "use_fail_text", v), "비우면 '지금은 쓸 수 없다.'")
 
 
 # ---------------------------------------------------------------- 여러 개 고쳤을 때 (속성 묶음 편집)
@@ -1268,7 +1335,7 @@ func paste_at(at: Vector2i) -> void:
 	var made := []
 	for c in _clip.objects:
 		var t := at + Vector2i(int(c.x), int(c.y))
-		if not canvas.fits(str(c.get("type", "")), t) or not canvas.object_at(t).is_empty():
+		if not canvas.fits(str(c.get("type", "")), t, c) or not canvas.object_at(t).is_empty():
 			continue
 		var o: Dictionary = c.duplicate(true)
 		o.object_id = _new_object_id(o.type)
@@ -1369,7 +1436,7 @@ func _build_left_panel() -> Control:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	filt_box.add_child(grid)
-	for f in [["tiles", "타일"], ["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"],
+	for f in [["tiles", "타일"], ["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["furniture", "가구"],
 			["travel", "문·통로·이용"], ["arrive", "도착 P"], ["event", "이벤트"], ["sight", "순찰"], ["names", "이름표"], ["links", "연결"],
 			["graphics", "그래픽"], ["lighting", "조명"], ["roof", "지붕"], ["props", "오브젝트"], ["light", "광원"], ["light_range", "광원 범위"], ["occluders", "그림자 차단"], ["logic", "벽 판정"]]:
 		var cb := CheckBox.new()

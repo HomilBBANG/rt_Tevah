@@ -67,6 +67,15 @@ static func prop_cells(map: Dictionary) -> Dictionary:
 	return out
 
 
+## 기타 가구(type=furniture)가 차지하는 칸: 놓은 칸 = 왼쪽 위, w 오른쪽·h 아래로
+static func furniture_cells(o: Dictionary) -> Array:
+	var out := []
+	for dy in maxi(1, int(o.get("h", 1))):
+		for dx in maxi(1, int(o.get("w", 1))):
+			out.append(Vector2i(int(o.x) + dx, int(o.y) + dy))
+	return out
+
+
 ## 지나갈 수 없는 오브젝트 칸 (solid) — 필드 충돌·컷신 길 찾기
 static func solid_cells(map: Dictionary) -> Array:
 	var out := []

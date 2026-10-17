@@ -202,6 +202,52 @@ func _ready() -> void:
 	wr.set_time(0)
 	check(not wr.windows.tw_win.light.enabled, "밤엔 창문 빛 없음")
 	wf.queue_free()
+	await _wait(0.1)
+	# ---- 기타 가구: 흰 사각형·막힘·사용 조건·줍기(사라짐)·사용(여러 번)
+	var fm := _map("indoor")
+	fm.map_id = "tfur"
+	var fobj := func(id: String, x: int, y: int, extra: Dictionary) -> Dictionary:
+		var o := {"object_id": id, "type": "furniture", "ref": "", "name": "", "text": "", "condition": "", "arrive": "", "from": [],
+			"default": false, "once": false, "map_id": "tfur", "x": x, "y": y, "patrol_dir": "", "patrol_len": 0, "schedule": [],
+			"w": 1, "h": 1, "label": "", "color": "#FFFFFF", "solid": true, "role": "", "use_condition": "", "use_fail_text": "", "effects": ""}
+		o.merge(extra, true)
+		return o
+	fm.objects = [fobj.call("tf_clock", 4, 1, {"w": 2, "h": 3, "label": "거대한 시계"}),
+		fobj.call("tf_drawer", 1, 1, {"label": "철제 서랍", "role": "pickup", "effects": "item:+bandage", "use_condition": "has:knife", "use_fail_text": "잠겨 있다."}),
+		fobj.call("tf_tap", 1, 5, {"label": "수도", "role": "use", "effects": "surv:thirst+10", "solid": false})]
+	DataLoader.maps["tfur"] = fm
+	FieldScript.next_map_id = "tfur"
+	var ff: Node = load("res://scenes/field/field.tscn").instantiate()
+	add_child(ff)
+	await _wait(0.3)
+	check(ff.furniture.size() == 3 and ff.furniture.all(func(x): return x.node.get_parent() == ff.get_node("%World")), "가구 3개 (인물과 같은 Y 정렬 노드)")
+	check(ff.path_grid().is_point_solid(Vector2i(5, 3)) and not ff.path_grid().is_point_solid(Vector2i(1, 5)), "막힌 가구 칸은 길 찾기에서 막힘 (2×3 전체), 안 막힌 가구는 지나감")
+	var clock: Dictionary = ff.furniture.filter(func(x): return x.data.object_id == "tf_clock")[0]
+	check(not clock in ff.spots, "역할 없는 가구(장식)는 상호작용 없음")
+	ff.player.position = ff._tile_center(2, 1)
+	await _wait(0.1)
+	await _snap("furniture")
+	var drawer: Dictionary = ff.furniture.filter(func(x): return x.data.object_id == "tf_drawer")[0]
+	check(ff._near_spot == drawer and "줍기: 철제 서랍" in ff.get_node("%Prompt").text, "가구 옆에서 '줍기: 철제 서랍' 안내 (이름 없으면 표시 메모)")
+	GameState.remove_item("knife", GameState.item_count("knife"))
+	var had: int = GameState.item_count("bandage")
+	await ff._use_furniture(drawer)
+	check(ff.get_node("%MessagePanel").visible and "잠겨 있다." in ff.get_node("%Message").text and drawer in ff.furniture, "사용 조건이 안 맞으면 못 쓸 때 문구")
+	ff.close_message()
+	GameState.add_item("knife", 1)
+	await ff._use_furniture(drawer)
+	check(GameState.item_count("bandage") == had + 1 and not drawer in ff.furniture and GameState.field_has("tfur", "removed", "tf_drawer")
+		and not ff.path_grid().is_point_solid(Vector2i(1, 1)), "조건이 맞으면 줍기: 아이템 얻고 가구는 사라짐 (회차 상태에 기록, 길도 열림)")
+	ff.close_message()
+	var tap: Dictionary = ff.furniture.filter(func(x): return x.data.object_id == "tf_tap")[0]
+	GameState.survival["thirst"] = 50.0
+	await ff._use_furniture(tap)
+	ff.close_message()
+	await ff._use_furniture(tap)
+	ff.close_message()
+	check(is_equal_approx(float(GameState.survival.thirst), 70.0) and tap in ff.furniture, "사용 가구는 여러 번 (사라지지 않음)")
+	ff.queue_free()
+	DataLoader.maps.erase("tfur")
 	DataLoader.maps.erase("twin")
 	DataLoader.maps.erase("tgfx")
 	SaveManager.delete_all()

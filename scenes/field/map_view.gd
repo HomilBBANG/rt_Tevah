@@ -46,6 +46,8 @@ func _draw_spots() -> void:
 	for s in spots:
 		if s.kind in ["exit", "spot", "window"] and art_ids.has(str(s.data.object_id)):
 			continue
+		if s.kind == "furniture":
+			continue   # 가구는 field_furniture 가 그림
 		var c: Vector2 = s.pos
 		match s.kind:
 			"camp":

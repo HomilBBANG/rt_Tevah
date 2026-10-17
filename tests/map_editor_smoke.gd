@@ -157,7 +157,8 @@ func _ready() -> void:
 	ed.undo()
 	ed.undo()
 	check(ed.canvas.default_p().is_empty() and ed.map.objects.size() == 3, "실행 취소")
-	# 베이스캠프: 기본 P 필수 — 마지막 기본 P 는 못 지움
+	# 베이스캠프: 기본 P 필수 — 마지막 기본 P 는 못 지움 (Config basecamp_map 과 상관없이 테스트 복사본의 basecamp 로)
+	ed.basecamp_id = "basecamp"
 	ed.open_map("basecamp")
 	await _frames(1)
 	var bc_p: Dictionary = ed.canvas.default_p()
@@ -450,6 +451,19 @@ func _ready() -> void:
 	check(cv.is_wall(Vector2i(5, 0)), "창문 칸은 바닥으로 칠해지지 않음")
 	ed.map.objects.erase(win)
 	ed.map.objects.erase(wall_door)
+	# 기타 가구: 흰 사각형, 크기만큼 칸을 차지 (어느 칸을 눌러도 그 가구), 벽과 겹치는 크기는 안 됨
+	ed.set_tool("furniture")
+	cv.apply_tool(Vector2i(2, 4))
+	var fur: Dictionary = cv.object_at(Vector2i(2, 4))
+	check(fur.get("type", "") == "furniture" and fur.get("color", "") == "#FFFFFF" and int(fur.w) == 1, "가구 놓기 (기본 흰색 1×1)")
+	fur.w = 3
+	fur.h = 2
+	check(cv.object_at(Vector2i(4, 5)) == fur and cv.object_at(Vector2i(5, 5)).is_empty(), "3×2 가구: 차지하는 칸 어디서나 고름")
+	check(cv.fits("furniture", Vector2i(2, 4), fur) and not cv.fits("furniture", Vector2i(11, 1), fur), "가구 크기만큼 바닥이어야 놓임 (벽과 겹치면 안 됨)")
+	ed.set_tool("wall")
+	cv.apply_tool(Vector2i(3, 5))
+	check(cv.is_floor(Vector2i(3, 5)), "가구 칸은 벽으로 안 칠해짐")
+	ed.map.objects.erase(fur)
 
 	# 맵 삭제: 쓰는 곳(다른 맵의 문) 목록 → 파일 지움, 베이스캠프는 못 지움
 	ed.new_map("test_del", 5, 5)

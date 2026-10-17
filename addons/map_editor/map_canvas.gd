@@ -14,20 +14,20 @@ signal stroke_started             # 한 번의 누름(칠하기·옮기기)이 �
 signal request(action: String)    # 단축키
 signal activated(obj: Dictionary) # 더블클릭
 
-const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop", "window"]
+const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop", "window", "furniture"]
 const VisualData = preload("res://core/visual_data.gd")
 const TRAVEL_TYPES := ["exit", "passage", "transit"]
 const COLORS := {
 	"enemy": Color("d05050"), "investigate": Color("e8c35a"), "npc": Color("5a8fd0"),
 	"camp": Color("5fae6a"), "exit": Color("a07850"),
-	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"), "event": Color("c070d0"), "light": Color("f5d76e"), "prop": Color("9a8a70"), "window": Color("8ec0e0"),
+	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"), "event": Color("c070d0"), "light": Color("f5d76e"), "prop": Color("9a8a70"), "window": Color("8ec0e0"), "furniture": Color.WHITE,
 }
-const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P", "event": "!!", "light": "빛", "prop": "◆", "window": "창"}
+const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P", "event": "!!", "light": "빛", "prop": "◆", "window": "창", "furniture": "가"}
 const EDGE_NAME := {"up": "위", "down": "아래", "left": "왼쪽", "right": "오른쪽"}
 const DIR := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 ## 표시 필터 묶음: 물체 종류 → 필터 이름
 const FILTER_OF := {"enemy": "enemy", "investigate": "investigate", "npc": "npc", "camp": "camp",
-	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive", "event": "event", "light": "light", "prop": "props", "window": "light"}
+	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive", "event": "event", "light": "light", "prop": "props", "window": "light", "furniture": "furniture"}
 const PAINT_TOOLS := ["wall", "floor", "void", "tile", "tile_erase"]   # 끌어서 칠하는 도구 (tile = 그래픽 층)
 
 var map := {}                 # { map_id, tiles: [String], start, run_start, objects: [...], edges }
@@ -48,7 +48,7 @@ var region := Rect2i()        # 영역 선택 (칸). size 0 = 없음
 var id_maker: Callable        # func(type) -> String
 var require_default := false  # 베이스캠프: ★ 기본 P 가 꼭 있어야 함 (첫 P 는 자동 기본, 기본 P 는 못 지움)
 ## 표시 필터 (false = 숨김, 숨긴 물체는 고를 수도 없음)
-var filters := {"tiles": true, "enemy": true, "investigate": true, "npc": true, "camp": true, "travel": true, "event": true, "light": true, "props": true,
+var filters := {"tiles": true, "enemy": true, "investigate": true, "npc": true, "camp": true, "travel": true, "event": true, "light": true, "props": true, "furniture": true,
 	"graphics": true, "lighting": true, "roof": true, "light_range": true, "occluders": false, "logic": false,
 	"arrive": true, "sight": true, "names": true, "links": true}
 ## 연결 표시: object_id → [글자, 맞으면 true] (편집기가 채움). 가장자리는 "edge:방향"
@@ -100,7 +100,13 @@ func is_wall(t: Vector2i) -> bool:
 
 
 ## 물체 종류 type 을 칸 t 에 둘 수 있나: 창문 = 옆(상하좌우)에 바닥이 있는 벽 칸, 나머지 = 바닥
-func fits(type: String, t: Vector2i) -> bool:
+func fits(type: String, t: Vector2i, o: Dictionary = {}) -> bool:
+	if type == "furniture":   # 가구: 왼쪽 위 t 부터 w × h 칸이 모두 바닥이고 다른 물체가 없어야
+		for c in VisualData.furniture_cells({"x": t.x, "y": t.y, "w": o.get("w", 1), "h": o.get("h", 1)}):
+			var there := object_at(c)
+			if not is_floor(c) or (not there.is_empty() and there != o):
+				return false
+		return true
 	if type == "window":
 		return is_wall(t) and (is_floor(t + Vector2i.DOWN) or is_floor(t + Vector2i.UP) or is_floor(t + Vector2i.LEFT) or is_floor(t + Vector2i.RIGHT))
 	return is_floor(t)
@@ -123,6 +129,8 @@ func object_at(t: Vector2i) -> Dictionary:
 	for o in map.get("objects", []):
 		if int(o.x) == t.x and int(o.y) == t.y:
 			return o
+		if o.get("type", "") == "furniture" and t.x >= int(o.x) and t.y >= int(o.y) 				and t.x < int(o.x) + maxi(1, int(o.get("w", 1))) and t.y < int(o.y) + maxi(1, int(o.get("h", 1))):
+			return o   # 큰 가구는 차지하는 칸 어디서나
 	return {}
 
 
@@ -199,7 +207,9 @@ func apply_tool(t: Vector2i, first := true) -> void:
 				if tool == "arrive" and require_default and default_p().is_empty():
 					o.default = true   # 베이스캠프의 첫 도착 P = 기본
 				if tool == "light":
-					o.merge(light_defaults.duplicate(true), true)   # 프리셋 값 복사 (광원마다 따로 고칠 수 있음)
+					o.merge(light_defaults.duplicate(true), true)
+				if tool == "furniture":
+					o.merge({"w": 1, "h": 1, "label": "", "color": "#FFFFFF", "solid": true, "role": "", "use_condition": "", "use_fail_text": "", "effects": ""})   # 프리셋 값 복사 (광원마다 따로 고칠 수 있음)
 				if tool == "prop":
 					if prop_id == "":
 						return
@@ -412,7 +422,7 @@ func _move_selection(d: Vector2i) -> void:
 	for p in _move_from:
 		var to: Vector2i = p[1] + d
 		var there := object_at(to)
-		if not fits(str(p[0].get("type", "")), to) or (not there.is_empty() and not there in movers):
+		if not fits(str(p[0].get("type", "")), to, p[0]) or (not there.is_empty() and not there in movers):
 			return
 	for p in _move_from:
 		p[0].x = p[1].x + d.x
@@ -555,6 +565,19 @@ func _draw() -> void:
 	# 물체
 	for o in map.objects:
 		if not is_visible_object(o):
+			continue
+		if o.type == "furniture":   # 기타 가구: 차지하는 칸만큼 색 사각형 + 표시 메모
+			var fr := Rect2(pan + Vector2(o.x, o.y) * s, Vector2(maxi(1, int(o.get("w", 1))), maxi(1, int(o.get("h", 1)))) * s).grow(-2)
+			var fc := Color.html(str(o.get("color", ""))) if Color.html_is_valid(str(o.get("color", ""))) else Color.WHITE
+			draw_rect(fr, Color(fc.r, fc.g, fc.b, 0.9))
+			draw_rect(fr, Color.WHITE if o in selection else fc.darkened(0.5), false, 3.0 if o in selection else 1.5)
+			var ink := Color(0.08, 0.08, 0.1) if fc.get_luminance() > 0.5 else Color.WHITE
+			var fl := str(o.get("label", ""))
+			if fl != "" and s >= 10.0:
+				var fsz := int(clampf(s * 0.3, 9.0, 22.0))
+				draw_string(_font, Vector2(fr.position.x + 2, fr.get_center().y + fsz * 0.35), fl, HORIZONTAL_ALIGNMENT_CENTER, fr.size.x - 4, fsz, ink)
+			if str(o.get("role", "")) != "":   # 쓸 수 있는 가구: 오른쪽 위 작은 점
+				draw_circle(fr.position + Vector2(fr.size.x - s * 0.15, s * 0.15), maxf(2.0, s * 0.08), Color("e8a33a"))
 			continue
 		var c := _center(int(o.x), int(o.y))
 		var col: Color = COLORS.get(o.type, Color.WHITE)
