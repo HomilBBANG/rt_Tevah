@@ -9,6 +9,8 @@ extends Node2D
 ##   조명: CanvasModulate(환경광, 시간대·맵 환경 outdoor/indoor/underground) + 실외 햇빛(DirectionalLight2D, 그림자 없음)
 ##         + 광원(맵 물체 type=light → PointLight2D, 벽 그림자)
 ##   오브젝트 그림: 맵 물체 type=prop → Sprite2D (발 = 놓은 칸 아래쪽). 인물과 같은 Y 정렬 노드에 두면 앞뒤가 저절로
+##   물체 표시 그림 (Tiles layer door / marker): 문(exit) = 닫힘·열림 그림 (set_door_open 이 바꿈, 물체 look 으로 고름),
+##         조사 지점(investigate) = 반짝이 애니메이션 (빛 영향 없이 어두워도 보임, set_spot_done 이 숨김)
 ##         (필드는 build_props(%World), 에디터는 렌더러 안 props_root)
 ## 쓰는 법: build(map, tile) → set_time(분) / set_door_open(id, 열림) / set_lighting(켜기)
 
@@ -28,6 +30,9 @@ var prop_sprites: Array = []
 var roof_regions: Array = []     # [{cells: {Vector2i: true}, layer: TileMapLayer, open: bool}]
 var roof_alpha := 1.0            # 덮었을 때 지붕 불투명도 (에디터 미리보기는 반투명)
 var _roof_cell := {}             # Vector2i → 지붕 묶음 번호
+var markers := {}                # object_id → {sprite, kind: door/spark, key, frames, fps}
+var _marker_root: Node2D
+var _anim_t := 0.0
 var _roof_root: Node2D
 static var _cone_tex: Texture2D
 var _bg: ColorRect
@@ -57,6 +62,9 @@ func _init() -> void:
 	props_root.name = "Props"
 	props_root.y_sort_enabled = true
 	add_child(props_root)
+	_marker_root = Node2D.new()
+	_marker_root.name = "Markers"
+	add_child(_marker_root)
 	_roof_root = Node2D.new()
 	_roof_root.name = "Roofs"
 	_roof_root.z_index = 50   # 인물(필드 %World, z 0)보다 위
@@ -77,6 +85,7 @@ func build(p_map: Dictionary, p_tile: float) -> void:
 	rebuild_tiles()
 	rebuild_lights()
 	build_props(props_root)
+	build_markers()
 	set_time(minutes)
 
 
@@ -147,6 +156,63 @@ func _rebuild_roofs(ts: TileSet, scale_k: float) -> void:
 		tl.modulate.a = roof_alpha
 		_roof_root.add_child(tl)
 		roof_regions.append({"cells": region, "layer": tl, "open": false})
+
+
+## 문·조사 지점 그림 (Tiles 에 그림이 없으면 만들지 않음 — 필드의 MapView 가 예전 도형으로 그림)
+func build_markers() -> void:
+	for c in _marker_root.get_children():
+		_marker_root.remove_child(c)
+		c.queue_free()
+	markers = {}
+	var door := VisualData.default_art("door")
+	var spark := VisualData.default_art("marker")
+	var px := float(VisualData.art_px())
+	for o in map.get("objects", []):
+		var key := ""
+		var kind := ""
+		if o.get("type") == "exit":
+			key = str(o.get("look", "")) if str(o.get("look", "")) != "" and VisualData.tiles().has(str(o.get("look", ""))) else door
+			kind = "door"
+		elif o.get("type") == "investigate":
+			key = spark
+			kind = "spark"
+		if key == "":
+			continue
+		var fr := VisualData.tile_frame(key, 0)
+		if fr.is_empty():
+			continue
+		var s := Sprite2D.new()
+		var at := AtlasTexture.new()
+		at.atlas = fr[0]
+		at.region = fr[1]
+		s.texture = at
+		s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		s.position = Vector2((float(o.x) + 0.5) * tile, (float(o.y) + 0.5) * tile)
+		s.scale = Vector2.ONE * (tile / px) * (0.9 if kind == "spark" else 1.0)
+		if kind == "spark":
+			var mat := CanvasItemMaterial.new()
+			mat.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED   # 어두워도 보이는 반짝임
+			s.material = mat
+		_marker_root.add_child(s)
+		var t: Dictionary = VisualData.tiles()[key]
+		markers[str(o.object_id)] = {"sprite": s, "kind": kind, "key": key,
+			"frames": maxi(1, int(t.get("frames", 1) if t.get("frames") != null else 1)), "fps": float(t.get("fps", 6.0) if t.get("fps") != null else 6.0)}
+
+
+## 조사를 마친 곳은 반짝이를 숨김
+func set_spot_done(object_id: String, done: bool) -> void:
+	if markers.has(object_id):
+		markers[object_id].sprite.visible = not done
+
+
+func _process(delta: float) -> void:
+	_anim_t += delta
+	for id in markers:
+		var m: Dictionary = markers[id]
+		if m.frames > 1 and m.sprite.visible:
+			var fr := VisualData.tile_frame(m.key, int(_anim_t * m.fps) % m.frames)
+			if not fr.is_empty():
+				m.sprite.texture.region = fr[1]
 
 
 ## 칸 c 를 덮는 지붕 묶음 번호 (없으면 -1)
@@ -237,6 +303,12 @@ func _occluder(r: Rect2) -> LightOccluder2D:
 
 ## 문을 열면 빛이 지나가고 닫으면 막힌다 (논리 — 통과·시야 — 는 필드가 따로 처리)
 func set_door_open(object_id: String, open: bool) -> void:
+	if markers.has(object_id) and markers[object_id].kind == "door":   # 문 그림: 열림 = key_open (없으면 같은 그림)
+		var m: Dictionary = markers[object_id]
+		var key: String = m.key + "_open" if open and VisualData.tiles().has(m.key + "_open") else m.key
+		var fr := VisualData.tile_frame(key, 0)
+		if not fr.is_empty():
+			m.sprite.texture.region = fr[1]
 	if doors.has(object_id):
 		doors[object_id].visible = not open
 

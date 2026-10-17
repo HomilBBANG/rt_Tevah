@@ -12,6 +12,7 @@ const WALL_EDGE := Color("3c3f4a")
 var tiles: Array = []
 var tile := 48.0
 var spots: Array = []     # [{ kind, pos: Vector2, done: bool }]
+var art_ids := {}         # 렌더러가 그림으로 그리는 문·조사 지점 object_id (여기서는 도형을 안 그림)
 ## false = 바닥·벽·검은 바탕은 그리지 않음 (core/map_renderer.gd 가 픽셀아트로 그림). 조사·문 표시만
 var draw_tiles := true
 
@@ -43,6 +44,8 @@ func _draw_tiles() -> void:
 
 func _draw_spots() -> void:
 	for s in spots:
+		if s.kind in ["exit", "spot"] and art_ids.has(str(s.data.object_id)):
+			continue
 		var c: Vector2 = s.pos
 		match s.kind:
 			"camp":

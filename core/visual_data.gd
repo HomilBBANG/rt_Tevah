@@ -148,6 +148,24 @@ static func cell_keys(map: Dictionary, x: int, y: int) -> Dictionary:
 	return out
 
 
+## 물체 그림 기본값: 문 = layer door 중 _open 이 아닌 첫 타일, 조사 반짝이 = layer marker 첫 타일
+static func default_art(layer: String) -> String:
+	for k in tiles():
+		if str(tiles()[k].get("layer", "")) == layer and not (layer == "door" and str(k).ends_with("_open")):
+			return k
+	return ""
+
+
+## 타일 그림 영역 (애니메이션이면 frame 번째: atlas_x + frame)
+static func tile_frame(key: String, frame: int) -> Array:
+	var t: Dictionary = tiles().get(key, {})
+	var tex := texture(str(t.get("file", ""))) if not t.is_empty() else null
+	if tex == null:
+		return []
+	var px := art_px()
+	return [tex, Rect2((int(t.get("atlas_x", 0)) + frame) * px, int(t.get("atlas_y", 0)) * px, px, px)]
+
+
 ## 지붕 칸 {Vector2i: tile_key} — 맵 안, 있는 지붕 타일(layer=roof)만. 이어진 칸 묶음 하나 = 집 한 채
 static func roof_cells(map: Dictionary) -> Dictionary:
 	var out := {}

@@ -8,7 +8,9 @@
    "atlas_x": 0,
    "atlas_y": 0,
    "casts_shadow": false,
-   "note": "그래픽을 안 칠한 바닥 칸(.)에 쓰임 — 꼭 있어야 함"
+   "note": "그래픽을 안 칠한 바닥 칸(.)에 쓰임 — 꼭 있어야 함",
+   "frames": 1,
+   "fps": 6.0
   },
   {
    "tile_key": "floor_grass",
@@ -18,7 +20,9 @@
    "atlas_x": 1,
    "atlas_y": 0,
    "casts_shadow": false,
-   "note": "테스트 타일"
+   "note": "테스트 타일",
+   "frames": 1,
+   "fps": 6.0
   },
   {
    "tile_key": "floor_dirt",
@@ -28,7 +32,9 @@
    "atlas_x": 2,
    "atlas_y": 0,
    "casts_shadow": false,
-   "note": "테스트 타일"
+   "note": "테스트 타일",
+   "frames": 1,
+   "fps": 6.0
   },
   {
    "tile_key": "floor_wood",
@@ -38,7 +44,9 @@
    "atlas_x": 3,
    "atlas_y": 0,
    "casts_shadow": false,
-   "note": "테스트 타일"
+   "note": "테스트 타일",
+   "frames": 1,
+   "fps": 6.0
   },
   {
    "tile_key": "wall_default",
@@ -48,7 +56,9 @@
    "atlas_x": 0,
    "atlas_y": 1,
    "casts_shadow": true,
-   "note": "그래픽을 안 칠한 벽 칸(#)에 쓰임 — 꼭 있어야 함"
+   "note": "그래픽을 안 칠한 벽 칸(#)에 쓰임 — 꼭 있어야 함",
+   "frames": 1,
+   "fps": 6.0
   },
   {
    "tile_key": "wall_wood",
@@ -58,7 +68,9 @@
    "atlas_x": 1,
    "atlas_y": 1,
    "casts_shadow": true,
-   "note": "테스트 타일"
+   "note": "테스트 타일",
+   "frames": 1,
+   "fps": 6.0
   },
   {
    "tile_key": "decal_crack",
@@ -68,7 +80,9 @@
    "atlas_x": 2,
    "atlas_y": 1,
    "casts_shadow": false,
-   "note": "테스트 타일 (투명 바탕)"
+   "note": "테스트 타일 (투명 바탕)",
+   "frames": 1,
+   "fps": 6.0
   },
   {
    "tile_key": "decal_blood",
@@ -78,7 +92,9 @@
    "atlas_x": 3,
    "atlas_y": 1,
    "casts_shadow": false,
-   "note": "테스트 타일 (투명 바탕)"
+   "note": "테스트 타일 (투명 바탕)",
+   "frames": 1,
+   "fps": 6.0
   },
   {
    "tile_key": "roof_red",
@@ -88,7 +104,9 @@
    "atlas_x": 0,
    "atlas_y": 2,
    "casts_shadow": false,
-   "note": "테스트 타일 — 지붕 층: 인물보다 위, 집 안에 들어가면 그 집 지붕이 사라짐"
+   "note": "테스트 타일 — 지붕 층: 인물보다 위, 집 안에 들어가면 그 집 지붕이 사라짐",
+   "frames": 1,
+   "fps": 6.0
   },
   {
    "tile_key": "roof_slate",
@@ -98,7 +116,45 @@
    "atlas_x": 1,
    "atlas_y": 2,
    "casts_shadow": false,
-   "note": "테스트 타일 — 지붕 층"
+   "note": "테스트 타일 — 지붕 층",
+   "frames": 1,
+   "fps": 6.0
+  },
+  {
+   "tile_key": "door_wood",
+   "name": "나무 문",
+   "layer": "door",
+   "file": "test_tiles.png",
+   "atlas_x": 0,
+   "atlas_y": 3,
+   "casts_shadow": false,
+   "note": "테스트 — 문(exit) 그림, 닫힘. 열린 그림 = 같은 이름 + _open",
+   "frames": 1,
+   "fps": 6.0
+  },
+  {
+   "tile_key": "door_wood_open",
+   "name": "나무 문 (열림)",
+   "layer": "door",
+   "file": "test_tiles.png",
+   "atlas_x": 1,
+   "atlas_y": 3,
+   "casts_shadow": false,
+   "note": "테스트 — door_wood 가 열렸을 때",
+   "frames": 1,
+   "fps": 6.0
+  },
+  {
+   "tile_key": "sparkle",
+   "name": "조사 반짝이",
+   "layer": "marker",
+   "file": "test_tiles.png",
+   "atlas_x": 0,
+   "atlas_y": 4,
+   "casts_shadow": false,
+   "note": "테스트 — 조사 지점(아직 안 한 곳) 표시. atlas_x 부터 오른쪽으로 frames 장, 초당 fps 장. 어두워도 보임",
+   "frames": 4,
+   "fps": 6.0
   }
  ],
  "light_presets": [

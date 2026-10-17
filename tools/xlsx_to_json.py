@@ -81,7 +81,7 @@ SCHEMA = {
     # 상태이상: 효과 status:+id / status:-id, 조건 status:id. description = 장비창 능력치 탭에서 마우스를 올리면 뜨는 설명
     "StatusEffects": ("status_id", ["status_id", "name", "description"], {}),
     # 그래픽 (기획 tevah_pixelart_2d_lighting_map_editor_spec_v1.0): 픽셀아트 타일, 광원 프리셋, 시간대 환경광
-    "Tiles": ("tile_key", ["tile_key", "name", "layer", "file"], {"atlas_x": (int, 0), "atlas_y": (int, 0)}),
+    "Tiles": ("tile_key", ["tile_key", "name", "layer", "file"], {"atlas_x": (int, 0), "atlas_y": (int, 0), "frames": (int, 1), "fps": (float, 6.0)}),
     "LightPresets": ("preset_id", ["preset_id", "name", "color", "energy", "radius"], {"energy": (float, None), "radius": (float, None)}),
     "DayNight": ("profile_id", ["profile_id", "hour", "ambient"], {"hour": (float, None), "sun_energy": (float, 0.0)}),
     # 오브젝트 그림 (나무·가구): 놓은 칸 = 왼쪽 아래, foot_w·foot_h 칸 차지. solid = 지나갈 수 없음(+적 시야 막음)
@@ -117,6 +117,7 @@ OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "Statu
 FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop"}   # prop = 오브젝트 그림
 PROPS_DIR = ROOT / "art" / "props"
 LIGHT_SHAPES = {"", "point", "cone"}   # light = 광원 (그래픽만)
+OBJECT_ART_LAYERS = {"door", "marker"}   # 칠하지 않고 물체에 씀: door = 문(exit) 그림 (닫힘 key, 열림 key_open), marker = 조사 지점 반짝이
 TILE_LAYERS = {"floor", "detail", "wall", "roof"}   # 그래픽 층: 바닥 / 바닥 장식 / 벽 외형 / 지붕 (인물 위 — 집 안에 들어가면 사라짐)
 TILES_DIR = ROOT / "art" / "tiles"
 LIGHT_NUMS = ("energy", "radius")   # event = 밟으면 대화(컷신)
@@ -154,7 +155,8 @@ OPTIONAL = {
     # 특성: category 화면 분류, conflicts 같이 못 고르는 trait_id(쉼표), selectable 1 = 생성 화면에서 고름, state 기획 상태
     "Traits": ["category", "description", "conflicts", "selectable", "state", "note"],
     # 상태이상: scope part(부위)/whole(전체), tick_mode·tick_amount 시간마다 효과(미정이면 빈칸), death_cause 사망 원인
-    "Tiles": ["atlas_x", "atlas_y", "casts_shadow", "note"],
+    # frames·fps: 애니메이션 (atlas_x 부터 오른쪽으로 frames 장, 초당 fps 장 — 조사 반짝이 등)
+    "Tiles": ["atlas_x", "atlas_y", "casts_shadow", "note", "frames", "fps"],
     "LightPresets": ["shadow", "shape", "note"],
     "Props": ["foot_w", "foot_h", "solid", "casts_shadow", "note"],
     "DayNight": ["sun_color", "sun_energy", "note"],
@@ -1239,8 +1241,12 @@ def validate_graphics(d, maps, rep):
     tiles = {t["tile_key"]: t for t in d["Tiles"]}
     for t in d["Tiles"]:
         w = loc("Tiles", t)
-        if t["layer"] not in TILE_LAYERS:
-            rep.err(w, f"layer 는 floor / detail / wall: '{t['layer']}'")
+        if t["layer"] not in TILE_LAYERS | OBJECT_ART_LAYERS:
+            rep.err(w, f"layer 는 floor / detail / wall / roof (칠하기) 또는 door (문 그림) / marker (조사 반짝이): '{t['layer']}'")
+        if t["layer"] == "door" and not t["tile_key"].endswith("_open") and t["tile_key"] + "_open" not in tiles:
+            rep.warn(w, f"문 '{t['tile_key']}' 의 열린 그림 '{t['tile_key']}_open' 이 없음 (열려도 같은 그림)")
+        if t["frames"] is not None and t["frames"] < 1:
+            rep.err(w, "frames 는 1 이상")
         if not (TILES_DIR / t["file"]).exists():
             rep.err(w, f"그림 파일이 없음: art/tiles/{t['file']}")
         if t["atlas_x"] < 0 or t["atlas_y"] < 0:
@@ -1538,7 +1544,7 @@ def export_maps(d, maps):
         tiles = [r.ljust(width, " ") for r in m["tiles"]]   # 짧은 줄의 나머지는 빈 공간
         objects = []
         for o in m["objects"]:
-            e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition", "arrive", "face")}
+            e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition", "arrive", "face", "look")}   # look = 문 그림 (Tiles layer=door)
             e["from"] = arrive_from(o)   # 도착 P: 이어지는 곳 (object_id / "맵:방향")
             e["default"] = bool(o.get("default"))   # 기본 도착 P
             e["once"] = bool(o.get("once"))         # 이벤트 칸: 한 번만

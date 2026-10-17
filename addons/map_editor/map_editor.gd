@@ -743,6 +743,11 @@ func _edit_object(o: Dictionary) -> void:
 				_edit_object.call_deferred(o))
 			if o.get("ref", "") != "":
 				_option("도착 P", _arrive_options(o.ref), o.get("arrive", ""), func(v): set_field(o, "arrive", v))
+			if o.type == "exit":   # 문 그림 (graphics.xlsx Tiles layer=door, 열림 = 같은 이름 + _open)
+				var doors: Array = VisualData.tiles().keys().filter(func(k): return str(VisualData.tiles()[k].get("layer", "")) == "door" and not str(k).ends_with("_open"))
+				_option("문 모양", [["", "기본 (%s)" % VisualData.default_art("door")]] + doors.map(func(k): return [k, "%s  (%s)" % [VisualData.tiles()[k].name, k]]), o.get("look", ""), func(v):
+					set_field(o, "look", v)
+					_gfx_dirty = true)
 		"arrive":
 			_section("도착 P")
 			var dcb := CheckBox.new()

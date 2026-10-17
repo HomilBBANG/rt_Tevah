@@ -134,6 +134,38 @@ func _ready() -> void:
 	f.player.position = f._tile_center(6, 9)
 	await _wait(0.5)
 	check(is_equal_approx(rr.roof_regions[house].layer.modulate.a, 1.0), "나오면 다시 덮음")
+
+	# ---- 문·조사 반짝이 그림 (Tiles layer door / marker)
+	GameState.clock = 23 * 60.0
+	f.load_map("test_field")
+	await _wait(0.2)
+	var mk: Dictionary = f.renderer.markers
+	var dmk: Dictionary = mk.get("fo_to_camp", {})
+	var sp: Dictionary = mk.get("fo_look1", {})
+	check(dmk.get("kind") == "door" and sp.get("kind") == "spark" and sp.frames == 4, "문(exit)은 문 그림, 조사 지점은 반짝이 (4장)")
+	check(f.get_node("%MapView").art_ids.has("fo_to_camp") and f.get_node("%MapView").art_ids.has("fo_look1"), "그림이 있으면 예전 도형은 안 그림")
+	check(sp.sprite.material is CanvasItemMaterial and sp.sprite.material.light_mode == CanvasItemMaterial.LIGHT_MODE_UNSHADED, "반짝이는 어두워도 보임 (빛 영향 없음)")
+	var x0: float = sp.sprite.texture.region.position.x
+	var changed := false
+	for i in 8:
+		await _wait(0.05)
+		if sp.sprite.texture.region.position.x != x0:
+			changed = true
+	check(changed, "반짝이 애니메이션")
+	var closed_x: float = dmk.sprite.texture.region.position.x
+	var ds: Dictionary = f.spots.filter(func(x): return x.data.object_id == "fo_to_camp")[0]
+	f.player.position = ds.pos + Vector2(f.tile, 0)
+	f.toggle_door(ds)
+	check(dmk.sprite.texture.region.position.x != closed_x, "문을 열면 열린 그림")
+	f.player.position = f._tile_center(7, 6)
+	await _wait(0.2)
+	await _snap("door_and_sparkle_night")
+	f.toggle_door(ds)
+	check(dmk.sprite.texture.region.position.x == closed_x, "닫으면 닫힌 그림")
+	var spot: Dictionary = f.spots.filter(func(x): return x.data.object_id == "fo_look1")[0]
+	f._investigate(spot)
+	await _wait(0.1)
+	check(not sp.sprite.visible, "조사하면 반짝이가 사라짐")
 	f.queue_free()
 	DataLoader.maps.erase("tgfx")
 	SaveManager.delete_all()

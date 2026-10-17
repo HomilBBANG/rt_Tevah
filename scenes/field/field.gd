@@ -180,6 +180,10 @@ func load_map(map_id: String) -> void:
 	renderer.minutes = GameState.minute_of_day()
 	renderer.build(map, tile)
 	renderer.build_props(%World)   # 오브젝트 그림은 인물과 같은 Y 정렬 노드에 (발 위치로 앞뒤)
+	for s in spots:   # 이미 조사한 곳은 반짝이 없음
+		if s.kind == "spot" and s.done:
+			renderer.set_spot_done(s.data.object_id, true)
+	%MapView.art_ids = renderer.markers
 	_roof_open = -1
 	_update_roof(true)
 	_update_held_light()
@@ -545,6 +549,8 @@ func _investigate(s: Dictionary) -> void:
 		lines.append_array(got)
 	s.done = true
 	GameState.field_mark(map.map_id, "done", s.data.object_id)
+	if renderer:
+		renderer.set_spot_done(s.data.object_id, true)
 	%MapView.queue_redraw()
 	_near_spot = {}
 	show_message("\n".join(lines))

@@ -341,6 +341,7 @@ func _ready() -> void:
 	ed._gfx_dirty = true
 	await _frames(2)
 	check(rnd.lights.size() == 1 and is_equal_approx(rnd.lights[0].texture_scale, 6.0 * 80.0 * 2.0 / 256.0), "광원마다 범위 고치기 → 그림에 반영")
+	check(rnd.markers.values().any(func(m): return m.kind == "door") and rnd.markers.values().any(func(m): return m.kind == "spark"), "에디터 그림에도 문·조사 반짝이")
 	# 지붕 층: 팔레트 '지붕' → 칠하면 visual.layers.roof, 에디터에서는 반투명
 	ed.palette_layer.select(3)
 	ed.palette_layer.item_selected.emit(3)
