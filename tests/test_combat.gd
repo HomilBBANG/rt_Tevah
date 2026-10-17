@@ -13,6 +13,7 @@ func _ready() -> void:
 	_test_player_turn()
 	_test_enemy_turn()
 	_test_player_damage()
+	_test_many()
 	print("\n[test_combat] %d 통과, %d 실패" % [_pass, _fail])
 	get_tree().quit(1 if _fail > 0 else 0)
 
@@ -118,6 +119,46 @@ func _test_player_damage() -> void:
 	for i in 4:
 		r = c.apply_strike(combo, combo.strikes[0], "fail")
 	check(r.dead and c.outcome == "lose", "머리 20 → 0 → 사망")
+
+
+## 여러 마리 (몬스터 최대 3)
+func _test_many() -> void:
+	var c := Combat.new()
+	check(c.setup_many(["enemy_test", "enemy_test"]), "두 마리 준비")
+	check(c.foes.size() == 2 and c.foes[0].info.name.ends_with(" 1") and c.foes[1].info.name.ends_with(" 2"), "같은 적이면 이름 뒤에 번호")
+	check(c.foes[0].parts != c.foes[1].parts or not is_same(c.foes[0].parts, c.foes[1].parts), "부위 상태는 적마다 따로")
+	c.select(1)
+	c.forced_rolls = [0.0]
+	c.player_attack("left_arm")
+	check(c.foes[1].parts.left_arm.hp < c.foes[1].parts.left_arm.max_hp and c.foes[0].parts.left_arm.hp == c.foes[0].parts.left_arm.max_hp, "고른 적(2)만 맞음")
+	c.select(0)
+	c.forced_rolls = [0.0]
+	var r := c.player_attack("head")
+	check(r.killed and c.outcome == "" and c.alive() == [1], "한 마리 쓰러져도 다른 적이 있으면 계속")
+	c.select(1)
+	c.forced_rolls = [0.0]
+	c.player_attack("head")
+	check(c.outcome == "win" and c.defeated() == [0, 1], "모두 쓰러지면 승리")
+	var d := Combat.new()
+	var old_flee = DataLoader.enemies.enemy_test.get("flee_chance")
+	d.setup_many(["enemy_test", "enemy_test", "enemy_test"])
+	d.foes[1].info.flee_chance = 40.0
+	d.foes[2].info.flee_chance = 30.0
+	check(is_equal_approx(d.flee_chance(), 30.0), "도주 확률 = 살아 있는 적 중 가장 낮은 값")
+	d.foes[2].dead = true
+	check(is_equal_approx(d.flee_chance(), 40.0), "쓰러진 적은 빼고")
+	d.foes[2].dead = false
+	DataLoader.enemies.enemy_test.flee_chance = old_flee
+	d.withdraw(2)
+	check(d.alive() == [0, 1] and d.foes[2].withdrew and d.outcome == "", "대화로 한 마리만 물러남")
+	d.select(1)
+	var atk := d.choose_enemy_attack()
+	check(not atk.is_empty() and d.foes[1].turns == 1 and d.foes[0].turns == 0, "적 차례는 적마다 (차례 수 따로)")
+	d.select(0)
+	d.player_parts.head.hp = 1
+	d.forced_rolls = []
+	var res := d.apply_strike({"damage": 99}, {"target": "head"}, Combat.DODGE_FAIL)
+	check(res.dead and d.outcome == "lose" and d.killer == d.foes[0].info.name, "쓰러뜨린 적 이름 (사망 문구)")
 
 
 func check(ok: bool, label: String) -> void:

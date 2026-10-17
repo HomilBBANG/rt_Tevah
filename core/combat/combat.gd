@@ -2,6 +2,9 @@ extends RefCounted
 ## 턴제 전투 로직 (기획서 §7–9). UI 없이 동작하고, 화면(scenes/combat.gd)이 호출해서 결과를 그린다.
 ##
 ## 흐름: 플레이어 턴(공격·아이템·도주, 방어는 지금 화면에 버튼 없음) → 적 턴(공격 1개 = 타격 1~N회, 타격마다 회피 판정) → 반복
+## 여러 마리 (몬스터 최대 Config combat_max_enemies = 3): foes 에 적마다 상태. select(i) 로 '지금 적'(플레이어가 노리는 적 /
+##   적 차례에 공격하는 적)을 고르면 enemy·enemy_parts·enemy_order·attacks·battle_bt 가 그 적의 것이 된다.
+##   적 차례 = 살아 있는 적이 차례대로 공격. 모두 쓰러지면(또는 물러나면) 승리. 한 마리일 때는 예전과 같다.
 ## 회피 판정은 judge_dodge() — 누른 키·타이밍 오차(초)만 받아 결과를 낸다. 시간 측정은 화면 몫.
 ##
 ## TODO(기획 §18 미확정, 지금은 임시 규칙):
@@ -10,6 +13,7 @@ extends RefCounted
 ##  - 이미 잘린 부위를 노린 타격은 몸통으로 들어감
 ##  - 일반 회피의 추가 자원 소모(스태미나) 없음
 ##  - 부위 HP·명중률·피해량은 엑셀 데이터 값
+##  - 여러 마리일 때 도주 확률 = 살아 있는 적 중 가장 낮은 값
 
 const Runner = preload("res://core/ai/bt_runner.gd")
 const AIAssets = preload("res://core/ai/ai_assets.gd")
@@ -36,44 +40,93 @@ var forced_rolls: Array[float] = []
 ## Self_<부위>_Broken · Player_<부위>_Broken (예: Self_right_arm_Broken, Player_left_leg_Broken)
 var battle_bt: Runner = null
 var enemy_turns := 0
+var foes: Array = []         # [{info, parts, order, attacks, battle_bt, turns, dead, withdrew}] — info = {enemy_id, name, flee_chance, image}
+var current := 0             # 지금 적 (select)
+var killer := ""             # 플레이어를 쓰러뜨린 적 이름 (사망 문구)
 
 
 ## player_state: 이전 전투에서 이어지는 플레이어 부위 상태 (비우면 새 몸). 복사해서 쓴다.
 func setup(enemy_id: String, player_state := {}) -> bool:
-	var data: Dictionary = DataLoader.enemies.get(enemy_id, {})
-	if data.is_empty():
-		push_error("[Combat] 없는 적: %s" % enemy_id)
+	return setup_many([enemy_id], player_state)
+
+
+## 여러 마리와 전투 (같은 적 종류가 여럿이면 이름 뒤에 1·2·3)
+func setup_many(enemy_ids: Array, player_state := {}) -> bool:
+	foes.clear()
+	var same := {}
+	for id in enemy_ids:
+		same[id] = same.get(id, 0) + 1
+	var seen := {}
+	for id in enemy_ids:
+		var data: Dictionary = DataLoader.enemies.get(id, {})
+		if data.is_empty():
+			push_error("[Combat] 없는 적: %s" % id)
+			continue
+		seen[id] = seen.get(id, 0) + 1
+		var name: String = data.name if same[id] == 1 else "%s %d" % [data.name, seen[id]]
+		var parts := {}
+		var order := []
+		for p in data.parts:
+			parts[p.part_id] = {"part_id": p.part_id, "name": p.name, "hp": int(p.hp), "max_hp": int(p.hp),
+				"vital": p.vital, "broken": false, "hit_chance": float(p.hit_chance)}
+			order.append(p.part_id)
+		foes.append({"info": {"enemy_id": id, "name": name, "flee_chance": data.get("flee_chance"), "image": data.get("image", ""),
+			"kind": data.get("kind", "npc")}, "parts": parts, "order": order, "attacks": data.attacks,
+			"battle_bt": _setup_battle_bt(str(data.get("battle_bt", ""))), "turns": 0, "dead": false, "withdrew": false})
+	if foes.is_empty():
 		return false
-	enemy = {"enemy_id": enemy_id, "name": data.name, "flee_chance": data.get("flee_chance"), "image": data.get("image", "")}
 	player_parts = player_state.duplicate(true) if not player_state.is_empty() else fresh_player_parts()
 	player_order.clear()
 	for p in DataLoader.player_parts:
 		player_order.append(p.part_id)
-	enemy_parts.clear()
-	enemy_order.clear()
-	for p in data.parts:
-		enemy_parts[p.part_id] = {"part_id": p.part_id, "name": p.name, "hp": int(p.hp), "max_hp": int(p.hp),
-			"vital": p.vital, "broken": false, "hit_chance": float(p.hit_chance)}
-		enemy_order.append(p.part_id)
-	attacks = data.attacks
 	defending = false
 	outcome = ""
-	enemy_turns = 0
-	_setup_battle_bt(str(data.get("battle_bt", "")))
+	killer = ""
+	select(0)
 	return true
 
 
-func _setup_battle_bt(bt_id: String) -> void:
-	battle_bt = null
+## '지금 적' 고르기 — 플레이어가 노릴 적 / 적 차례에 공격할 적
+func select(i: int) -> void:
+	current = clampi(i, 0, foes.size() - 1)
+	var f: Dictionary = foes[current]
+	enemy = f.info
+	enemy_parts = f.parts
+	enemy_order = f.order
+	attacks = f.attacks
+	battle_bt = f.battle_bt
+	enemy_turns = f.turns
+
+
+## 아직 싸우는 적 (쓰러지지도 물러나지도 않은)
+func alive() -> Array:
+	return range(foes.size()).filter(func(i): return not foes[i].dead)
+
+
+## 쓰러뜨렸거나 물러난 적 번호 (필드가 맵에서 지움)
+func defeated() -> Array:
+	return range(foes.size()).filter(func(i): return foes[i].dead)
+
+
+## 대화로 물러남 (endcombat:win) — 모두 없어지면 승리
+func withdraw(i: int) -> void:
+	foes[i].dead = true
+	foes[i].withdrew = true
+	if alive().is_empty():
+		outcome = "win"
+
+
+func _setup_battle_bt(bt_id: String) -> Runner:
 	if bt_id == "":
-		return
+		return null
 	var bt: Dictionary = DataLoader.ai_assets.get(bt_id, {})
 	var errs := AIAssets.validate_bt(bt, DataLoader.ai_assets) if not bt.is_empty() else [{"msg": "없는 BT"}]
 	if not errs.is_empty() or AIAssets.bt_domain(bt) != "battle":
 		push_warning("[Combat] 전투 BT '%s' 를 쓸 수 없어 가중치로 고름: %s" % [bt_id, errs[0].msg if not errs.is_empty() else "domain 이 battle 이 아님"])
-		return
-	battle_bt = Runner.new()
-	battle_bt.setup(bt, DataLoader.ai_assets.get(str(bt.get("blackboard_id", "")), {}), self)
+		return null
+	var r := Runner.new()
+	r.setup(bt, DataLoader.ai_assets.get(str(bt.get("blackboard_id", "")), {}), self)
+	return r
 
 
 # 전투 BT 어댑터 (bt_tasks.gd UseAttack·UseRandomAttack)
@@ -146,7 +199,9 @@ func player_attack(part_id: String) -> Dictionary:
 			res.broken = true
 			if part.vital:
 				res.killed = true
-				outcome = "win"
+				foes[current].dead = true
+				if alive().is_empty():
+					outcome = "win"
 	return res
 
 
@@ -154,10 +209,13 @@ func player_defend() -> void:
 	defending = true
 
 
-## 이 적에게서 도주할 확률 (%): Enemies.flee_chance, 비어 있으면 Config combat_flee_chance
+## 도주할 확률 (%): Enemies.flee_chance, 비어 있으면 Config combat_flee_chance. 여러 마리면 살아 있는 적 중 가장 낮은 값 (TODO 기획)
 func flee_chance() -> float:
-	var c = enemy.get("flee_chance")
-	return float(c) if c != null else config_float("combat_flee_chance", 50)
+	var best := 100.0
+	for i in alive():
+		var c = foes[i].info.get("flee_chance")
+		best = minf(best, float(c) if c != null else config_float("combat_flee_chance", 50))
+	return best
 
 
 ## 도주: 주사위 1~100 이 성공률 이하면 성공. 굴린 값은 last_flee = { roll, chance, success }
@@ -196,6 +254,7 @@ func choose_enemy_attack() -> Dictionary:
 	if pool.is_empty():
 		return {}
 	enemy_turns += 1
+	foes[current].turns = enemy_turns
 	if battle_bt != null:
 		_write_battle_bb()
 		battle_bt.memory.erase("chosen_attack")
@@ -252,6 +311,7 @@ func apply_strike(attack: Dictionary, strike: Dictionary, judgement: String) -> 
 		if part.vital:
 			res.dead = true
 			outcome = "lose"
+			killer = str(enemy.get("name", ""))
 	return res
 
 

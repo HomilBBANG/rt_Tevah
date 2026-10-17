@@ -205,6 +205,9 @@ func _ready() -> void:
 	f.load_map("basecamp")
 	await _wait(0.2)
 	check(f.enemies.size() == 1, "따라온 몬스터는 그 맵에 남음 (다시 들어와도)")
+	await _wait(0.3)
+	if f._combat_ui != null:   # 들어온 칸에 서 있던 몬스터와 닿아 전투가 열렸으면 닫기
+		await _end_combat("fled")
 	f.travel("test_ai")
 	await _wait(0.2)
 	check(_enemy("ai_infected") == null, "원래 맵에는 없음 (떠났으니)")
@@ -227,6 +230,49 @@ func _ready() -> void:
 		if o.object_id == "ai_infected":
 			o.bt = "BT_Infected_Field"
 			o.erase("follow")
+
+	# ---------- 여러 마리 동시 전투: test_ai 에서 두 마리에게 쫓기면 전투 화면에 두 마리
+	if f._combat_ui != null:
+		await _end_combat("fled")
+	GameState.field_state.erase("test_ai")
+	GameState.field_state.erase("basecamp")
+	f.load_map("test_ai")
+	await _wait(0.2)
+	var m1: Node = _enemy("ai_infected")
+	var m2: Node = _enemy("ai_old")
+	m1.position = f._tile_center(10, 6)   # 3칸 — 시야(4칸) 안
+	m2.position = f._tile_center(3, 6)
+	_teleport(7, 6)
+	ok = await _wait_until(func(): return f._combat_ui != null, 4.0)
+	check(ok and f._combat_ui.combat.foes.size() == 2 and f._combat_group.size() == 2, "두 마리에게 쫓기다 닿으면 둘 다 전투에 (%d)" % (f._combat_ui.combat.foes.size() if ok else 0))
+	await _wait(0.3)
+	check(f._combat_ui._figs.size() == 2 and f._combat_ui._fig_names[0].text.contains("1") and f._combat_ui._fig_names[1].text.contains("2"), "전투 화면에 적 그림 두 개 + 이름 (1·2)")
+	await _snap("two_monsters_combat")
+	var cui: Node = f._combat_ui
+	cui._on_attack()
+	var opts: Array = cui.get_node("%Options").get_children().map(func(c): return c.text)
+	check(opts.size() == 3 and opts[1].begins_with(cui.combat.foes[1].info.name), "공격 → 먼저 노릴 적 고르기 (%s)" % [opts])
+	cui.get_node("%Options").get_child(1).pressed.emit()
+	await _wait(0.05)
+	var parts_opts: Array = cui.get_node("%Options").get_children().map(func(c): return c.text)
+	check(cui.combat.current == 1 and cui._fig_names[1].text.begins_with("▼") and parts_opts.size() == 5, "둘째 적을 고르면 그 적의 부위 (▼ 표시)")
+	await _snap("two_monsters_target")
+	cui._player_turn()
+	for pid in cui.combat.player_parts:   # 맞아도 죽지 않게
+		cui.combat.player_parts[pid].hp = 999
+		cui.combat.player_parts[pid].max_hp = 999
+	cui._state = "enemy"
+	await cui._enemy_turn()
+	check(cui.combat.foes[0].turns == 1 and cui.combat.foes[1].turns == 1 and cui._state == "player", "적 차례: 두 마리가 차례대로 한 번씩 공격 → 다시 내 차례")
+	var grp: Array = f._combat_group.duplicate()
+	var gone_id: String = grp[1].data.object_id
+	f._combat_ui.combat.foes[1].dead = true   # 한 마리는 쓰러뜨렸다고 치고 도주
+	await _end_combat("fled")
+	check(not is_instance_valid(grp[1]) or not grp[1] in f.enemies, "쓰러뜨린 적은 맵에서 사라짐")
+	check(grp[0] in f.enemies and grp[0].grace > 0.0 and GameState.field_has("test_ai", "removed", gone_id), "남은 적은 도주 유예")
+	DataLoader.enemies.enemy_test.kind = "npc"
+	check(f._combat_joiners(grp[0]).is_empty(), "NPC(몬스터 아님)는 함께 싸우지 않음 (늘 혼자)")
+	DataLoader.enemies.enemy_test.kind = "monster"
 	SaveManager.delete_all()
 	print("[ai_field_smoke] 스크린샷 %d장, 실패 %d → %s" % [_shot, _fail, ProjectSettings.globalize_path("user://ai_field_smoke")])
 	get_tree().quit(1 if _fail > 0 else 0)

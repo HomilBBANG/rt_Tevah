@@ -69,6 +69,7 @@ var _ai_breakpoints := {}        # 디버거 브레이크포인트 {bt_id: [node
 var _combat_ui: Node
 var _dialogue_ui: Node
 var _combat_enemy: Node
+var _combat_group: Array = []    # 함께 싸우는 맵 위 적들 (첫 번째 = 닿은 적, 나머지 = 쫓아오던 몬스터, 최대 Config combat_max_enemies)
 var _combat_from_dialogue := false   # 대화 선택지(type=combat)로 시작한 전투
 var _near_spot := {}
 var _collecting := false         # StoryRunner 메시지를 모으는 중 (조사·거점 행동)
@@ -1185,7 +1186,27 @@ func _camera_follow() -> void:
 func _start_combat(enemy: Node) -> void:
 	frozen = true
 	_combat_enemy = enemy
-	_open_combat(enemy.data.ref)
+	_combat_group = [enemy] + _combat_joiners(enemy)
+	_open_combat(_combat_group.map(func(e): return str(e.data.ref)))
+
+
+## 함께 싸울 몬스터: 닿은 적이 몬스터(Npcs kind=monster)면, 나를 쫓고 있던(추격 중·유예 아님) 다른 몬스터를
+## 가까운 순서로 Config combat_max_enemies(3) 마리까지 (반경 Config combat_join_radius 칸, 임시값). NPC 는 끼지 않는다.
+func _combat_joiners(first: Node) -> Array:
+	if not _is_monster(first):
+		return []
+	var limit := int(DataLoader.config.get("combat_max_enemies", 3)) - 1
+	var radius := float(DataLoader.config.get("combat_join_radius", 8)) * tile
+	var list := []
+	for e in enemies:
+		if is_instance_valid(e) and e != first and _is_monster(e) and e.state == "chase" and e.grace == 0.0 				and e.global_position.distance_to(player.global_position) <= radius:
+			list.append(e)
+	list.sort_custom(func(a, b): return a.global_position.distance_to(player.global_position) < b.global_position.distance_to(player.global_position))
+	return list.slice(0, maxi(0, limit))
+
+
+func _is_monster(e: Node) -> bool:
+	return str(DataLoader.enemies.get(str(e.data.get("ref", "")), {}).get("kind", "npc")) == "monster"
 
 
 ## 대화 선택지 type=combat: 대화를 숨기고 전투, 끝나면 결과를 StoryRunner 에 돌려준다 (이기거나 도주하면 대화 계속)
@@ -1197,19 +1218,27 @@ func _on_dialogue_combat(enemy_id: String) -> void:
 	_open_combat(enemy_id)
 
 
-func _open_combat(enemy_id: String) -> void:
-	_combat_enemy_name = str(DataLoader.enemies.get(enemy_id, {}).get("name", ""))
+## enemy = 적 하나(enemy_id) 또는 여러 마리 [enemy_id, …]
+func _open_combat(enemy: Variant) -> void:
+	var ids: Array = enemy if enemy is Array else [enemy]
+	_combat_enemy_name = str(DataLoader.enemies.get(str(ids[0]), {}).get("name", ""))
 	%Prompt.visible = false
 	_combat_ui = CombatScene.instantiate()
 	_combat_ui.embedded = true
-	_combat_ui.enemy_id_override = enemy_id
+	_combat_ui.enemy_id_override = str(ids[0])
+	_combat_ui.enemy_ids_override = ids
 	_combat_ui.player_state = GameState.player_body
 	_combat_ui.finished.connect(_on_combat_finished)
 	%Overlay.add_child(_combat_ui)
 
 
 func _on_combat_finished(outcome: String) -> void:
+	if _combat_ui == null:
+		return   # 이미 끝냄 ('계속' 을 두 번 눌러도 한 번만)
 	GameState.player_body = _combat_ui.combat.player_parts.duplicate(true)
+	var defeated: Array = _combat_ui.combat.defeated()
+	if _combat_ui.combat.killer != "":
+		_combat_enemy_name = _combat_ui.combat.killer
 	_combat_ui.queue_free()
 	_combat_ui = null
 	_update_hud()
@@ -1224,21 +1253,28 @@ func _on_combat_finished(outcome: String) -> void:
 			_dialogue_ui = null
 			_on_death("combat", _combat_enemy_name)
 		return
+	# 함께 싸운 적마다: 쓰러뜨렸거나 물러난 적은 맵에서 지우고, 나머지는 도주 유예
+	var group := _combat_group if not _combat_group.is_empty() else [_combat_enemy]
 	match outcome:
-		"win":
-			GameState.field_mark(map.map_id, "removed", _combat_enemy.data.object_id)
-			enemies.erase(_combat_enemy)
-			_combat_enemy.queue_free()
-			frozen = false
-		"fled":
-			_combat_enemy.grace = float(DataLoader.config.get("field_flee_grace", 3))
-			_combat_enemy.state = "return"
-			if _combat_enemy.bt:
-				_combat_enemy.bt.notify_battle_end()
+		"win", "fled":
+			for i in group.size():
+				var e: Node = group[i]
+				if not is_instance_valid(e):
+					continue
+				if outcome == "win" or i in defeated:
+					GameState.field_mark(map.map_id, "removed", e.data.object_id)
+					enemies.erase(e)
+					e.queue_free()
+				else:
+					e.grace = float(DataLoader.config.get("field_flee_grace", 3))
+					e.state = "return"
+					if e.bt:
+						e.bt.notify_battle_end()
 			frozen = false
 		_:
 			_on_death("combat", _combat_enemy_name)
 	_combat_enemy = null
+	_combat_group = []
 
 
 ## 사망 (§11): 부활 수단(초월체·아이템)이 있으면 모두 유지한 채 베이스캠프에서 깨어나고, 없으면 게임 처음부터.

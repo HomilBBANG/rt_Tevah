@@ -104,6 +104,20 @@ func _can_see(target: Vector2) -> bool:
 	return get_world_2d().direct_space_state.intersect_ray(q).is_empty()
 
 
+## 곧장 걸어가도 되나: 몸 가운데와 양옆(몸 반지름)으로 벽·닫힌 문이 없을 때만 (모서리에 걸려 멈추지 않게)
+func _straight_ok(target: Vector2) -> bool:
+	var dir := target - global_position
+	if dir.length() < 1.0:
+		return true
+	var side := dir.normalized().orthogonal() * radius * 0.85
+	var space := get_world_2d().direct_space_state
+	for off in [Vector2.ZERO, side, -side]:
+		var q := PhysicsRayQueryParameters2D.create(global_position + off, target + off, 1 | 8)
+		if not space.intersect_ray(q).is_empty():
+			return false
+	return true
+
+
 func _nearest_point() -> int:
 	var best := 0
 	for i in _points.size():
@@ -131,7 +145,7 @@ func ai_move(to: Vector2, run: bool, delta: float) -> String:
 	if global_position.distance_to(goal_px) < 3.0:
 		return "arrived"
 	var aim := goal_px
-	if not _can_see(goal_px):
+	if not _straight_ok(goal_px):
 		var goal := Vector2i(roundi(to.x), roundi(to.y))
 		var here := Vector2i(roundi(ai_tile().x), roundi(ai_tile().y))
 		if goal != _path_goal or _path.is_empty():

@@ -43,5 +43,7 @@
  "ai_flashlight_sight_mult": 1.5,
  "ai_follow_enabled": 1,
  "ai_follow_delay": 3,
+ "combat_max_enemies": 3,
+ "combat_join_radius": 8,
  "opening_dialogue": ""
 }
