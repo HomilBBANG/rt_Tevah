@@ -463,6 +463,17 @@ func _ready() -> void:
 	ed.set_tool("wall")
 	cv.apply_tool(Vector2i(3, 5))
 	check(cv.is_floor(Vector2i(3, 5)), "가구 칸은 벽으로 안 칠해짐")
+	# 선택 도구로 끌어 옮기기: 가운데 칸(3,5)을 잡고 오른쪽 아래로 2칸 → 가구 전체가 이동
+	ed.set_tool("select")
+	cv._press(Vector2i(3, 5), false, false)
+	check(cv.selected == fur, "가구의 아무 칸이나 눌러 고름")
+	cv._move_selection(Vector2i(2, 1))
+	cv._release(Vector2i(5, 6))
+	check(int(fur.x) == 4 and int(fur.y) == 5 and cv.object_at(Vector2i(6, 6)) == fur, "가구를 끌어 옮김 (%d, %d)" % [fur.x, fur.y])
+	cv._press(Vector2i(4, 5), false, false)
+	cv._move_selection(Vector2i(7, 1))   # 벽과 겹치는 곳((13, 7))으로는 안 감
+	cv._release(Vector2i(11, 5))
+	check(int(fur.x) == 4, "벽과 겹치는 곳으로는 안 옮겨짐")
 	ed.map.objects.erase(fur)
 
 	# 맵 삭제: 쓰는 곳(다른 맵의 문) 목록 → 파일 지움, 베이스캠프는 못 지움
