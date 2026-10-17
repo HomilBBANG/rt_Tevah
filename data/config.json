@@ -18,7 +18,7 @@
  "field_flee_grace": 3,
  "protagonist_id": "char_t1",
  "start_map": "test_field",
- "basecamp_map": "basecamp",
+ "basecamp_map": "new_america_in_church",
  "time_scale": 2,
  "start_hour": 8,
  "sleep_max_hours": 12,
@@ -51,5 +51,8 @@
  "character_scale": 0,
  "window_light_energy": 1.2,
  "window_light_radius": 6,
+ "vignette_strength": 0.75,
+ "vignette_inner": 0.35,
+ "vignette_color": "#000000",
  "opening_dialogue": ""
 }

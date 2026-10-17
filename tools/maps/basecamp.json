@@ -31,19 +31,6 @@
    "default": true
   },
   {
-   "object_id": "fo_camp",
-   "type": "camp",
-   "x": 4,
-   "y": 2,
-   "ref": "",
-   "name": "베이스캠프 거점",
-   "text": "",
-   "patrol_dir": "",
-   "patrol_len": 0,
-   "condition": "",
-   "schedule": ""
-  },
-  {
    "object_id": "fo_cat",
    "type": "npc",
    "x": 9,
