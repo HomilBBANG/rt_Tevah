@@ -58,6 +58,13 @@ var enemies: Array = []
 var spots: Array = []            # 상호작용 지점 [{ kind: "spot"/"camp"/"exit", data, pos, done }]
 var npcs: Array = []             # NPC [{ kind: "npc", data, pos, node, active }] — active: 지금 시간대에 있음
 var _path_grid: AStarGrid2D      # 벽을 돌아가는 길 찾기 (맵마다 한 번 만듦 — 컷신 걷기·BT 몬스터 이동)
+var _arrive_tile := Vector2i.ZERO  # 이 맵에 들어온 칸 (쫓아오는 몬스터가 여기로 들어옴)
+var _follow_queue: Array = []    # 따라 들어올 몬스터 [{data, left(초)}] — Config ai_follow_delay
+var _noise_t := 0.0              # 달리는 소리 간격
+var ai_paused := false           # 디버거 일시정지 (몬스터만 멈춤)
+var ai_stepping := false         # 디버거 '한 단계': 이번 물리 프레임만 진행
+var _ai_step_pending := false
+var _ai_breakpoints := {}        # 디버거 브레이크포인트 {bt_id: [node id]} (새로 생기는 몬스터에도)
 
 var _combat_ui: Node
 var _dialogue_ui: Node
@@ -126,6 +133,8 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	if EngineDebugger.has_capture("monster_ai"):
+		EngineDebugger.unregister_message_capture("monster_ai")
 	for pair in [[StoryRunner.message, _on_story_message], [StoryRunner.inventory_full, _on_inventory_full],
 			[StoryRunner.save_slot_requested, _on_save_slot_requested], [StoryRunner.combat_requested, _on_dialogue_combat],
 			[StoryRunner.travel_requested, _on_travel_requested]]:
@@ -159,6 +168,7 @@ func load_map(map_id: String) -> void:
 	tile = float(DataLoader.config.get("field_tile", 48))
 	_build_walls()
 	_build_actors()
+	_spawn_followers()
 	# 그림·조명: 맨 아래에 (그 위에 조사·문 표시, 인물)
 	if renderer == null:
 		renderer = MapRenderer.new()
@@ -243,6 +253,7 @@ func _build_actors() -> void:
 	GameState.arrive_at = ""
 	GameState.arrive_from = ""
 	_travel_lock = Vector2i(int(spawn[0]), int(spawn[1]))
+	_arrive_tile = _travel_lock
 	player.position = _tile_center(spawn[0], spawn[1])
 	_add_circle_shape(player, player.radius)
 	var cam := Camera2D.new()
@@ -268,27 +279,9 @@ func _build_actors() -> void:
 		var pos := _tile_center(o.x, o.y)
 		match o.type:
 			"enemy":
-				if GameState.field_has(map.map_id, "removed", o.object_id):
-					continue
-				var e := CharacterBody2D.new()
-				e.set_script(EnemyScript)
-				e.field = self
-				e.data = o
-				e.radius = tile * 0.32
-				# 순찰 = 걷기, 추격 = 달리기 (Npcs 시트의 walk_speed·run_speed, 칸/초)
-				var npc: Dictionary = DataLoader.enemies.get(o.ref, {})
-				e.patrol_speed = float(npc.get("walk_speed", 2)) * tile
-				e.chase_speed = float(npc.get("run_speed", 3.2)) * tile
-				e.sight = cfg.call("field_enemy_sight", 5)
-				e.lose_sight = cfg.call("field_enemy_lose_sight", 8)
-				e.collision_layer = 0
-				e.collision_mask = WALL_LAYER | DOOR_LAYER
-				e.position = pos
-				e.setup_patrol(pos, dirs.get(o.patrol_dir, Vector2.ZERO) * tile, int(o.patrol_len))
-				_setup_enemy_bt(e, o)
-				_add_circle_shape(e, e.radius * 0.8)
-				%World.add_child(e)
-				enemies.append(e)
+				if GameState.field_has(map.map_id, "removed", o.object_id) or GameState.field_has(map.map_id, "gone", o.object_id):
+					continue   # 처치함 / 플레이어를 쫓아 다른 맵으로 떠남
+				_spawn_enemy(o)
 			"investigate", "camp", "exit", "passage", "transit":
 				var kind: String = "spot" if o.type == "investigate" else o.type
 				spots.append({"kind": kind, "data": o, "pos": pos,
@@ -363,6 +356,7 @@ func toggle_door(s: Dictionary) -> void:
 		return
 	s.open = not s.open
 	s.body.collision_layer = 0 if s.open else DOOR_LAYER
+	make_noise(s.pos, float(DataLoader.config.get("noise_door_radius", 5)))   # 문 여닫는 소리
 	if renderer:
 		renderer.set_door_open(s.data.object_id, s.open)   # 열린 문으로 빛이 지나감
 	%MapView.queue_redraw()
@@ -390,6 +384,15 @@ func _physics_process(delta: float) -> void:
 		return
 	# 탐험 중에는 시간이 실시간으로 흐른다 (§4)
 	GameState.advance_time(delta * float(DataLoader.config.get("time_scale", 1)))
+	ai_stepping = _ai_step_pending   # 디버거 '한 단계' = 이번 프레임만 (몬스터는 필드 다음에 처리됨)
+	_ai_step_pending = false
+	_tick_followers(delta)
+	# 소리: 달리면 일정 간격으로 (Config noise_run_radius 칸, noise_interval 초)
+	if Input.is_action_pressed("run") and player.velocity.length() > 1.0:
+		_noise_t -= delta
+		if _noise_t <= 0.0:
+			_noise_t = float(DataLoader.config.get("noise_interval", 0.3))
+			make_noise(player.global_position, float(DataLoader.config.get("noise_run_radius", 6)))
 	# 생존 수치 0(Survival death_cause)·효과 die: → 사망. 대화·메뉴 중이면 그것이 끝난 뒤 여기서
 	var cause := GameState.death_cause_now()
 	if cause != "":
@@ -502,7 +505,11 @@ func interact() -> void:
 func travel(map_id: String, arrive := "", from := "") -> void:
 	GameState.arrive_at = arrive
 	GameState.arrive_from = from
+	var chasers := _take_chasers()
 	load_map(map_id)
+	var delay := float(DataLoader.config.get("ai_follow_delay", 3.0))
+	for d in chasers:
+		_follow_queue.append({"data": d, "left": delay})
 
 
 ## 가장자리 이동: 플레이어가 맵 맨 끝 칸(edges 가 정해진 쪽)에 있으면 그 edge { ref, arrive, dir }
@@ -929,6 +936,98 @@ func request_battle(e: Node) -> bool:
 	return true
 
 
+## 적 하나 만들기 (맵 물체 또는 쫓아 들어온 몬스터)
+func _spawn_enemy(o: Dictionary) -> Node:
+	var dirs := {"up": Vector2.UP, "down": Vector2.DOWN, "left": Vector2.LEFT, "right": Vector2.RIGHT}
+	var pos := _tile_center(o.x, o.y)
+	var e := CharacterBody2D.new()
+	e.set_script(EnemyScript)
+	e.field = self
+	e.data = o
+	e.radius = tile * 0.32
+	# 순찰 = 걷기, 추격 = 달리기 (Npcs 시트의 walk_speed·run_speed, 칸/초)
+	var npc: Dictionary = DataLoader.enemies.get(o.ref, {})
+	e.patrol_speed = float(npc.get("walk_speed", 2)) * tile
+	e.chase_speed = float(npc.get("run_speed", 3.2)) * tile
+	e.sight = float(DataLoader.config.get("field_enemy_sight", 5)) * tile
+	e.lose_sight = float(DataLoader.config.get("field_enemy_lose_sight", 8)) * tile
+	e.collision_layer = 0
+	e.collision_mask = WALL_LAYER | DOOR_LAYER
+	e.position = pos
+	e.setup_patrol(pos, dirs.get(o.get("patrol_dir", ""), Vector2.ZERO) * tile, int(o.get("patrol_len", 0)))
+	_setup_enemy_bt(e, o)
+	if e.bt:
+		for id in _ai_breakpoints.get(str(o.get("bt", "")), []):
+			e.bt.breakpoints[id] = true
+	_add_circle_shape(e, e.radius * 0.8)
+	%World.add_child(e)
+	enemies.append(e)
+	return e
+
+
+## 쫓아 들어온 몬스터들 (이 맵의 field_state followers — 처치하지 않은 것)
+func _spawn_followers() -> void:
+	for o in GameState.followers(map.map_id):
+		if not GameState.field_has(map.map_id, "removed", o.object_id):
+			_spawn_enemy(o)
+
+
+# ---------------------------------------------------------------- 소리·빛 (몬스터 AI 감각, 기획 v2.0 §7.3 확장)
+## 소리: 반경(칸) 안의 BT 몬스터가 듣는다 (벽 너머도 들림). 달리기·문 여닫기 (Config noise_*_radius, 임시값 TODO 기획)
+func make_noise(at: Vector2, radius_tiles: float) -> void:
+	for e in enemies:
+		if is_instance_valid(e) and e.bt and e.global_position.distance_to(at) <= radius_tiles * tile:
+			e.hear(e._to_tile(at))
+
+
+## 빛: 플레이어가 손전등(손에 든 빛)을 켜고 있으면 몬스터 시야 × Config ai_flashlight_sight_mult (임시값 TODO 기획)
+func sight_mult() -> float:
+	return float(DataLoader.config.get("ai_flashlight_sight_mult", 1.5)) if held_light != null and is_instance_valid(held_light) else 1.0
+
+
+# ---------------------------------------------------------------- 맵 간 추적
+## 맵을 떠날 때 쫓던 몬스터들은 Config ai_follow_delay 초 뒤 같은 곳(들어온 칸)으로 따라 들어온다.
+## 맵 물체 follow = "off" 면 안 따라옴. 따라온 몬스터는 그 맵의 field_state followers 에 남고(저장됨), 원래 맵에서는 "gone".
+func _take_chasers() -> Array:
+	var out := []
+	for q in _follow_queue:   # 아직 못 들어온 몬스터도 계속 따라옴
+		out.append(q.data)
+	_follow_queue.clear()
+	if not bool(int(DataLoader.config.get("ai_follow_enabled", 1))):
+		return out
+	var keep := []
+	for f in GameState.followers(map.map_id):
+		keep.append(f)
+	for e in enemies:
+		if not is_instance_valid(e) or e.state != "chase" or e.grace > 0.0 or str(e.data.get("follow", "")) == "off":
+			continue
+		out.append(e.data.duplicate(true))
+		keep = keep.filter(func(f): return f.object_id != e.data.object_id)
+		GameState.field_mark(map.map_id, "gone", e.data.object_id)
+	GameState.set_followers(map.map_id, keep)
+	return out
+
+
+func _tick_followers(delta: float) -> void:
+	if _follow_queue.is_empty():
+		return
+	for q in _follow_queue.duplicate():
+		q.left -= delta
+		if q.left > 0.0:
+			continue
+		_follow_queue.erase(q)
+		var o: Dictionary = q.data
+		o.x = _arrive_tile.x
+		o.y = _arrive_tile.y
+		o.patrol_dir = ""
+		o.patrol_len = 0
+		var list := GameState.followers(map.map_id).filter(func(f): return f.object_id != o.object_id)
+		list.append(o)
+		GameState.set_followers(map.map_id, list)
+		GameState.field_state[map.map_id].get("removed", []).erase(o.object_id)
+		_spawn_enemy(o)
+
+
 ## 맵 물체 bt = BT_ 자산 → Behavior Tree 로 움직임. 자산이 없거나 잘못되면 예전 AI (경고만)
 func _setup_enemy_bt(e: Node, o: Dictionary) -> void:
 	var bt_id := str(o.get("bt", ""))
@@ -1015,12 +1114,47 @@ func _update_held_light() -> void:
 func _process(delta: float) -> void:
 	if held_light and is_instance_valid(held_light) and player:
 		held_light.rotation = player.facing.angle()   # 바라보는 쪽을 비춤
+	# 브레이크포인트에 걸린 몬스터가 있으면 모두 멈춤 (Unreal 처럼)
+	if not ai_paused:
+		for e in enemies:
+			if is_instance_valid(e) and e.bt and e.bt.is_paused():
+				ai_paused = true
+				break
 	# 몬스터 AI 디버거: Godot 에디터에서 실행(F5·맵 테스트 플레이)했으면 BT 몬스터 상태를 '몬스터 AI' 탭으로
 	if EngineDebugger.is_active():
+		if not EngineDebugger.has_capture("monster_ai"):
+			EngineDebugger.register_message_capture("monster_ai", _on_ai_debug_message)
 		_ai_send_t -= delta
 		if _ai_send_t <= 0.0:
 			_ai_send_t = AI_SEND_INTERVAL
 			EngineDebugger.send_message("monster_ai:snapshot", [ai_snapshot()])
+
+
+## 몬스터 AI 디버거에서 오는 명령 (에디터 → 게임): pause [bool] / step [] / breakpoints [{bt_id: [node id]}]
+func _on_ai_debug_message(message: String, data: Array) -> bool:
+	match message.trim_prefix("monster_ai:"):
+		"pause":
+			set_ai_paused(bool(data[0]) if not data.is_empty() else true)
+		"step":
+			_ai_step_pending = true
+		"breakpoints":
+			_ai_breakpoints = data[0] if not data.is_empty() and data[0] is Dictionary else {}
+			for e in enemies:
+				if is_instance_valid(e) and e.bt:
+					e.bt.breakpoints.clear()
+					for id in _ai_breakpoints.get(str(e.data.get("bt", "")), []):
+						e.bt.breakpoints[id] = true
+		_:
+			return false
+	return true
+
+
+func set_ai_paused(v: bool) -> void:
+	ai_paused = v
+	if not v:
+		for e in enemies:
+			if is_instance_valid(e) and e.bt:
+				e.bt.set_paused(false)
 
 
 ## 이 맵의 BT 몬스터 상태 (디버거용) {map, frozen, monsters: [{id, name, ref, tile, grace, snap}]}
@@ -1031,7 +1165,7 @@ func ai_snapshot() -> Dictionary:
 			var t: Vector2 = e.ai_tile()
 			list.append({"id": str(e.data.object_id), "name": str(e.data.get("name", "")), "ref": str(e.data.get("ref", "")),
 				"tile": [snappedf(t.x, 0.1), snappedf(t.y, 0.1)], "grace": snappedf(e.grace, 0.1), "snap": e.bt.debug_snapshot()})
-	return {"map": str(map.get("map_id", "")), "frozen": frozen, "monsters": list}
+	return {"map": str(map.get("map_id", "")), "frozen": frozen, "paused": ai_paused, "monsters": list}
 
 
 func _camera() -> Camera2D:

@@ -635,6 +635,8 @@ func _edit_object(o: Dictionary) -> void:
 			_option("닿으면 바로 전투", [["", base], ["on", "켬 — 닿는 순간 전투"], ["off", "끔 — 닿아도 전투 안 함"]], o.get("touch_battle", ""), func(v):
 				set_field(o, "touch_battle", v))
 			_hint("끄면 BT 의 '전투 시작'(EnterTurnBattle) Task 로만 싸웁니다." if str(o.get("bt", "")) != "" 				else "예전 AI 는 '끔' 이면 싸우지 않습니다 (따라오기만).")
+			_option("다른 맵까지 따라오기", [["", "켬 — 쫓다가 플레이어가 문으로 나가면 몇 초 뒤 따라 들어옴"], ["off", "끔"]], o.get("follow", ""), func(v):
+				set_field(o, "follow", v))
 			if str(o.get("bt", "")) != "":
 				_bb_overrides(o, ai)
 		"light":

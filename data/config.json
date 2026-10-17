@@ -37,5 +37,11 @@
  "combat_talk_uses_turn": 1,
  "tile_art_px": 16,
  "revive_survival_floor": 10,
+ "noise_run_radius": 6,
+ "noise_door_radius": 5,
+ "noise_interval": 0.3,
+ "ai_flashlight_sight_mult": 1.5,
+ "ai_follow_enabled": 1,
+ "ai_follow_delay": 3,
  "opening_dialogue": ""
 }

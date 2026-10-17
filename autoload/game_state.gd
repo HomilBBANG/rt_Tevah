@@ -217,8 +217,21 @@ func field_has(map_id: String, kind: String, object_id: String) -> bool:
 func field_mark(map_id: String, kind: String, object_id: String) -> void:
 	if not field_state.has(map_id):
 		field_state[map_id] = {"removed": [], "done": []}
+	if not field_state[map_id].has(kind):
+		field_state[map_id][kind] = []
 	if not object_id in field_state[map_id][kind]:
 		field_state[map_id][kind].append(object_id)
+
+
+## 다른 맵에서 쫓아 들어온 몬스터 (맵 물체와 같은 모양의 사전, x·y = 들어온 칸). kind "gone" = 원래 맵을 떠난 몬스터
+func followers(map_id: String) -> Array:
+	return field_state.get(map_id, {}).get("followers", [])
+
+
+func set_followers(map_id: String, list: Array) -> void:
+	if not field_state.has(map_id):
+		field_state[map_id] = {"removed": [], "done": []}
+	field_state[map_id]["followers"] = list
 
 
 # ---------------------------------------------------------------- 스탯

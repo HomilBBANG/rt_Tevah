@@ -26,6 +26,7 @@ var _path: Array = []            # BT 이동: 남은 길 (칸)
 var _path_goal := Vector2i(-9999, -9999)
 var _stuck_t := 0.0
 var _last_pos := Vector2.ZERO
+var _heard := {}                 # 들은 소리 {pos (칸)} — ai_noise 가 한 번 꺼내 감
 
 
 func setup_patrol(origin: Vector2, step: Vector2, count: int) -> void:
@@ -59,9 +60,16 @@ func _physics_process(delta: float) -> void:
 	if field.frozen:
 		velocity = Vector2.ZERO
 		return
+	if field.ai_paused and not field.ai_stepping:   # 디버거 일시정지
+		velocity = Vector2.ZERO
+		queue_redraw()
+		return
 	grace = maxf(0.0, grace - delta)
 	if bt:
-		bt.tick(delta)
+		if field.ai_stepping:
+			bt.step(delta)
+		else:
+			bt.tick(delta)
 		state = "chase" if bt.bb.get_value("HasLineOfSight") else "patrol"
 		queue_redraw()
 		return
@@ -69,7 +77,7 @@ func _physics_process(delta: float) -> void:
 	var dist := global_position.distance_to(player.global_position)
 	match state:
 		"patrol", "return":
-			if grace == 0.0 and dist <= sight and _can_see(player.global_position):
+			if grace == 0.0 and dist <= sight * field.sight_mult() and _can_see(player.global_position):
 				state = "chase"
 			else:
 				_move_toward(_points[_target_i], patrol_speed)
@@ -168,7 +176,7 @@ func ai_origin() -> Vector2:
 func ai_perceive(range_tiles: float) -> Dictionary:
 	var p: Node2D = field.player
 	var dist: float = global_position.distance_to(p.global_position) / field.tile
-	var vis: bool = grace == 0.0 and dist <= range_tiles and _can_see(p.global_position)
+	var vis: bool = grace == 0.0 and dist <= range_tiles * field.sight_mult() and _can_see(p.global_position)   # 손전등을 들면 더 멀리서
 	return {"visible": vis, "id": "player", "pos": _to_tile(p.global_position), "distance": dist}
 
 
@@ -176,8 +184,15 @@ func ai_entity_tile(id: String) -> Variant:
 	return _to_tile(field.player.global_position) if id == "player" else null
 
 
+## 들은 소리를 꺼내 감 (UpdateNoise Service) — 달리기·문 여닫기 (field.make_noise)
 func ai_noise() -> Dictionary:
-	return {}   # TODO(기획): 소리 시스템 없음
+	var n := _heard
+	_heard = {}
+	return n
+
+
+func hear(tile_pos: Vector2) -> void:
+	_heard = {"pos": tile_pos}
 
 
 func ai_request_battle() -> bool:

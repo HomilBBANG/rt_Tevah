@@ -1429,6 +1429,8 @@ def validate_field(d, maps, rep, enemies):
                 rep.err(w, f"type 은 {' / '.join(sorted(FIELD_TYPES))}: '{t}'")
             elif t == "enemy" and ref not in enemies:
                 rep.err(w, f"적 종류(ref)는 싸울 수 있는 NPC(NpcParts·NpcAttacks 가 있는 npc_id): '{ref}'")
+            elif t == "enemy" and o.get("follow", "") not in ("", "off"):
+                rep.err(w, f"follow(다른 맵까지 따라오기)는 비움(켬) / off: '{o.get('follow')}'")
             elif t == "enemy" and o.get("touch_battle", "") not in ("", "on", "off"):
                 rep.err(w, f"touch_battle(닿으면 바로 전투)는 비움 / on / off: '{o.get('touch_battle')}'")
             elif t == "enemy" and (o.get("bt") or o.get("bb_overrides")) and check_enemy_bt(o, d.get("_ai", {}), w, rep):
@@ -1542,7 +1544,7 @@ def export_maps(d, maps):
             e["once"] = bool(o.get("once"))         # 이벤트 칸: 한 번만
             if o.get("type") == "enemy":            # 몬스터 AI: Behavior Tree 와 개체별 Blackboard 시작값 (비우면 예전 AI)
                 e.update(bt=o.get("bt", ""), bb_overrides=o.get("bb_overrides") or {},
-                         touch_battle=o.get("touch_battle", ""))   # 닿으면 바로 전투: "" = BT 설정(없으면 켬) / on / off
+                         touch_battle=o.get("touch_battle", ""), follow=o.get("follow", ""))   # follow off = 다른 맵까지 안 따라옴   # 닿으면 바로 전투: "" = BT 설정(없으면 켬) / on / off
             if o.get("type") == "light":            # 광원: 놓을 때 프리셋에서 복사한 값 (광원마다 고칠 수 있음)
                 e.update(preset=o.get("preset", ""), color=o.get("color", "") or "#FFFFFF",
                          energy=float(o.get("energy", 1.0)), radius=float(o.get("radius", 4.0)),

@@ -136,6 +136,97 @@ func _ready() -> void:
 	for o in DataLoader.maps.test_ai.objects:
 		if o.object_id == "ai_infected":
 			o.bt = "BT_Infected_Field"
+
+	# ---------- Phase 6: 소리 (BT_02_HearAndSearch — 달리기·문 소리를 들으면 확인하러 감)
+	for o in DataLoader.maps.test_ai.objects:
+		if o.object_id == "ai_infected":
+			o.bt = "BT_02_HearAndSearch"
+	f.load_map("test_ai")
+	await _wait(0.2)
+	var hs: Node = _enemy("ai_infected")
+	hs.position = f._tile_center(12, 6)
+	_teleport(1, 6)   # 멀리 (시야 밖)
+	await _wait(0.3)
+	check(not hs.bt.bb.get_value("HasLineOfSight"), "소리 테스트: 처음엔 못 봄")
+	Input.action_press("run")
+	Input.action_press("move_right")
+	await _wait(0.4)
+	Input.action_release("move_right")
+	Input.action_release("run")
+	await _wait(0.1)
+	var heard: bool = hs.bt.bb.get_value("HasHeardNoise") or hs.bt.task_node == "move_noise"
+	check(not heard, "달린 곳이 6칸 밖이면 못 들음")
+	hs.position = f._tile_center(7, 1)   # 기둥(x6~8, y3~4) 위 — 가깝지만 안 보임
+	_teleport(7, 6)
+	Input.action_press("run")
+	Input.action_press("move_left")
+	await _wait(0.4)
+	Input.action_release("move_left")
+	Input.action_release("run")
+	ok = await _wait_until(func(): return hs.bt.task_node == "move_noise", 2.0)
+	var nl = hs.bt.bb.get_value("NoiseLocation")
+	check(ok and nl != null and nl.distance_to(hs._to_tile(f.player.global_position)) < 3.0, "6칸 안에서 달리면 들음 → 순찰을 멈추고 소리 난 곳으로 (%s)" % hs.bt.task_node)
+	_teleport(1, 1)
+	ok = await _wait_until(func(): return hs.bt.task_node == "patrol" and hs.bt.last_result.get("listen") == "SUCCESS", 10.0)
+	check(ok, "소리 난 곳을 둘러본 뒤 순찰로 (%s %s %s)" % [hs.bt.task_node, hs.bt.last_result, hs.bt.log.slice(-6).map(func(e): return "%s %s %s %s" % [e.ev, e.node, e.result, e.reason])])
+	hs.bt.bb.set_value("HasHeardNoise", false)
+	f.make_noise(hs.global_position - Vector2(f.tile * 3, 0), 5)
+	ok = await _wait_until(func(): return hs.bt.task_node in ["move_noise", "listen"], 1.0)
+	check(ok, "문 소리 등 make_noise 도 들음 → 확인하러 감 (%s)" % hs.bt.task_node)
+	# 빛: 손전등을 들면 더 멀리서 봄 (시야 4칸 × 1.5)
+	hs.bt.bb.set_value("HasHeardNoise", false)
+	hs.position = f._tile_center(14, 6)
+	hs.bt.set_paused(false)
+	_teleport(9, 6)   # 5칸
+	f.ai_paused = true   # 몬스터를 멈추고 감지만 비교
+	var far: Dictionary = hs.ai_perceive(4.0)
+	GameState.add_item("flashlight", 1)
+	var fi := GameState.inventory.find_custom(func(sl): return sl.id == "flashlight")
+	GameState.equip(fi)
+	await _wait(0.1)
+	var lit: Dictionary = hs.ai_perceive(4.0)
+	check(not far.visible and lit.visible and is_equal_approx(f.sight_mult(), 1.5), "손전등을 들면 5칸 앞에서도 보임 (시야 4 × 1.5)")
+	f.ai_paused = false
+
+	# ---------- Phase 6: 맵 간 추적 — 쫓던 몬스터가 몇 초 뒤 같은 곳으로 따라 들어옴
+	DataLoader.config["ai_follow_delay"] = 1.0
+	_teleport(11, 6)
+	ok = await _wait_until(func(): return hs.state == "chase", 2.0)
+	check(ok, "추격 중")
+	f.travel("basecamp")
+	await _wait(0.2)
+	check(GameState.field_has("test_ai", "gone", "ai_infected") and f.enemies.is_empty() and f._follow_queue.size() == 1, "다른 맵으로 가면 쫓던 몬스터는 원래 맵을 떠나 따라오는 중")
+	ok = await _wait_until(func(): return not f.enemies.is_empty(), 3.0)
+	var fol: Node = f.enemies[0] if ok else null
+	check(ok and fol.data.object_id == "ai_infected" and fol.bt != null and Vector2i(fol.data.x, fol.data.y) == f._arrive_tile
+		and GameState.followers("basecamp").size() == 1, "1초 뒤 들어온 곳으로 따라 들어옴 (BT 그대로)")
+	if f._combat_ui != null:
+		await _end_combat("fled")
+	f.load_map("basecamp")
+	await _wait(0.2)
+	check(f.enemies.size() == 1, "따라온 몬스터는 그 맵에 남음 (다시 들어와도)")
+	f.travel("test_ai")
+	await _wait(0.2)
+	check(_enemy("ai_infected") == null, "원래 맵에는 없음 (떠났으니)")
+	GameState.field_state.erase("test_ai")
+	GameState.field_state.erase("basecamp")
+	# follow = off 면 안 따라옴
+	for o in DataLoader.maps.test_ai.objects:
+		if o.object_id == "ai_infected":
+			o.follow = "off"
+	f.load_map("test_ai")
+	await _wait(0.2)
+	var nf: Node = _enemy("ai_infected")
+	nf.position = f._tile_center(12, 6)
+	_teleport(10, 6)
+	await _wait_until(func(): return nf.state == "chase", 2.0)
+	f.travel("basecamp")
+	await _wait(1.5)
+	check(f.enemies.is_empty() and not GameState.field_has("test_ai", "gone", "ai_infected"), "맵 에디터 '따라오기 끔' 이면 안 따라옴")
+	for o in DataLoader.maps.test_ai.objects:
+		if o.object_id == "ai_infected":
+			o.bt = "BT_Infected_Field"
+			o.erase("follow")
 	SaveManager.delete_all()
 	print("[ai_field_smoke] 스크린샷 %d장, 실패 %d → %s" % [_shot, _fail, ProjectSettings.globalize_path("user://ai_field_smoke")])
 	get_tree().quit(1 if _fail > 0 else 0)
