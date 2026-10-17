@@ -214,7 +214,7 @@ func build_markers() -> void:
 		markers[str(o.object_id)] = {"sprite": s, "kind": kind, "key": key,
 			"frames": maxi(1, int(t.get("frames", 1) if t.get("frames") != null else 1)), "fps": float(t.get("fps", 6.0) if t.get("fps") != null else 6.0)}
 		if kind == "window" and windows.has(str(o.object_id)):
-			set_curtain(str(o.object_id), windows[str(o.object_id)].curtain)
+			set_curtain(str(o.object_id), windows[str(o.object_id)].curtain)   # 그림·유리 밝기 (_apply_windows)
 
 
 ## 조사를 마친 곳은 반짝이를 숨김
@@ -438,7 +438,8 @@ func rebuild_lights() -> void:
 		p.texture_scale = float(VisualData.data().get("window_light_radius", 6)) * tile * 2.0 / LIGHT_TEX_SIZE
 		p.texture_scale *= sqrt(float(maxi(1, int(o.get("w", 1)) if d.y != 0 else int(o.get("h", 1)))))   # 넓은 창문은 조금 더 멀리
 		p.shadow_enabled = true
-		p.shadow_filter = Light2D.SHADOW_FILTER_NONE
+		p.shadow_filter = Light2D.SHADOW_FILTER_PCF13   # 창문 빛은 부드러운 그림자 (등불처럼 딱딱하면 무대 조명 같음)
+		p.shadow_filter_smooth = 6.0
 		p.position = (wl.origin + Vector2(d) * 0.04) * tile   # 바닥 가장자리 바로 안쪽 (벽 그림자에 묻히지 않게)
 		p.rotation = Vector2(d).angle()
 		p.set_meta("object_id", o.get("object_id", ""))
@@ -448,7 +449,9 @@ func rebuild_lights() -> void:
 	_apply_lighting()
 
 
-## 창문 빛 그림: 가운데에서 오른쪽 반원으로 퍼짐 (가장자리 부드럽게), 멀수록 흐림
+## 창문 빛 그림: 창문(가운데)에서 방 안(오른쪽)으로 은은하게 번지는 빛 — 테두리 없이 넓게, 멀수록 부드럽게 사라짐.
+## 최대 밝기도 낮게 (WINDOW_PEAK) — 방 전체 분위기를 해치지 않는 '창가가 조금 밝은' 정도
+const WINDOW_PEAK := 0.6
 static func window_texture() -> Texture2D:
 	if _window_tex == null:
 		var n := LIGHT_TEX_SIZE
@@ -456,11 +459,12 @@ static func window_texture() -> Texture2D:
 		var c := Vector2(n, n) / 2.0
 		for y in n:
 			for x in n:
-				var v := Vector2(x, y) - c
-				var d := v.length() / (n / 2.0)
-				var edge := clampf((deg_to_rad(80.0) - absf(v.angle())) / deg_to_rad(25.0), 0.0, 1.0)
-				var k := edge * pow(clampf(1.0 - d, 0.0, 1.0), 1.4) if d <= 1.0 else 0.0
-				img.set_pixel(x, y, Color(1, 1, 1, k))
+				var v := (Vector2(x, y) - c) / (n / 2.0)
+				var d := Vector2(v.x, v.y * 1.15).length()                 # 벽을 따라 조금 더 넓게
+				var ang := absf(v.angle())
+				var side := 1.0 - smoothstep(deg_to_rad(35.0), deg_to_rad(105.0), ang)   # 옆으로 갈수록 서서히
+				var fall := pow(1.0 - smoothstep(0.0, 1.0, d), 1.6)       # 멀수록 서서히 (끝이 딱 끊기지 않게)
+				img.set_pixel(x, y, Color(1, 1, 1, WINDOW_PEAK * side * fall))
 		_window_tex = ImageTexture.create_from_image(img)
 	return _window_tex
 
@@ -474,6 +478,18 @@ func _apply_windows() -> void:
 		w.light.color = dl.color
 		w.light.energy = e
 		w.light.enabled = not w.curtain and e > 0.01
+		if markers.has(id):   # 창문 유리: 낮에는 바깥 빛으로 밝게 (주변광과 상관없이), 밤·커튼이면 방과 같이 어둡게
+			var sp: Sprite2D = markers[id].sprite
+			if w.curtain or float(dl.k) < 0.05:
+				sp.material = null
+				sp.modulate = Color.WHITE
+			else:
+				if sp.material == null:
+					var mat := CanvasItemMaterial.new()
+					mat.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+					sp.material = mat
+				var g := lerpf(0.45, 0.95, float(dl.k))
+				sp.modulate = Color(g, g, g * 0.97)
 
 
 static func light_texture() -> Texture2D:
