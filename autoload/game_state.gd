@@ -223,6 +223,11 @@ func field_mark(map_id: String, kind: String, object_id: String) -> void:
 		field_state[map_id][kind].append(object_id)
 
 
+func field_unmark(map_id: String, kind: String, object_id: String) -> void:
+	if field_state.has(map_id) and field_state[map_id].has(kind):
+		field_state[map_id][kind].erase(object_id)
+
+
 ## 다른 맵에서 쫓아 들어온 몬스터 (맵 물체와 같은 모양의 사전, x·y = 들어온 칸). kind "gone" = 원래 맵을 떠난 몬스터
 func followers(map_id: String) -> Array:
 	return field_state.get(map_id, {}).get("followers", [])

@@ -12,6 +12,8 @@ extends Node2D
 ##   물체 표시 그림 (Tiles layer door / marker): 문(exit) = 닫힘·열림 그림 (set_door_open 이 바꿈, 물체 look 으로 고름),
 ##         조사 지점(investigate) = 반짝이 애니메이션 (빛 영향 없이 어두워도 보임, set_spot_done 이 숨김)
 ##         (필드는 build_props(%World), 에디터는 렌더러 안 props_root)
+##   창문 (맵 물체 type=window, 벽 칸): 그림 = Tiles layer window (커튼 = key_curtain), 옆 바닥 쪽으로 햇빛(부채꼴 PointLight2D,
+##         실외 시간대 밝기·색 — 밤엔 꺼짐, 실내 맵에서도). 커튼을 치면 빛이 꺼짐 (set_curtain). 창문 칸은 그림자를 만들지 않음
 ## 쓰는 법: build(map, tile) → set_time(분) / set_door_open(id, 열림) / set_lighting(켜기)
 
 const VisualData = preload("res://core/visual_data.gd")
@@ -30,7 +32,9 @@ var prop_sprites: Array = []
 var roof_regions: Array = []     # [{cells: {Vector2i: true}, layer: TileMapLayer, open: bool}]
 var roof_alpha := 1.0            # 덮었을 때 지붕 불투명도 (에디터 미리보기는 반투명)
 var _roof_cell := {}             # Vector2i → 지붕 묶음 번호
-var markers := {}                # object_id → {sprite, kind: door/spark, key, frames, fps}
+var markers := {}                # object_id → {sprite, kind: door/spark/window, key, frames, fps}
+var windows := {}                # object_id → {light: PointLight2D, curtain: bool}
+static var _window_tex: Texture2D
 var _marker_root: Node2D
 var _anim_t := 0.0
 var _roof_root: Node2D
@@ -115,6 +119,9 @@ func rebuild_tiles() -> void:
 			if keys.wall != "" and VisualData.tiles().get(keys.wall, {}).get("casts_shadow", false):
 				shadow_cells[Vector2i(x, y)] = true
 	_rebuild_roofs(ts, scale_k)
+	for o in map.get("objects", []):
+		if o.get("type", "") == "window":
+			shadow_cells.erase(Vector2i(int(o.x), int(o.y)))   # 창문 칸으로 빛이 지나감
 	var pc := VisualData.prop_cells(map)
 	for c in pc:
 		if pc[c].get("casts_shadow", false):
@@ -176,6 +183,9 @@ func build_markers() -> void:
 		elif o.get("type") == "investigate":
 			key = spark
 			kind = "spark"
+		elif o.get("type") == "window":
+			key = str(o.get("look", "")) if str(o.get("look", "")) != "" and VisualData.tiles().has(str(o.get("look", ""))) else VisualData.default_art("window")
+			kind = "window"
 		if key == "":
 			continue
 		var fr := VisualData.tile_frame(key, 0)
@@ -197,6 +207,8 @@ func build_markers() -> void:
 		var t: Dictionary = VisualData.tiles()[key]
 		markers[str(o.object_id)] = {"sprite": s, "kind": kind, "key": key,
 			"frames": maxi(1, int(t.get("frames", 1) if t.get("frames") != null else 1)), "fps": float(t.get("fps", 6.0) if t.get("fps") != null else 6.0)}
+		if kind == "window" and windows.has(str(o.object_id)):
+			set_curtain(str(o.object_id), windows[str(o.object_id)].curtain)
 
 
 ## 조사를 마친 곳은 반짝이를 숨김
@@ -313,6 +325,19 @@ func set_door_open(object_id: String, open: bool) -> void:
 		doors[object_id].visible = not open
 
 
+## 커튼 치기(closed = true)·걷기: 그림 = key_curtain, 햇빛 꺼짐
+func set_curtain(object_id: String, closed: bool) -> void:
+	if windows.has(object_id):
+		windows[object_id].curtain = closed
+	if markers.has(object_id) and markers[object_id].kind == "window":
+		var m: Dictionary = markers[object_id]
+		var key: String = m.key + "_curtain" if closed and VisualData.tiles().has(m.key + "_curtain") else m.key
+		var fr := VisualData.tile_frame(key, 0)
+		if not fr.is_empty():
+			m.sprite.texture.region = fr[1]
+	_apply_windows()
+
+
 ## 오브젝트 그림을 parent(Y 정렬 노드)에 둔다. 다시 부르면 전에 만든 것을 지우고 새로
 func build_props(parent: Node2D) -> void:
 	for s in prop_sprites:
@@ -392,7 +417,55 @@ func rebuild_lights() -> void:
 		p.set_meta("object_id", o.get("object_id", ""))
 		_light_root.add_child(p)
 		lights.append(p)
+	# 창문 햇빛: 창문 칸의 바닥 쪽 가장자리에서 안으로 퍼지는 부채꼴
+	var old := windows
+	windows = {}
+	for o in map.get("objects", []):
+		if o.get("type", "") != "window":
+			continue
+		var d := VisualData.window_dir(map, int(o.x), int(o.y))
+		if d == Vector2i.ZERO:
+			continue
+		var p := PointLight2D.new()
+		p.texture = window_texture()
+		p.texture_scale = float(VisualData.data().get("window_light_radius", 6)) * tile * 2.0 / LIGHT_TEX_SIZE
+		p.shadow_enabled = true
+		p.shadow_filter = Light2D.SHADOW_FILTER_NONE
+		p.position = (Vector2(int(o.x), int(o.y)) + Vector2(0.5, 0.5) + Vector2(d) * 0.52) * tile
+		p.rotation = Vector2(d).angle()
+		p.set_meta("object_id", o.get("object_id", ""))
+		_light_root.add_child(p)
+		var oid := str(o.get("object_id", ""))
+		windows[oid] = {"light": p, "curtain": old[oid].curtain if old.has(oid) else bool(o.get("curtain", false))}
 	_apply_lighting()
+
+
+## 창문 빛 그림: 가운데에서 오른쪽 반원으로 퍼짐 (가장자리 부드럽게), 멀수록 흐림
+static func window_texture() -> Texture2D:
+	if _window_tex == null:
+		var n := LIGHT_TEX_SIZE
+		var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+		var c := Vector2(n, n) / 2.0
+		for y in n:
+			for x in n:
+				var v := Vector2(x, y) - c
+				var d := v.length() / (n / 2.0)
+				var edge := clampf((deg_to_rad(80.0) - absf(v.angle())) / deg_to_rad(25.0), 0.0, 1.0)
+				var k := edge * pow(clampf(1.0 - d, 0.0, 1.0), 1.4) if d <= 1.0 else 0.0
+				img.set_pixel(x, y, Color(1, 1, 1, k))
+		_window_tex = ImageTexture.create_from_image(img)
+	return _window_tex
+
+
+## 창문 햇빛 밝기: 실외 시간대 × Config window_light_energy, 커튼을 치면 꺼짐
+func _apply_windows() -> void:
+	var dl := VisualData.daylight(minutes)
+	var e := float(VisualData.data().get("window_light_energy", 1.2)) * float(dl.k)
+	for id in windows:
+		var w: Dictionary = windows[id]
+		w.light.color = dl.color
+		w.light.energy = e
+		w.light.enabled = not w.curtain and e > 0.01
 
 
 static func light_texture() -> Texture2D:
@@ -436,3 +509,4 @@ func _apply_lighting() -> void:
 	_sun.color = a.sun
 	_sun.energy = a.sun_energy
 	_light_root.visible = lighting
+	_apply_windows()

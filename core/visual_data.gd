@@ -241,5 +241,29 @@ static func ambient(profile: String, minutes: float) -> Dictionary:
 	return _row(rows[0])
 
 
+## 창문으로 들어오는 햇빛: 맵 환경과 상관없이 실외(outdoor) 시간대로 → {color, k(0 밤 ~ 1 가장 밝을 때)}
+static func daylight(minutes: float) -> Dictionary:
+	var rows: Array = data().get("day_night", {}).get("outdoor", [])
+	if rows.is_empty():
+		return {"color": Color.WHITE, "k": 1.0}
+	var lo := INF
+	var hi := -INF
+	for r in rows:
+		lo = minf(lo, float(r[3]))
+		hi = maxf(hi, float(r[3]))
+	var a := ambient("outdoor", minutes)
+	return {"color": a.sun, "k": clampf((a.sun_energy - lo) / (hi - lo), 0.0, 1.0) if hi > lo else 1.0}
+
+
+## 창문 칸에서 빛이 들어갈 쪽 (옆의 바닥 칸 — 아래·위·왼쪽·오른쪽 순서). 없으면 ZERO
+static func window_dir(map: Dictionary, x: int, y: int) -> Vector2i:
+	var rows: Array = map.get("tiles", [])
+	for d in [Vector2i.DOWN, Vector2i.UP, Vector2i.LEFT, Vector2i.RIGHT]:
+		var c: Vector2i = Vector2i(x, y) + d
+		if c.y >= 0 and c.y < rows.size() and c.x >= 0 and c.x < String(rows[c.y]).length() and String(rows[c.y])[c.x] == ".":
+			return d
+	return Vector2i.ZERO
+
+
 static func _row(r: Array) -> Dictionary:
 	return {"ambient": Color.html(str(r[1])), "sun": Color.html(str(r[2])), "sun_energy": float(r[3])}

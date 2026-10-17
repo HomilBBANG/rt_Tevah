@@ -180,9 +180,11 @@ func load_map(map_id: String) -> void:
 	renderer.minutes = GameState.minute_of_day()
 	renderer.build(map, tile)
 	renderer.build_props(%World)   # 오브젝트 그림은 인물과 같은 Y 정렬 노드에 (발 위치로 앞뒤)
-	for s in spots:   # 이미 조사한 곳은 반짝이 없음
+	for s in spots:   # 이미 조사한 곳은 반짝이 없음, 창문 커튼
 		if s.kind == "spot" and s.done:
 			renderer.set_spot_done(s.data.object_id, true)
+		if s.kind == "window":
+			renderer.set_curtain(s.data.object_id, s.curtain)
 	%MapView.art_ids = renderer.markers
 	_roof_open = -1
 	_update_roof(true)
@@ -298,6 +300,9 @@ func _build_actors() -> void:
 				if o.type == "exit":
 					spots.back().open = false
 					spots.back().body = _add_door_body(pos)
+			"window":   # 창문: E 로 커튼 치기·걷기. 맵 처음 상태(curtain)에서 바꾼 것은 field_state "curtain" 에 (회차 저장)
+				spots.append({"kind": "window", "data": o, "pos": pos,
+					"curtain": bool(o.get("curtain", false)) != GameState.field_has(map.map_id, "curtain", o.object_id)})
 			"npc":
 				var n := StaticBody2D.new()
 				n.set_script(NpcScript)
@@ -357,6 +362,19 @@ func _add_door_body(pos: Vector2) -> StaticBody2D:
 	body.add_child(shape)
 	%World.add_child(body)
 	return body
+
+
+## 커튼 치기·걷기: 치면 창문 햇빛이 막힘
+func toggle_curtain(s: Dictionary) -> void:
+	s.curtain = not s.curtain
+	if s.curtain != bool(s.data.get("curtain", false)):
+		GameState.field_mark(map.map_id, "curtain", s.data.object_id)
+	else:
+		GameState.field_unmark(map.map_id, "curtain", s.data.object_id)
+	if renderer:
+		renderer.set_curtain(s.data.object_id, s.curtain)
+	%MapView.queue_redraw()
+	_near_spot = {}   # 안내 문구 다시 쓰기
 
 
 ## 문 열기·닫기. 문 칸 위에 서 있으면 닫지 않는다.
@@ -486,7 +504,7 @@ func _update_near_spot() -> void:
 		%Prompt.visible = not best.is_empty()
 		if not best.is_empty():
 			var verb: String = {"npc": "대화", "camp": "거점", "exit": "문 열기", "spot": "조사", "transit": "이용",
-				"passage": "통로"}[best.kind]
+				"passage": "통로", "window": "커튼 걷기" if best.get("curtain", false) else "커튼 치기"}[best.kind]
 			var extra := "  (조사함)" if best.kind == "spot" and best.done else ""
 			if best.kind == "exit" and best.open:
 				verb = "문 닫기"
@@ -505,6 +523,7 @@ func interact() -> void:
 		"npc": _start_dialogue(s)
 		"camp": _open_camp()
 		"exit": toggle_door(s)
+		"window": toggle_curtain(s)
 		"transit": travel(s.data.ref, s.data.get("arrive", ""), s.data.object_id)
 		"spot": await _investigate(s)
 

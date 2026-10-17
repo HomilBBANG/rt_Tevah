@@ -293,6 +293,34 @@
    "fps": 6.0,
    "face": "",
    "face_rows": 1
+  },
+  {
+   "tile_key": "window_wood",
+   "name": "나무 창문",
+   "layer": "window",
+   "file": "test_tiles.png",
+   "atlas_x": 0,
+   "atlas_y": 7,
+   "casts_shadow": false,
+   "note": "창문 (맵 물체 type=window). 커튼 친 그림 = window_wood_curtain",
+   "frames": 1,
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
+  },
+  {
+   "tile_key": "window_wood_curtain",
+   "name": "나무 창문 (커튼)",
+   "layer": "window",
+   "file": "test_tiles.png",
+   "atlas_x": 1,
+   "atlas_y": 7,
+   "casts_shadow": false,
+   "note": "커튼을 친 창문",
+   "frames": 1,
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   }
  ],
  "light_presets": [
@@ -463,5 +491,7 @@
    ]
   ]
  },
- "tile_art_px": 16
+ "tile_art_px": 16,
+ "window_light_energy": 1.2,
+ "window_light_radius": 6.0
 }

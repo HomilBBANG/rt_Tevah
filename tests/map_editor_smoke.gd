@@ -431,6 +431,26 @@ func _ready() -> void:
 	ed.undo()
 	check(ed.map.objects.size() == clr_n and ed.map.tiles == clr_tiles, "실행 취소로 모두 되돌림")
 
+	# 벽에 문 놓기 → 그 칸이 바닥, 창문은 벽 칸(옆에 바닥)에만
+	ed.open_map("test_field")
+	await _frames(1)
+	ed.map.visual = {"layers": {"wall": {"13,1": "wall_wood"}}}
+	ed.set_tool("exit")
+	cv.apply_tool(Vector2i(13, 1))
+	var wall_door: Dictionary = cv.object_at(Vector2i(13, 1))
+	check(cv.is_floor(Vector2i(13, 1)) and wall_door.get("type", "") == "exit" and not ed.map.visual.layers.wall.has("13,1"), "벽에 문 → 바닥으로 바뀌고 벽 그림도 지움")
+	ed.set_tool("window")
+	cv.apply_tool(Vector2i(5, 1))
+	check(cv.object_at(Vector2i(5, 1)).is_empty(), "창문은 바닥에 못 놓음")
+	cv.apply_tool(Vector2i(5, 0))
+	var win: Dictionary = cv.object_at(Vector2i(5, 0))
+	check(win.get("type", "") == "window" and cv.is_wall(Vector2i(5, 0)), "창문: 벽 칸에 놓임 (벽 그대로)")
+	ed.set_tool("floor")
+	cv.apply_tool(Vector2i(5, 0))
+	check(cv.is_wall(Vector2i(5, 0)), "창문 칸은 바닥으로 칠해지지 않음")
+	ed.map.objects.erase(win)
+	ed.map.objects.erase(wall_door)
+
 	# 맵 삭제: 쓰는 곳(다른 맵의 문) 목록 → 파일 지움, 베이스캠프는 못 지움
 	ed.new_map("test_del", 5, 5)
 	ed.new_map("test_del_src", 5, 5)

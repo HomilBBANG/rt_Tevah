@@ -21,7 +21,7 @@ const TOOL_GROUPS := [
 	["위치", [["arrive", "도착 P"], ["run_start", "시작 S"]]],
 	["물체", [["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["event", "이벤트"]]],
 	["이동", [["exit", "문"], ["passage", "통로"], ["transit", "이용"]]],
-	["그래픽", [["tile", "타일"], ["tile_erase", "타일 지우기"], ["prop", "오브젝트"], ["light", "광원"]]],
+	["그래픽", [["tile", "타일"], ["tile_erase", "타일 지우기"], ["prop", "오브젝트"], ["light", "광원"], ["window", "창문"]]],
 	["", [["erase", "지우개"]]],
 ]
 const TOOL_TIPS := {
@@ -36,13 +36,14 @@ const TOOL_TIPS := {
 	"npc": "NPC: 놓은 뒤 오른쪽 칸에서 대화(시작 노드)·나타나는 시간대",
 	"camp": "베이스캠프 거점 (식사·물·씻기·잠 메뉴, 엑셀 CampActions)",
 	"event": "이벤트 칸: 밟으면 대화(컷신) 시작. 게임에서는 안 보임. 오른쪽 칸에서 대화·한 번만·나타나는 조건",
-	"exit": "문: E 로 열고, 열린 문으로 걸어 들어가면 이동. 오른쪽 칸에서 이동할 맵",
+	"exit": "문: E 로 열고, 열린 문으로 걸어 들어가면 이동. 오른쪽 칸에서 이동할 맵. 벽 칸에 놓으면 그 칸이 저절로 바닥이 됨",
 	"passage": "통로: 밟으면 바로 이동 (계단·길·동굴 입구)",
 	"transit": "이용: E 를 눌러야 이동 (사다리·엘리베이터 등). 이름이 안내에 나옴",
 	"erase": "지우개: 클릭한 물체(또는 S)를 지움. 벽은 바닥으로 칠해서 지움",
 	"tile": "타일 붓: 왼쪽 '타일 팔레트'에서 층·타일을 고르고 끌어서 칠함 (보이는 모습만 — 벽·바닥 판정은 그대로). □ 사각형·Shift 로 채우기",
 	"tile_erase": "타일 지우개: 지금 층의 칠한 타일을 지움 (그 칸은 기본 타일로 보임)",
 	"prop": "오브젝트 그림 (나무·가구): 왼쪽 '타일 팔레트'를 '오브젝트'로 바꿔 고르고 클릭한 칸(= 왼쪽 아래 칸)에 놓기. 인물과 앞뒤는 저절로",
+	"window": "창문: 벽 칸(옆에 바닥이 있는)에 놓기. 낮에는 바닥 쪽으로 햇빛이 들어오고 밤엔 어두움. 게임에서 E 로 커튼을 치면 빛이 막힘",
 	"light": "광원: 클릭한 칸에 놓기 (오른쪽 칸에서 프리셋·색·밝기·범위·그림자). 고르면 끌어서 옮기기, Ctrl+C/V 복제",
 }
 const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
@@ -88,7 +89,7 @@ const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
 [b]지도 표시[/b]  [color=#3fae5f]● P[/color] 도착 P (★ 기본) · [color=#b89a2a]S[/color] 회차 시작 · [color=#d05050]● 적[/color] · [color=#e8c35a]● 조[/color] 조사 · [color=#5a8fd0]● N[/color] NPC · [color=#5fae6a]● 거[/color] 거점 · [color=#c070d0]● !![/color] 이벤트 (밟으면 컷신) · [color=#a07850]● 문[/color] · [color=#6fa8dc]● 통[/color] 통로 · [color=#c8a060]● 이[/color] 이용 · 맵 바깥 푸른 띠 = 가장자리 이동
 """
 const TYPE_NAME :={"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구(문)",
-	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P", "event": "이벤트 칸", "light": "광원", "prop": "오브젝트 그림"}
+	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P", "event": "이벤트 칸", "light": "광원", "prop": "오브젝트 그림", "window": "창문"}
 const EDGES := [["up", "위"], ["down", "아래"], ["left", "왼쪽"], ["right", "오른쪽"]]
 
 var dir := MAP_DIR                   # 테스트에서 바꿔 쓴다
@@ -767,6 +768,18 @@ func _edit_object(o: Dictionary) -> void:
 				_option("문 모양", [["", "기본 (%s)" % VisualData.default_art("door")]] + doors.map(func(k): return [k, "%s  (%s)" % [VisualData.tiles()[k].name, k]]), o.get("look", ""), func(v):
 					set_field(o, "look", v)
 					_gfx_dirty = true)
+		"window":
+			_section("창문")
+			var wins: Array = VisualData.tiles().keys().filter(func(k): return str(VisualData.tiles()[k].get("layer", "")) == "window" and not str(k).ends_with("_curtain"))
+			_option("창문 모양", [["", "기본 (%s)" % VisualData.default_art("window")]] + wins.map(func(k): return [k, "%s  (%s)" % [VisualData.tiles()[k].name, k]]), o.get("look", ""), func(v):
+				set_field(o, "look", v))
+			var cur := CheckBox.new()
+			cur.text = "처음에 커튼을 쳐 둠"
+			cur.tooltip_text = "켜면 맵에 처음 들어왔을 때 커튼이 쳐져 있어 빛이 안 들어옴. 게임에서 E 로 치고 걷기 (회차 저장에 남음)"
+			cur.button_pressed = bool(o.get("curtain", false))
+			cur.toggled.connect(func(on): set_field(o, "curtain", on))
+			inspector.add_child(cur)
+			_hint("빛은 옆의 바닥 쪽(아래 → 위 → 왼쪽 → 오른쪽 순서로 처음 찾은 쪽)으로 들어옵니다. 밝기·거리는 엑셀 Config window_light_energy · window_light_radius, 시간대는 '시간 미리보기'로 확인")
 		"arrive":
 			_section("도착 P")
 			var dcb := CheckBox.new()
@@ -1255,7 +1268,7 @@ func paste_at(at: Vector2i) -> void:
 	var made := []
 	for c in _clip.objects:
 		var t := at + Vector2i(int(c.x), int(c.y))
-		if not canvas.is_floor(t) or not canvas.object_at(t).is_empty():
+		if not canvas.fits(str(c.get("type", "")), t) or not canvas.object_at(t).is_empty():
 			continue
 		var o: Dictionary = c.duplicate(true)
 		o.object_id = _new_object_id(o.type)

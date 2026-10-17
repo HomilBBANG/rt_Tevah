@@ -167,6 +167,42 @@ func _ready() -> void:
 	await _wait(0.1)
 	check(not sp.sprite.visible, "조사하면 반짝이가 사라짐")
 	f.queue_free()
+	await _wait(0.1)
+	# ---- 창문: 실내 맵에서도 낮이면 햇빛, 밤엔 꺼짐, 커튼을 치면 막힘 (회차 상태에 남음)
+	var wm := _map("indoor")
+	wm.map_id = "twin"
+	wm.objects = wm.objects.filter(func(o): return o.type != "light")
+	wm.objects.append({"object_id": "tw_win", "type": "window", "ref": "", "name": "창문", "text": "", "condition": "", "arrive": "", "from": [],
+		"default": false, "once": false, "map_id": "twin", "x": 3, "y": 0, "patrol_dir": "", "patrol_len": 0, "schedule": [], "look": "", "curtain": false})
+	DataLoader.maps["twin"] = wm
+	GameState.clock = 12 * 60.0
+	FieldScript.next_map_id = "twin"
+	var wf: Node = load("res://scenes/field/field.tscn").instantiate()
+	add_child(wf)
+	await _wait(0.3)
+	var wr: Node2D = wf.renderer
+	check(wr.windows.has("tw_win") and wr.windows.tw_win.light.enabled and wr.windows.tw_win.light.energy > 0.5
+		and is_equal_approx(wr.windows.tw_win.light.rotation, PI / 2), "창문: 실내 맵 정오에 아래(바닥 쪽)로 햇빛")
+	check(wr.markers.has("tw_win") and wr.markers.tw_win.kind == "window", "창문 그림")
+	wf.player.position = wf._tile_center(3, 2)
+	await _snap("window_noon")
+	var ws: Dictionary = wf.spots.filter(func(x): return x.kind == "window")[0]
+	var open_x: float = wr.markers.tw_win.sprite.texture.region.position.x
+	wf.player.position = wf._tile_center(3, 1)
+	await _wait(0.1)
+	check(wf._near_spot == ws and "커튼 치기" in wf.get_node("%Prompt").text, "창문 옆에서 '커튼 치기' 안내")
+	wf.interact()
+	check(ws.curtain and not wr.windows.tw_win.light.enabled and wr.markers.tw_win.sprite.texture.region.position.x != open_x
+		and GameState.field_has("twin", "curtain", "tw_win"), "커튼을 치면 빛이 막히고 커튼 그림, 회차 상태에 기록")
+	await _wait(0.1)
+	check("커튼 걷기" in wf.get_node("%Prompt").text, "커튼을 친 뒤 안내는 '커튼 걷기'")
+	await _snap("window_curtain")
+	wf.toggle_curtain(ws)
+	check(wr.windows.tw_win.light.enabled and not GameState.field_has("twin", "curtain", "tw_win"), "커튼 걷기 → 다시 햇빛")
+	wr.set_time(0)
+	check(not wr.windows.tw_win.light.enabled, "밤엔 창문 빛 없음")
+	wf.queue_free()
+	DataLoader.maps.erase("twin")
 	DataLoader.maps.erase("tgfx")
 	SaveManager.delete_all()
 	print("[graphics_smoke] 실패 %d" % _fail)

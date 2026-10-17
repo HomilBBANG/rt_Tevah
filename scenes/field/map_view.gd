@@ -44,7 +44,7 @@ func _draw_tiles() -> void:
 
 func _draw_spots() -> void:
 	for s in spots:
-		if s.kind in ["exit", "spot"] and art_ids.has(str(s.data.object_id)):
+		if s.kind in ["exit", "spot", "window"] and art_ids.has(str(s.data.object_id)):
 			continue
 		var c: Vector2 = s.pos
 		match s.kind:
@@ -60,6 +60,10 @@ func _draw_spots() -> void:
 				else:
 					draw_rect(door, Color("8a6a44"))
 					draw_circle(c + Vector2(tile * 0.24, 0), 5.0, Color("e8d0a0"))
+			"window":   # 그림이 없을 때: 하늘색 유리 (커튼 = 붉은색)
+				var r := Rect2(c - Vector2(tile, tile) * 0.36, Vector2(tile, tile) * 0.72)
+				draw_rect(r, Color("6e2028") if s.get("curtain", false) else Color("7aa0bc"))
+				draw_rect(r, Color("5c4028"), false, 4.0)
 			"passage":
 				var r := Rect2(c - Vector2(tile, tile) * 0.46, Vector2(tile, tile) * 0.92)
 				draw_rect(r, Color(0.35, 0.55, 0.8, 0.35))

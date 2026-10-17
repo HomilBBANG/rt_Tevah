@@ -14,20 +14,20 @@ signal stroke_started             # 한 번의 누름(칠하기·옮기기)이 �
 signal request(action: String)    # 단축키
 signal activated(obj: Dictionary) # 더블클릭
 
-const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop"]
+const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop", "window"]
 const VisualData = preload("res://core/visual_data.gd")
 const TRAVEL_TYPES := ["exit", "passage", "transit"]
 const COLORS := {
 	"enemy": Color("d05050"), "investigate": Color("e8c35a"), "npc": Color("5a8fd0"),
 	"camp": Color("5fae6a"), "exit": Color("a07850"),
-	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"), "event": Color("c070d0"), "light": Color("f5d76e"), "prop": Color("9a8a70"),
+	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"), "event": Color("c070d0"), "light": Color("f5d76e"), "prop": Color("9a8a70"), "window": Color("8ec0e0"),
 }
-const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P", "event": "!!", "light": "빛", "prop": "◆"}
+const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P", "event": "!!", "light": "빛", "prop": "◆", "window": "창"}
 const EDGE_NAME := {"up": "위", "down": "아래", "left": "왼쪽", "right": "오른쪽"}
 const DIR := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 ## 표시 필터 묶음: 물체 종류 → 필터 이름
 const FILTER_OF := {"enemy": "enemy", "investigate": "investigate", "npc": "npc", "camp": "camp",
-	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive", "event": "event", "light": "light", "prop": "props"}
+	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive", "event": "event", "light": "light", "prop": "props", "window": "light"}
 const PAINT_TOOLS := ["wall", "floor", "void", "tile", "tile_erase"]   # 끌어서 칠하는 도구 (tile = 그래픽 층)
 
 var map := {}                 # { map_id, tiles: [String], start, run_start, objects: [...], edges }
@@ -93,6 +93,29 @@ func in_bounds(t: Vector2i) -> bool:
 
 func is_floor(t: Vector2i) -> bool:
 	return in_bounds(t) and String(map.tiles[t.y])[t.x] == "."
+
+
+func is_wall(t: Vector2i) -> bool:
+	return in_bounds(t) and String(map.tiles[t.y])[t.x] == "#"
+
+
+## 물체 종류 type 을 칸 t 에 둘 수 있나: 창문 = 옆(상하좌우)에 바닥이 있는 벽 칸, 나머지 = 바닥
+func fits(type: String, t: Vector2i) -> bool:
+	if type == "window":
+		return is_wall(t) and (is_floor(t + Vector2i.DOWN) or is_floor(t + Vector2i.UP) or is_floor(t + Vector2i.LEFT) or is_floor(t + Vector2i.RIGHT))
+	return is_floor(t)
+
+
+## 벽 칸에 문을 낼 때: 바닥으로 바꾸고 그 칸의 벽·지붕 그림을 지움 (보이는 모습도 바닥으로)
+func open_wall(t: Vector2i) -> void:
+	if not is_wall(t):
+		return
+	set_tile(t, ".")
+	var layers = (map.get("visual", {}) if map.get("visual") is Dictionary else {}).get("layers", {})
+	if layers is Dictionary:
+		for l in ["wall", "roof"]:
+			if layers.get(l) is Dictionary:
+				layers[l].erase("%d,%d" % [t.x, t.y])
 
 
 ## 그 칸의 물체 (숨긴 것 포함 — 겹치기 검사용)
@@ -167,7 +190,9 @@ func apply_tool(t: Vector2i, first := true) -> void:
 				map.run_start = null
 				changed.emit()
 		_:
-			if tool in OBJECT_TYPES and first and is_floor(t) and object_at(t).is_empty():
+			if tool in TRAVEL_TYPES and first and object_at(t).is_empty():
+				open_wall(t)   # 벽에 문·통로를 놓으면 그 칸은 바닥이 됨
+			if tool in OBJECT_TYPES and first and fits(tool, t) and object_at(t).is_empty():
 				var o := {"object_id": id_maker.call(tool) if id_maker.is_valid() else "%s_%d" % [tool, map.objects.size() + 1],
 					"type": tool, "x": t.x, "y": t.y, "ref": "", "name": "", "text": "",
 					"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}
@@ -188,7 +213,10 @@ func apply_tool(t: Vector2i, first := true) -> void:
 
 ## 칠하기 한 칸. 물체·P·S 가 있는 칸은 벽·빈 공간으로 안 바뀜
 func _paint(t: Vector2i, ch: String) -> void:
-	if ch != "." and (not object_at(t).is_empty() or _is_marker(t, "start") or _is_marker(t, "run_start")):
+	var o := object_at(t)
+	if not o.is_empty() and o.get("type", "") == "window":
+		return   # 창문 칸은 벽 그대로
+	if ch != "." and (not o.is_empty() or _is_marker(t, "start") or _is_marker(t, "run_start")):
 		return
 	set_tile(t, ch)
 
@@ -384,7 +412,7 @@ func _move_selection(d: Vector2i) -> void:
 	for p in _move_from:
 		var to: Vector2i = p[1] + d
 		var there := object_at(to)
-		if not is_floor(to) or (not there.is_empty() and not there in movers):
+		if not fits(str(p[0].get("type", "")), to) or (not there.is_empty() and not there in movers):
 			return
 	for p in _move_from:
 		p[0].x = p[1].x + d.x

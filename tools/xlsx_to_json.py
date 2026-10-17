@@ -115,10 +115,11 @@ OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "Statu
                    "Survival", "CampActions", "Revivals", "DeathCauses"}
 # 맵 물체: exit 문(E 로 열고 걸어 들어가면 이동) / passage 통로(밟으면 이동) / transit 이용(사다리 등, E 로 이동) /
 #         arrive 도착 지점 (이동할 때 arrive 로 고르면 P 대신 여기 도착)
-FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop"}   # prop = 오브젝트 그림
+FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop", "window"}   # prop = 오브젝트 그림, window = 창문 (벽 칸 위)
 PROPS_DIR = ROOT / "art" / "props"
 LIGHT_SHAPES = {"", "point", "cone"}   # light = 광원 (그래픽만)
-OBJECT_ART_LAYERS = {"door", "marker"}   # 칠하지 않고 물체에 씀: door = 문(exit) 그림 (닫힘 key, 열림 key_open), marker = 조사 지점 반짝이
+# 칠하지 않고 물체에 씀: door = 문(exit) 그림 (닫힘 key, 열림 key_open), marker = 조사 지점 반짝이, window = 창문 (커튼 key_curtain)
+OBJECT_ART_LAYERS = {"door", "marker", "window"}
 TILE_LAYERS = {"floor", "detail", "wall", "roof"}   # 그래픽 층: 바닥 / 바닥 장식 / 벽 외형 / 지붕 (인물 위 — 집 안에 들어가면 사라짐)
 TILES_DIR = ROOT / "art" / "tiles"
 LIGHT_NUMS = ("energy", "radius")   # event = 밟으면 대화(컷신)
@@ -1244,7 +1245,9 @@ def validate_graphics(d, maps, rep):
     for t in d["Tiles"]:
         w = loc("Tiles", t)
         if t["layer"] not in TILE_LAYERS | OBJECT_ART_LAYERS:
-            rep.err(w, f"layer 는 floor / detail / wall / roof (칠하기) 또는 door (문 그림) / marker (조사 반짝이): '{t['layer']}'")
+            rep.err(w, f"layer 는 floor / detail / wall / roof (칠하기) 또는 door (문 그림) / marker (조사 반짝이) / window (창문): '{t['layer']}'")
+        if t["layer"] == "window" and not t["tile_key"].endswith("_curtain") and t["tile_key"] + "_curtain" not in tiles:
+            rep.warn(w, f"창문 '{t['tile_key']}' 의 커튼 그림 '{t['tile_key']}_curtain' 이 없음 (커튼을 쳐도 같은 그림)")
         if t["layer"] == "door" and not t["tile_key"].endswith("_open") and t["tile_key"] + "_open" not in tiles:
             rep.warn(w, f"문 '{t['tile_key']}' 의 열린 그림 '{t['tile_key']}_open' 이 없음 (열려도 같은 그림)")
         if t["frames"] is not None and t["frames"] < 1:
@@ -1428,7 +1431,12 @@ def validate_field(d, maps, rep, enemies):
             else:
                 seen[oid] = m["file"]
             x, y = int(o.get("x", -1)), int(o.get("y", -1))
-            if not floor(x, y):
+            if o.get("type") == "window":   # 창문은 벽 칸에, 바로 옆(상하좌우)에 바닥이 있어야 (빛이 들어갈 쪽)
+                if not (0 <= y < len(m["tiles"]) and 0 <= x < len(m["tiles"][y]) and m["tiles"][y][x] == "#"):
+                    rep.err(w, f"창문 위치 ({x}, {y}) 가 벽이 아님")
+                elif not any(floor(x + dx, y + dy) for dx, dy in ((0, 1), (0, -1), (-1, 0), (1, 0))):
+                    rep.err(w, f"창문 ({x}, {y}) 옆에 바닥이 없음 (빛이 들어갈 곳)")
+            elif not floor(x, y):
                 rep.err(w, f"위치 ({x}, {y}) 가 바닥이 아님")
             elif (x, y) in occupied:
                 rep.err(w, f"위치 ({x}, {y}) 에 이미 {occupied[(x, y)]} 가 있음")
@@ -1555,6 +1563,8 @@ def export_maps(d, maps):
             if o.get("type") == "enemy":            # 몬스터 AI: Behavior Tree 와 개체별 Blackboard 시작값 (비우면 예전 AI)
                 e.update(bt=o.get("bt", ""), bb_overrides=o.get("bb_overrides") or {},
                          touch_battle=o.get("touch_battle", ""), follow=o.get("follow", ""))   # follow off = 다른 맵까지 안 따라옴   # 닿으면 바로 전투: "" = BT 설정(없으면 켬) / on / off
+            if o.get("type") == "window":           # 창문: 처음에 커튼을 쳐 두었나
+                e["curtain"] = bool(o.get("curtain"))
             if o.get("type") == "light":            # 광원: 놓을 때 프리셋에서 복사한 값 (광원마다 고칠 수 있음)
                 e.update(preset=o.get("preset", ""), color=o.get("color", "") or "#FFFFFF",
                          energy=float(o.get("energy", 1.0)), radius=float(o.get("radius", 4.0)),
@@ -1622,6 +1632,9 @@ def export(d, maps):
                                 for r in sorted(rows, key=lambda r: r["hour"])]
                           for pid, rows in d.get("_profiles", {}).items()},
             "tile_art_px": int(next((r["value"] for r in d["Config"] if r["key"] == "tile_art_px"), 16) or 16),
+            # 창문 햇빛 (Config — 에디터 렌더러도 읽게 여기 같이)
+            "window_light_energy": float(next((r["value"] for r in d["Config"] if r["key"] == "window_light_energy"), 1.2) or 0),
+            "window_light_radius": float(next((r["value"] for r in d["Config"] if r["key"] == "window_light_radius"), 6) or 6),
         },
         "traits": [dict(r, conflicts=split_list(r["conflicts"]), selectable=is_true(r["selectable"]) if r["selectable"] else True)
                    for r in clean(d["Traits"])],
