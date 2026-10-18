@@ -617,10 +617,37 @@ func _edit_map() -> void:
 			canvas.queue_redraw()
 			_edit_map.call_deferred())
 		if e.get("ref", "") != "":
-			_option("   도착 P", _arrive_options(e.ref), e.get("arrive", ""), func(v):
+			var seam := CheckBox.new()
+			seam.text = "   이어지는 맵 (P 대신 같은 자리로)"
+			seam.tooltip_text = "켜면 도착 P 로 가지 않고, %s 맵의 반대쪽 가장자리에서 걸어 나간 자리 그대로 이어서 들어감 (그 자리가 막혔으면 옆 칸, 없으면 P)" % e.ref
+			seam.button_pressed = bool(e.get("seamless", false))
+			seam.toggled.connect(func(on):
 				checkpoint()
-				map.edges[dir_id].arrive = v
-				dirty = true)
+				if on:
+					map.edges[dir_id].seamless = true
+				else:
+					map.edges[dir_id].erase("seamless")
+					map.edges[dir_id].erase("offset")
+				dirty = true
+				_refresh_links()
+				_edit_map.call_deferred())
+			inspector.add_child(seam)
+			if e.get("seamless", false):
+				var off := _spin("   칸 어긋남", int(e.get("offset", 0)), -999, 999)
+				off.tooltip_text = "두 맵이 가장자리를 따라 어긋난 칸 수. 이 맵의 %s칸이 저쪽 맵의 몇 칸이 되는지: 저쪽 = 이쪽 + 어긋남" % ("x" if dir_id in ["up", "down"] else "y")
+				off.value_changed.connect(func(v):
+					checkpoint("edge/%s/offset" % dir_id)
+					if int(v) == 0:
+						map.edges[dir_id].erase("offset")
+					else:
+						map.edges[dir_id].offset = int(v)
+					dirty = true)
+				_hint("반대 방향도 이어지게 하려면 %s 맵의 %s 가장자리도 이 맵으로 '이어지는 맵'을 켜고 어긋남을 반대 부호로" % [e.ref, Canvas.EDGE_NAME.get({"up": "down", "down": "up", "left": "right", "right": "left"}.get(dir_id, ""), "")])
+			else:
+				_option("   도착 P", _arrive_options(e.ref), e.get("arrive", ""), func(v):
+					checkpoint()
+					map.edges[dir_id].arrive = v
+					dirty = true)
 
 
 func _edit_object(o: Dictionary) -> void:
@@ -1747,6 +1774,8 @@ func _refresh_links() -> void:
 	for d in map.get("edges", {}):
 		var e: Dictionary = map.edges[d]
 		var info := _link_out("%s:%s" % [map.map_id, d], e.get("ref", ""), e.get("arrive", ""))
+		if e.get("seamless", false) and e.get("ref", "") in _all_maps:
+			info = ["→ %s · 이어짐%s" % [e.ref, (" (어긋남 %+d)" % int(e.offset)) if int(e.get("offset", 0)) != 0 else ""], true]
 		labels["edge:" + d] = ["%s %s" % [Canvas.EDGE_NAME.get(d, d), info[0]], info[1]]
 	canvas.link_labels = labels
 	canvas.queue_redraw()

@@ -270,12 +270,18 @@ func _build_actors() -> void:
 			if o.type == "arrive" and ((GameState.arrive_at != "" and o.object_id == GameState.arrive_at)
 					or (GameState.arrive_at == "" and GameState.arrive_from != "" and GameState.arrive_from in o.get("from", []))):
 				spawn = [o.x, o.y]
+	var seam_pos := Vector2.INF
+	if not GameState.wake_at_run_start and not GameState.arrive_edge.is_empty():
+		seam_pos = _seamless_spawn(GameState.arrive_edge)
+		if seam_pos != Vector2.INF:
+			spawn = [floori(seam_pos.x / tile), floori(seam_pos.y / tile)]
 	GameState.wake_at_run_start = false
 	GameState.arrive_at = ""
 	GameState.arrive_from = ""
+	GameState.arrive_edge = {}
 	_travel_lock = Vector2i(int(spawn[0]), int(spawn[1]))
 	_arrive_tile = _travel_lock
-	player.position = _tile_center(spawn[0], spawn[1])
+	player.position = _tile_center(spawn[0], spawn[1]) if seam_pos == Vector2.INF else seam_pos
 	_add_circle_shape(player, player.radius)
 	var cam := Camera2D.new()
 	cam.name = "Camera2D"   # 연출(_camera)이 찾는 이름
@@ -525,6 +531,9 @@ func _physics_process(delta: float) -> void:
 				return
 		var edge := _edge_at(here)
 		if not edge.is_empty():
+			if edge.get("seamless", false):   # 이어지는 맵: 도착 P 대신 반대쪽 가장자리의 같은 자리로
+				var along: float = (player.position.x if edge.dir in ["up", "down"] else player.position.y) / tile
+				GameState.arrive_edge = {"dir": edge.dir, "along": along + float(edge.get("offset", 0))}
 			travel(edge.ref, edge.get("arrive", ""), "%s:%s" % [map.map_id, edge.dir])
 			return
 	if here != _last_tile:
@@ -631,6 +640,40 @@ func travel(map_id: String, arrive := "", from := "") -> void:
 	var delay := float(DataLoader.config.get("ai_follow_delay", 3.0))
 	for d in chasers:
 		_follow_queue.append({"data": d, "left": delay})
+
+
+## 이어지는 맵으로 들어온 자리: 나간 쪽의 반대 가장자리(아래로 나갔으면 이 맵 위쪽)에서, 가장자리를 따라 같은 위치(along)의
+## 가장 바깥 바닥 칸. 그 줄이 막혔으면 옆 칸들(±8)에서 찾음, 안쪽으로는 8칸까지. 못 찾으면 INF (→ 도착 P)
+func _seamless_spawn(e: Dictionary) -> Vector2:
+	var w := int(map.width)
+	var h := int(map.height)
+	var along := float(e.get("along", 0.0))
+	var vertical: bool = e.get("dir", "") in ["up", "down"]   # 위·아래로 나감 → 가장자리를 따라 = x
+	var n := w if vertical else h
+	var base := clampi(floori(along), 0, n - 1)
+	for k in 17:
+		var lane: int = base + ((k + 1) / 2) * (1 if k % 2 == 1 else -1)
+		if lane < 0 or lane >= n:
+			continue
+		for depth in 9:
+			var c: Vector2i
+			match e.get("dir", ""):
+				"down": c = Vector2i(lane, depth)
+				"up": c = Vector2i(lane, h - 1 - depth)
+				"right": c = Vector2i(depth, lane)
+				_: c = Vector2i(w - 1 - depth, lane)
+			if c.y < 0 or c.y >= map.tiles.size() or c.x >= String(map.tiles[c.y]).length() or c.x < 0:
+				break
+			if String(map.tiles[c.y])[c.x] == ".":
+				var p := _tile_center(c.x, c.y)
+				if lane == base:   # 같은 줄이면 소수 자리까지 이어서 (칸 가운데로 튀지 않게)
+					var f := clampf(along * tile, (lane + 0.3) * tile, (lane + 0.7) * tile)
+					if vertical:
+						p.x = f
+					else:
+						p.y = f
+				return p
+	return Vector2.INF
 
 
 ## 가장자리 이동: 플레이어가 맵 맨 끝 칸(edges 가 정해진 쪽)에 있으면 그 edge { ref, arrive, dir }

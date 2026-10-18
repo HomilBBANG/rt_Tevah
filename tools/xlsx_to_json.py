@@ -1411,6 +1411,14 @@ def validate_field(d, maps, rep, enemies):
                 err = travel_error(maps, e["ref"], e.get("arrive", ""))
                 if err:
                     rep.err(f"{wm} 가장자리 {edir}", err)
+                elif e.get("seamless"):
+                    if e.get("arrive"):
+                        rep.warn(f"{wm} 가장자리 {edir}", "이어지는 맵이면 도착 P(arrive)는 쓰지 않음 (들어갈 자리가 없을 때만)")
+                    dt = maps[e["ref"]]["tiles"]
+                    rows = {"down": dt[:9], "up": dt[-9:]}.get(edir)
+                    cols = {"right": [r[:9] for r in dt], "left": [r[-9:] for r in dt]}.get(edir)
+                    if not any("." in r for r in (rows if rows is not None else cols)):
+                        rep.warn(f"{wm} 가장자리 {edir}", f"이어지는 맵 {e['ref']} 의 반대쪽 가장자리(9칸 안)에 바닥이 없음 — 도착 P 로 감")
         # 도착 P 의 '이어지는 곳': 이 맵으로 들어오는 곳이어야 하고, 한 곳은 한 도착 P 에만
         ents = entrances_to(maps, mid)
         claimed = {}
@@ -1663,7 +1671,9 @@ def export_maps(d, maps):
                      schedule=[parse_time_range(r) for r in split_list(o.get("schedule", ""))])
             objects.append(e)
         start = m.get("start") or [0, 0]
-        edges = {k: {"ref": v.get("ref", ""), "arrive": v.get("arrive", "")}
+        # seamless = 이어지는 맵 (도착 P 대신 반대쪽 가장자리의 같은 자리로), offset = 가장자리를 따라 어긋난 칸 수
+        edges = {k: {"ref": v.get("ref", ""), "arrive": v.get("arrive", ""), "seamless": bool(v.get("seamless")),
+                     "offset": int(v.get("offset", 0) or 0)}
                  for k, v in (m.get("edges") or {}).items() if v and v.get("ref")}
         out.append({"map_id": mid, "width": width, "height": len(tiles), "tiles": tiles, "start": start,
                     "run_start": m.get("run_start") or start, "objects": objects, "edges": edges,

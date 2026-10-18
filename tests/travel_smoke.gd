@@ -73,6 +73,41 @@ func _ready() -> void:
 	await _wait(0.1)
 	check(f.map.map_id == "basecamp" and _at(bc_p[0], bc_p[1]), "대화가 끝나면 이동 (%s)" % _where())
 
+	# 이어지는 맵 (가장자리 seamless): 아래로 나가면 저쪽 맵 위쪽 같은 자리(+어긋남)로, 도착 P 가 아니라
+	var mk := func(id: String, tiles: Array, edges: Dictionary) -> Dictionary:
+		return {"map_id": id, "width": String(tiles[0]).length(), "height": tiles.size(), "tiles": tiles, "start": [1, 1], "run_start": [1, 1],
+			"edges": edges, "objects": [], "visual": {"layers": {}}}
+	DataLoader.maps["seam_a"] = mk.call("seam_a", ["##########", "#........#", "#........#", "#........#", "#........#"],
+		{"down": {"ref": "seam_b", "arrive": "", "seamless": true, "offset": 2}})
+	DataLoader.maps["seam_b"] = mk.call("seam_b", ["##############", "#............#", "#............#", "#..##........#", "#............#", "##############"], {})
+	f.travel("seam_a")
+	await _wait(0.2)
+	f.player.position = Vector2(3.4 * f.tile, 3.5 * f.tile)
+	await get_tree().physics_frame
+	Input.action_press("move_down")
+	var tt := 0.0
+	while f.map.map_id == "seam_a" and tt < 1.5:
+		await get_tree().physics_frame
+		tt += get_physics_process_delta_time()
+	Input.action_release("move_down")
+	check(f.map.map_id == "seam_b" and absf(f.player.position.x / f.tile - 5.4) < 0.05 and floori(f.player.position.y / f.tile) == 1,
+		"이어지는 맵: 아래로 나가면 저쪽 맵 맨 위 바닥 줄, x 그대로 + 어긋남 2 (%s)" % _where())
+	for i in 10:
+		await get_tree().physics_frame
+	check(f.map.map_id == "seam_b", "도착하자마자 되돌아가지 않음")
+	# 같은 자리가 막혔으면 옆 칸: x 1.4 + 2 = 3.4 → (3,1) 은 바닥, (3,3) 벽은 상관없음. 맨 위 줄이 다 막힌 칸이면 옆으로
+	DataLoader.maps["seam_b"].tiles[1] = "#..##........#"
+	f.travel("seam_a")
+	await _wait(0.2)
+	f.player.position = Vector2(1.6 * f.tile, 4.5 * f.tile)
+	GameState.arrive_edge = {"dir": "down", "along": 3.6}
+	f.travel("seam_b")
+	await _wait(0.1)
+	check(f.map.map_id == "seam_b" and Vector2i(floori(f.player.position.x / f.tile), floori(f.player.position.y / f.tile)) in [Vector2i(3, 2), Vector2i(2, 1), Vector2i(5, 1)],
+		"이어지는 자리가 벽이면 안쪽·옆 바닥으로 (%s)" % _where())
+	DataLoader.maps.erase("seam_a")
+	DataLoader.maps.erase("seam_b")
+
 	SaveManager.delete_all()
 	DataLoader.load_all()   # 진짜 데이터로 되돌림
 	print("[travel_smoke] 실패 %d" % _fail)

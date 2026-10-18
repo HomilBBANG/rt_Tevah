@@ -46,6 +46,7 @@ var combat_enemy := ""        # 지금 싸우는 상대 enemy_id (전투 화면�
 var pending_death := ""       # 효과 die:cause_id 로 정해진 사망 — 필드가 대화가 끝난 뒤 처리. 저장 안 함
 var talk_now := 0             # 지금 대화를 전에 몇 번 했나 (조건 count:talk, 첫 대화 = 0)
 var arrive_at := ""           # 다음 맵 로드 때 도착할 도착 지점(arrive 물체) id (저장 안 함)
+var arrive_edge := {}         # 이어지는 맵(가장자리 seamless): {dir: 나간 쪽, along: 가장자리를 따라 위치(칸, 소수, offset 더함)} — 반대쪽 같은 자리로 (저장 안 함)
 var arrive_from := ""         # 어디로 들어왔나: 문·통로·이용 object_id 또는 "맵:방향"(가장자리). 도착 P 의 from 과 맞추어 도착
 var wake_at_run_start := false   # 다음 맵 로드 때 그 맵의 S(회차 시작 위치)에서 깨어남 (저장 안 함)
 
