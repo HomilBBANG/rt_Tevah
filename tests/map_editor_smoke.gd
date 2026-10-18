@@ -559,6 +559,39 @@ func _ready() -> void:
 	check(not cv.locked_layers.has("overhead"), "잠금 풀기")
 	cv.tile_layer = "floor"
 
+	# 벽·바닥 층 = 판정도 같이: 벽 층에 칠하면 벽, 바닥 층은 바닥, 벽 층 지우기 = 바닥, 바닥 도구는 벽 그림도 지움, 예전 맵 맞추기
+	ed.open_map("test_field")
+	await _frames(1)
+	cv.tile_layer = "wall"
+	cv.tile_key = "forest"
+	ed.set_tool("tile")
+	cv._press(Vector2i(3, 5), false, false)
+	cv._release(Vector2i(3, 5))
+	check(cv.is_wall(Vector2i(3, 5)) and ed.map.visual.layers.wall.get("3,5", "") == "forest", "벽 층에 숲을 칠하면 그 칸은 벽 (지나갈 수 없음)")
+	ed.set_tool("tile_erase")
+	cv._press(Vector2i(3, 5), false, false)
+	cv._release(Vector2i(3, 5))
+	check(cv.is_floor(Vector2i(3, 5)) and not ed.map.visual.layers.get("wall", {}).has("3,5"), "벽 층 지우기 → 바닥")
+	cv.tile_layer = "floor"
+	cv.tile_key = "floor_grass"
+	ed.set_tool("tile")
+	cv._press(Vector2i(0, 5), false, false)
+	cv._release(Vector2i(0, 5))
+	check(cv.is_floor(Vector2i(0, 5)), "바닥 층을 벽 칸에 칠하면 바닥")
+	ed.undo()
+	check(cv.is_wall(Vector2i(0, 5)), "실행 취소")
+	ed.map.visual.layers.wall = {"4,6": "forest"}
+	ed.set_tool("floor")
+	cv.apply_tool(Vector2i(4, 6))
+	check(not ed.map.visual.layers.wall.has("4,6"), "바닥 도구로 칠하면 벽 그림도 지움 (벽처럼 보이는데 지나가는 칸 없음)")
+	ed.map.visual.layers.wall = {"5,6": "forest", "%d,%d" % [10, 1]: "forest"}
+	ed.map.visual.layers.floor = {"0,6": "floor_grass"}
+	var synced: int = ed.sync_logic_to_paint()
+	check(synced >= 2 and cv.is_wall(Vector2i(5, 6)) and cv.is_floor(Vector2i(0, 6)) and not cv.object_at(Vector2i(10, 1)).is_empty() and cv.is_floor(Vector2i(10, 1)),
+		"칠한 그림대로 벽·바닥 맞추기 (물체 칸은 그대로) — %d칸" % synced)
+	ed.undo()
+	cv.tile_layer = "floor"
+
 	# 맵 삭제: 쓰는 곳(다른 맵의 문) 목록 → 파일 지움, 베이스캠프는 못 지움
 	ed.new_map("test_del", 5, 5)
 	ed.new_map("test_del_src", 5, 5)

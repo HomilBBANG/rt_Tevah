@@ -13,7 +13,9 @@ const LAYERS := ["floor", "detail", "wall"]   # 바닥 그림 층 (cell_keys)
 ## 칠할 수 있는 층 = 바닥 그림 층 + 지붕 (지붕은 인물보다 위에 따로 — map_renderer 의 roof)
 ## 전경 가림(overhead): 인물 위에 늘 보이는 가림막·천장·상단 벽 — 보이기만, 충돌·시야·빛 차단 없음 (map_renderer 의 Overhead)
 const PAINT_LAYERS := ["floor", "detail", "wall", "roof", "overhead"]
-const LAYER_NAME := {"floor": "바닥", "detail": "바닥 장식", "wall": "벽 외형", "roof": "지붕", "overhead": "전경 가림"}
+## 벽·바닥 층은 칠하면 그 칸의 판정도 같이 바뀜 (벽 = 지나갈 수 없음, 바닥 = 지나갈 수 있음). 나머지는 그림만 (map_canvas._paint_tile)
+const LAYER_NAME := {"floor": "바닥 (지나갈 수 있음)", "detail": "바닥 장식 (그림만)", "wall": "벽 (지나갈 수 없음)", "roof": "지붕 (그림만)", "overhead": "전경 가림 (그림만)"}
+const LOGIC_OF_LAYER := {"wall": "#", "floor": "."}
 
 static var _data := {}
 static var _tiles := {}

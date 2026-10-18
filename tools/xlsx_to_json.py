@@ -1323,6 +1323,12 @@ def validate_graphics(d, maps, rep):
                 rep.warn(wm, f"그래픽 '{layer}' 층에 없는 타일 {', '.join(bad)} (기본 타일로 보임)")
             if wrong:
                 rep.warn(wm, f"그래픽 '{layer}' 층에 다른 층 타일 {', '.join(wrong)}")
+            if layer == "wall":   # 벽 그림이 칠해진 바닥 칸 = 벽처럼 보이는데 지나가짐 (맵 에디터 '칠한 그림대로 벽·바닥 맞추기')
+                at_obj = {f"{int(o.get('x', -1))},{int(o.get('y', -1))}" for o in m.get("objects", [])}   # 문 칸 등 물체 칸은 빼고
+                walk = [c for c in cells if _cell_in(c, wdt, h) and c not in at_obj
+                        and m["tiles"][int(c.split(",")[1])][int(c.split(",")[0]):int(c.split(",")[0]) + 1] == "."]
+                if walk:
+                    rep.warn(wm, f"벽 그림이 칠해진 바닥 칸 {len(walk)}개 (예: {walk[0]}) — 벽처럼 보이지만 지나갈 수 있음. 맵 에디터 편집 ▾ › 칠한 그림대로 벽·바닥 맞추기")
             out = [c for c in cells if not _cell_in(c, wdt, h)]
             if out:
                 rep.warn(wm, f"그래픽 '{layer}' 층에 맵 밖 칸 {len(out)}개 (무시됨)")

@@ -238,10 +238,17 @@ func _paint(t: Vector2i, ch: String) -> void:
 		return   # 창문 칸은 벽 그대로
 	if ch != "." and (not o.is_empty() or _is_marker(t, "start") or _is_marker(t, "run_start")):
 		return
+	if ch != "#":   # 바닥·빈 공간이 된 칸에는 벽 그림을 남기지 않음 (벽처럼 보이는데 지나가지는 일이 없게)
+		var layers = (map.get("visual", {}) if map.get("visual") is Dictionary else {}).get("layers", {})
+		if layers is Dictionary and layers.get("wall") is Dictionary and layers.wall.has("%d,%d" % [t.x, t.y]):
+			layers.wall.erase("%d,%d" % [t.x, t.y])
+			changed.emit()
 	set_tile(t, ch)
 
 
-## 그래픽 층 칠하기 (보이는 모습만 — 벽·바닥 판정은 그대로). map.visual.layers[층]["x,y"] = tile_key
+## 그래픽 층 칠하기. map.visual.layers[층]["x,y"] = tile_key
+## 벽 층에 칠하면 그 칸은 벽(#, 지나갈 수 없음), 바닥 층에 칠하면 바닥(.). 벽 층을 지우면 바닥으로. 바닥 장식·지붕·전경 가림은 그림만.
+## 물체·P·S 가 있는 칸은 벽이 되지 않음 (창문은 벽 칸이라 그대로)
 func _paint_tile(t: Vector2i, erase: bool) -> void:
 	if not erase and tile_key == "":
 		return
@@ -259,13 +266,27 @@ func _paint_tile(t: Vector2i, erase: bool) -> void:
 		layers[tile_layer] = {}
 	var cells: Dictionary = layers[tile_layer]
 	var k := "%d,%d" % [t.x, t.y]
+	var o := object_at(t)
+	var blocked: bool = (not o.is_empty() and o.get("type", "") != "window") or _is_marker(t, "start") or _is_marker(t, "run_start")
+	if tile_layer == "wall" and not erase and blocked:
+		if not _lock_noticed:
+			notice.emit("물체·P·S 가 있는 칸은 벽으로 칠할 수 없어요")
+			_lock_noticed = true
+		return
 	if erase:
+		if tile_layer == "wall" and is_wall(t) and not (not o.is_empty() and o.get("type", "") == "window"):
+			set_tile(t, ".")   # 벽 지우기 = 바닥으로
 		if not cells.has(k):
+			if cells.is_empty():
+				layers.erase(tile_layer)
 			return
 		cells.erase(k)
 		if cells.is_empty():
 			layers.erase(tile_layer)
 	else:
+		var logic: String = VisualData.LOGIC_OF_LAYER.get(tile_layer, "")
+		if logic != "" and in_bounds(t) and String(map.tiles[t.y])[t.x] != logic and not (logic == "." and not o.is_empty() and o.get("type", "") == "window"):
+			set_tile(t, logic)   # 벽 층 = 지나갈 수 없음, 바닥 층 = 지나갈 수 있음
 		if cells.get(k, "") == tile_key:
 			return
 		cells[k] = tile_key

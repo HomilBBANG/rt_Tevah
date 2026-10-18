@@ -41,8 +41,8 @@ const TOOL_TIPS := {
 	"passage": "통로: 밟으면 바로 이동 (계단·길·동굴 입구)",
 	"transit": "이용: E 를 눌러야 이동 (사다리·엘리베이터 등). 이름이 안내에 나옴",
 	"erase": "지우개: 클릭한 물체(또는 S)를 지움. 벽은 바닥으로 칠해서 지움",
-	"tile": "타일 붓: 왼쪽 '타일 팔레트'에서 층·타일을 고르고 끌어서 칠함 (보이는 모습만 — 벽·바닥 판정은 그대로). □ 사각형·Shift 로 채우기",
-	"tile_erase": "타일 지우개: 지금 층의 칠한 타일을 지움 (그 칸은 기본 타일로 보임)",
+	"tile": "타일 붓: 왼쪽 '타일 팔레트'에서 층·타일을 고르고 끌어서 칠함. 벽 층 = 그 칸이 벽(지나갈 수 없음), 바닥 층 = 바닥, 나머지 층은 그림만. □ 사각형·Shift 로 채우기",
+	"tile_erase": "타일 지우개: 지금 층의 칠한 타일을 지움 (벽 층을 지우면 그 칸은 바닥이 됨)",
 	"prop": "오브젝트 그림 (나무·가구): 왼쪽 '타일 팔레트'를 '오브젝트'로 바꿔 고르고 클릭한 칸(= 왼쪽 아래 칸)에 놓기. 인물과 앞뒤는 저절로",
 	"furniture": "기타 가구: 그림 대신 흰 사각형. 클릭한 칸 = 왼쪽 위, 오른쪽 칸에서 크기·표시 메모(예: 철제 서랍)·색·역할(조사·줍기·사용·대화)·사용 조건",
 	"window": "창문: 벽 칸에 놓기 — 옆에 바닥이 있거나, 비스듬한 탑뷰의 뒷벽(아래로 벽만 이어지다 바닥). 크기는 오른쪽 칸 너비·높이. 낮에는 바닥 쪽으로 햇빛이 들어오고 밤엔 어두움. 게임에서 E 로 커튼을 치면 빛이 막힘",
@@ -80,7 +80,8 @@ const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
 [b]5. 그래픽 (픽셀아트 · 조명)[/b] — 보이는 모습만. 지나갈 수 있는지(벽 #·바닥 .)는 위 '칠하기'가 정합니다.
   · [b]전경 가림[/b]: 팔레트 층 '전경 가림'(검은 가림막 등)으로 칠하면 게임에서 캐릭터 [b]위[/b]에 늘 그려짐 — 통로 위 천장·상단 벽. 지나가는 건 막지 않고(충돌은 벽 #), 적 시야·빛도 안 막음.
     표시 칸의 '전경 가림' 끄기 / '전경만' / '전경 투명도'(편집 미리보기 전용, 저장 안 됨)로 아래를 고치기 쉽게. '벽 판정'을 켜면 실제로 막힌 곳이 붉게.
-  · [b]타일 붓[/b]: 왼쪽 [b]타일 팔레트[/b]에서 층(바닥 / 바닥 장식 / 벽 외형)과 타일을 고르고 끌어서 칠함. □ 사각형·Shift 로 채우기. [b]타일 지우개[/b] = 지금 층에서 지움.
+  · [b]타일 붓[/b]: 왼쪽 [b]타일 팔레트[/b]에서 층과 타일을 고르고 끌어서 칠함. □ 사각형·Shift 로 채우기. [b]타일 지우개[/b] = 지금 층에서 지움.
+    [b]벽 층[/b]에 칠하면 그 칸은 [b]벽(지나갈 수 없음)[/b], [b]바닥 층[/b]은 [b]바닥[/b]이 됨. 바닥 장식·지붕·전경 가림은 그림만. 예전 맵은 [b]편집 ▾ › 칠한 그림대로 벽·바닥 맞추기[/b].
     안 칠한 칸은 기본 바닥·기본 벽으로 보입니다. 새 타일은 그림을 art/tiles/ 에 넣고 엑셀 graphics.xlsx 'Tiles' 에 한 줄 → 변환·검사.
   · [b]오브젝트[/b] (나무·가구 그림): 타일 팔레트 층을 '오브젝트'로 바꿔 고르고 칸 클릭 (놓은 칸 = 왼쪽 아래). 인물과 앞뒤는 발 위치로 저절로.
     지나갈 수 없음·빛을 막음은 graphics.xlsx 'Props' (solid·casts_shadow). 새 그림은 art/props/ 에 넣고 Props 에 한 줄.
@@ -171,7 +172,7 @@ func _init() -> void:
 	var pm := edit_menu.get_popup()
 	for it in [["복사   Ctrl+C", copy_selection], ["붙여넣기   Ctrl+V  (마우스가 있는 칸)", func(): paste_at(canvas._hover)],
 			["삭제   Delete", delete_selection], [], ["모두 선택   Ctrl+A", func(): canvas.select_many(map.get("objects", []).filter(canvas.is_visible_object))],
-			["선택 해제   Esc", func(): canvas.select({})], [], ["모두 지우기…  (빈 맵으로)", _ask_clear_all]]:
+			["선택 해제   Esc", func(): canvas.select({})], [], ["칠한 그림대로 벽·바닥 맞추기", sync_logic_to_paint], ["모두 지우기…  (빈 맵으로)", _ask_clear_all]]:
 		if it.is_empty():
 			pm.add_separator()
 			continue
@@ -1173,6 +1174,43 @@ func _restore(snap: Dictionary) -> void:
 	_edit_map()
 
 
+## 칠한 그림대로 벽·바닥 맞추기 (예전에 '벽 외형'으로 칠해 지나갈 수 있던 칸 고치기):
+## 벽 층 그림이 있는 바닥 칸 → 벽, 벽 층 그림 없이 바닥 그림만 있는 벽 칸 → 바닥. 물체·P·S 칸과 창문은 그대로. 실행 취소 가능
+func sync_logic_to_paint() -> int:
+	if map.is_empty():
+		return 0
+	var layers = (map.get("visual", {}) if map.get("visual") is Dictionary else {}).get("layers", {})
+	if not layers is Dictionary:
+		return 0
+	var walls: Dictionary = layers.get("wall", {}) if layers.get("wall") is Dictionary else {}
+	var floors: Dictionary = layers.get("floor", {}) if layers.get("floor") is Dictionary else {}
+	checkpoint()
+	var n := 0
+	for y in map.tiles.size():
+		for x in String(map.tiles[y]).length():
+			var t := Vector2i(x, y)
+			var k := "%d,%d" % [x, y]
+			var o: Dictionary = canvas.object_at(t)
+			if not o.is_empty() or canvas._is_marker(t, "start") or canvas._is_marker(t, "run_start"):
+				continue
+			var ch := String(map.tiles[y])[x]
+			var want := ch
+			if walls.has(k):
+				want = "#"
+			elif floors.has(k) and ch == "#":
+				want = "."
+			if want != ch:
+				canvas._set_char(t, want)
+				n += 1
+	if n > 0:
+		dirty = true
+		_gfx_dirty = true
+		canvas.changed.emit()
+	_status("칠한 그림대로 맞춤: %d칸 (벽 그림 → 벽, 바닥 그림만 있는 벽 → 바닥) — Ctrl+Z 로 되돌리기" % n)
+	canvas.queue_redraw()
+	return n
+
+
 ## 모두 지우기: 크기·환경만 남기고 테두리 벽 + 바닥, 도착 P 하나만. 실행 취소(Ctrl+Z) 가능, 저장 전에는 파일 그대로
 func clear_all() -> void:
 	if map.is_empty():
@@ -1465,7 +1503,7 @@ func _build_left_panel() -> Control:
 	for l in VisualData.PAINT_LAYERS:
 		palette_layer.add_item(VisualData.LAYER_NAME[l])
 	palette_layer.add_item("오브젝트 (나무·가구)")
-	palette_layer.tooltip_text = "칠할 그래픽 층 (바닥 → 바닥 장식 → 벽 외형 순서로 겹침, 지붕은 인물 위 — 게임에서 집 안에 들어가면 그 집 지붕만 사라짐, 전경 가림은 인물 위에 늘 보임 — 통로 위 천장·검은 가림막, 지나가는 건 막지 않음), 또는 놓을 오브젝트 그림"
+	palette_layer.tooltip_text = "칠할 그래픽 층. 벽 = 칠한 칸이 벽(지나갈 수 없음), 바닥 = 칠한 칸이 바닥, 나머지는 그림만 (바닥 → 바닥 장식 → 벽 순서로 겹침, 지붕은 인물 위 — 게임에서 집 안에 들어가면 그 집 지붕만 사라짐, 전경 가림은 인물 위에 늘 보임 — 통로 위 천장·검은 가림막, 지나가는 건 막지 않음), 또는 놓을 오브젝트 그림"
 	palette_layer.item_selected.connect(func(i):
 		if i < VisualData.PAINT_LAYERS.size():
 			canvas.tile_layer = VisualData.PAINT_LAYERS[i]
