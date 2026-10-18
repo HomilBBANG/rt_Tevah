@@ -205,6 +205,9 @@ func build_markers() -> void:
 		elif o.get("type") == "investigate":
 			key = spark
 			kind = "spark"
+		elif o.get("type") == "camp":   # 거점: 텐트 그림 (Tiles layer camp)
+			key = VisualData.default_art("camp")
+			kind = "camp"
 		elif o.get("type") == "window":
 			key = str(o.get("look", "")) if VisualData.tiles().has(str(o.get("look", ""))) else ""
 			kind = "window"
@@ -232,6 +235,9 @@ func build_markers() -> void:
 		s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		s.position = Vector2((float(o.x) + 0.5) * tile, (float(o.y) + 0.5) * tile)
 		s.scale = Vector2.ONE * (tile / px) * (0.9 if kind == "spark" else 1.0)
+		if kind == "camp":   # 거점 텐트: 1.5배, 밑변은 칸 바닥에
+			s.scale *= 1.5
+			s.position.y -= tile * 0.25
 		if kind == "window":   # 창문 크기 w × h 칸 (그림을 늘림)
 			var ww := maxi(1, int(o.get("w", 1)))
 			var wh := maxi(1, int(o.get("h", 1)))

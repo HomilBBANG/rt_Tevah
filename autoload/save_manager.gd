@@ -116,6 +116,7 @@ func load_run(slot: int) -> bool:
 	if not d is Dictionary or not DataLoader.maps.has(d.get("current_map", "")):
 		return false
 	GameState.run_from_dict(d)
+	GameState.wake_at_respawn = GameState.current_map == DataLoader.get_config_str("basecamp_map")   # 베이스캠프 저장 = 부활 R 에서
 	save_world()   # 불러온 슬롯의 특성(안 B)을 월드에도 — 이 뒤로 죽어도 이 특성이 이어진다
 	return true
 

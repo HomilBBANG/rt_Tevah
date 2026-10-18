@@ -19,7 +19,7 @@ const PLAYTEST_FILE := "user://map_playtest.json"
 const TOOL_GROUPS := [
 	["", [["select", "선택"]]],
 	["칠하기", [["wall", "벽"], ["floor", "바닥"], ["void", "빈 공간"]]],
-	["위치", [["arrive", "도착 P"], ["run_start", "시작 S"]]],
+	["위치", [["arrive", "도착 P"], ["respawn", "부활 R"], ["run_start", "시작 S"]]],
 	["물체", [["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["event", "이벤트"], ["furniture", "가구"]]],
 	["이동", [["exit", "문"], ["passage", "통로"], ["transit", "이용"]]],
 	["그래픽", [["tile", "타일"], ["tile_erase", "타일 지우기"], ["prop", "오브젝트"], ["light", "광원"], ["window", "창문"]]],
@@ -32,6 +32,7 @@ const TOOL_TIPS := {
 	"floor": "바닥: 누른 채 끌어서 칠함 (걸어 다니는 곳)",
 	"void": "빈 공간: 누른 채 끌어서 칠함 (검게 보이고 지나갈 수 없음)",
 	"arrive": "도착 P: 다른 맵에서 들어올 때 서는 곳. 오른쪽 칸 '이어지는 곳'에서 어느 입구로 오면 여기 설지 고름.\n★ = 기본 P (이어지지 않은 곳 — 베이스캠프만 필수)",
+	"respawn": "부활 R: 죽었다가 부활하거나 저장을 불러오면 베이스캠프의 이 자리에서 깨어남 (베이스캠프 맵에 하나, 없으면 첫 도착 P)",
 	"run_start": "회차 시작 S: 새 회차를 이 맵에서 시작할 때 깨어나는 곳 (Config start_map 의 맵에서만 쓰임)",
 	"enemy": "적: 놓은 뒤 오른쪽 칸에서 적 종류·순찰 방향·칸 수",
 	"investigate": "조사 지점: 놓은 뒤 오른쪽 칸에서 얻는 것(Loot)·조사 문구",
@@ -96,7 +97,7 @@ const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
 [b]지도 표시[/b]  [color=#3fae5f]● P[/color] 도착 P (★ 기본) · [color=#b89a2a]S[/color] 회차 시작 · [color=#d05050]● 적[/color] · [color=#e8c35a]● 조[/color] 조사 · [color=#5a8fd0]● N[/color] NPC · [color=#5fae6a]● 거[/color] 거점 · [color=#c070d0]● !![/color] 이벤트 (밟으면 컷신) · [color=#a07850]● 문[/color] · [color=#6fa8dc]● 통[/color] 통로 · [color=#c8a060]● 이[/color] 이용 · 맵 바깥 푸른 띠 = 가장자리 이동
 """
 const TYPE_NAME :={"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구(문)",
-	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P", "event": "이벤트 칸", "light": "광원", "prop": "오브젝트 그림", "window": "창문", "furniture": "기타 가구"}
+	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P", "event": "이벤트 칸", "light": "광원", "prop": "오브젝트 그림", "window": "창문", "furniture": "기타 가구", "respawn": "부활 R"}
 const EDGES := [["up", "위"], ["down", "아래"], ["left", "왼쪽"], ["right", "오른쪽"]]
 
 var dir := MAP_DIR                   # 테스트에서 바꿔 쓴다
@@ -411,10 +412,8 @@ func open_map(id: String) -> void:
 		var st: Array = map.start if map.start != null else [1, 1]
 		map.objects.insert(0, {"object_id": id + "_p", "type": "arrive", "x": st[0], "y": st[1], "ref": "", "name": "기본",
 			"text": "", "patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": "", "default": true})
-	elif id == basecamp_id and not ps.any(func(o): return o.get("default", false)):
-		ps[0].default = true   # 베이스캠프는 기본 P 필수
 	path = p
-	canvas.require_default = id == basecamp_id
+	canvas.require_default = false   # 기본 P 는 어느 맵에도 필수 아님 (2026-10-18)
 	canvas.set_map(map)
 	_gfx_dirty = true
 	dirty = false
@@ -447,9 +446,7 @@ func new_map(id: String, w: int, h: int) -> bool:
 	map = {"map_id": id, "tiles": tiles, "start": [w / 2, h / 2], "run_start": null, "objects": [
 		{"object_id": id + "_p", "type": "arrive", "x": w / 2, "y": h / 2, "ref": "", "name": "", "text": "",
 		"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}]}
-	if id == basecamp_id:
-		map.objects[0].default = true
-	canvas.require_default = id == basecamp_id
+	canvas.require_default = false
 	path = dir + id + ".json"
 	canvas.set_map(map)
 	_undo.clear()
@@ -860,12 +857,9 @@ func _edit_object(o: Dictionary) -> void:
 		"arrive":
 			_section("도착 P")
 			var dcb := CheckBox.new()
-			var base: bool = map.map_id == basecamp_id
 			dcb.text = "★ 기본 P"
-			dcb.tooltip_text = "아무 P 에도 이어지지 않은 곳으로 들어올 때 서는 P.%s" % (
-				"\n베이스캠프는 부활·불러오기 때 깨어나는 곳이라 꼭 하나 (다른 P 에서 체크해야 옮겨짐)" if base else "\n이 맵은 없어도 됨 (그러면 들어오는 곳마다 P 를 이어 둘 것)")
+			dcb.tooltip_text = "아무 P 에도 이어지지 않은 곳으로 들어올 때 서는 P (선택 — 없으면 첫 P). 부활·불러오기는 베이스캠프의 부활 R"
 			dcb.button_pressed = o.get("default", false)
-			dcb.disabled = base and o.get("default", false)
 			dcb.toggled.connect(func(on):
 				checkpoint()
 				for x in map.objects:
@@ -1902,7 +1896,7 @@ func _link_out(src: String, ref: String, explicit: String) -> Array:
 	if explicit != "" and target[0] == "":
 		return ["→ %s · ⚠ 없는 도착 P %s" % [ref, explicit], false]
 	if target[1] == "":
-		return ["→ %s · ⚠ 설 P 없음 (그 맵 P 의 이어지는 곳에 체크하거나 기본 P)" % ref, false]
+		return ["→ %s · 첫 P" % ref, true]   # 이어진 P·기본 P 가 없으면 첫 P (기본 P 는 필수 아님)
 	# 문 쪽에서 고른 P 와 그 맵 P 쪽 '이어지는 곳'이 다르면 충돌
 	if explicit != "":
 		for a in _all_maps[ref].get("objects", []):

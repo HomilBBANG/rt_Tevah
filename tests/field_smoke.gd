@@ -164,6 +164,10 @@ func _ready() -> void:
 	check(f.get_node("%DeathMessage").text.begins_with("적 A (테스트)의 공격으로 인해 사망했습니다."),
 		"사망 원인 문구 (전투): %s" % f.get_node("%DeathMessage").text)
 	var clock_before := GameState.clock   # 사망 패널 동안 시간 멈춤
+	var bc_start: Array = DataLoader.maps.basecamp.start   # 부활 R 을 기본 자리 옆에 (부활하면 P 가 아니라 R 에서)
+	var r_at := Vector2i(int(bc_start[0]) + 1, int(bc_start[1]))
+	DataLoader.maps.basecamp.objects.append({"object_id": "t_respawn", "type": "respawn", "x": r_at.x, "y": r_at.y, "ref": "", "name": "", "text": "",
+		"condition": "", "arrive": "", "from": [], "default": false, "once": false, "map_id": "basecamp", "patrol_dir": "", "patrol_len": 0, "schedule": []})
 	await _snap("revive")
 	f.get_node("%NewRunButton").pressed.emit()
 	await _wait(0.2)
@@ -171,8 +175,11 @@ func _ready() -> void:
 	check(GameState.item_count("charm") == 0 and GameState.inventory.size() == items_before - 1, "부적만 소모, 소지품 유지")
 	check(GameState.player_body.left_arm.broken and not GameState.player_body.head.broken, "잘린 왼팔 유지, 머리 회복")
 	check(absf(GameState.clock - clock_before) < 1.0, "시간 유지 (깨어난 뒤 흐른 몇 초 제외)")
-	var start: Array = f.map.start
-	check(f.player.position.distance_to(Vector2((start[0] + 0.5) * f.tile, (start[1] + 0.5) * f.tile)) < 1.0, "베이스캠프 P 위치")
+	check(f.player.position.distance_to(Vector2((r_at.x + 0.5) * f.tile, (r_at.y + 0.5) * f.tile)) < 1.0, "부활하면 베이스캠프의 부활 R 에서 깨어남")
+	DataLoader.maps.basecamp.objects.pop_back()
+	var camp_s: Array = f.spots.filter(func(x): return x.kind == "camp")
+	check(camp_s.is_empty() or (f.renderer.markers.has(camp_s[0].data.object_id) and f.renderer.markers[camp_s[0].data.object_id].kind == "camp"
+		and f.get_node("%MapView").z_index >= 0), "거점 텐트 그림 (+ 표시 층이 바닥 위)")
 
 	# 부활 수단 없이 사망 → 게임 처음부터 (맵 한복판 S)
 	f.load_map("test_field")

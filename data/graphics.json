@@ -461,6 +461,20 @@
    "fps": 6.0,
    "face": "",
    "face_rows": 1
+  },
+  {
+   "tile_key": "camp_tent",
+   "name": "거점 텐트",
+   "layer": "camp",
+   "file": "test_tiles.png",
+   "atlas_x": 0,
+   "atlas_y": 10,
+   "casts_shadow": false,
+   "note": "베이스캠프 거점(camp) 그림",
+   "frames": 1,
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   }
  ],
  "light_presets": [

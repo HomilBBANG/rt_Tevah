@@ -275,6 +275,12 @@ func _build_actors() -> void:
 		seam_pos = _seamless_spawn(GameState.arrive_edge)
 		if seam_pos != Vector2.INF:
 			spawn = [floori(seam_pos.x / tile), floori(seam_pos.y / tile)]
+	if GameState.wake_at_respawn and not GameState.wake_at_run_start:   # 부활·불러오기: 베이스캠프의 부활 R (없으면 기본 P·첫 P)
+		for o in map.objects:
+			if o.type == "respawn":
+				spawn = [o.x, o.y]
+				seam_pos = Vector2.INF
+	GameState.wake_at_respawn = false
 	GameState.wake_at_run_start = false
 	GameState.arrive_at = ""
 	GameState.arrive_from = ""

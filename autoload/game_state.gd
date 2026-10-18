@@ -49,6 +49,7 @@ var arrive_at := ""           # 다음 맵 로드 때 도착할 도착 지점(ar
 var arrive_edge := {}         # 이어지는 맵(가장자리 seamless): {dir: 나간 쪽, along: 가장자리를 따라 위치(칸, 소수, offset 더함)} — 반대쪽 같은 자리로 (저장 안 함)
 var arrive_from := ""         # 어디로 들어왔나: 문·통로·이용 object_id 또는 "맵:방향"(가장자리). 도착 P 의 from 과 맞추어 도착
 var wake_at_run_start := false   # 다음 맵 로드 때 그 맵의 S(회차 시작 위치)에서 깨어남 (저장 안 함)
+var wake_at_respawn := false     # 다음 맵 로드 때 그 맵의 부활 R 에서 깨어남 — 부활·불러오기 (없으면 기본 P → 첫 P, 저장 안 함)
 
 # --- 월드 상태 (월드 파일에 저장, 회차가 바뀌어도 유지)
 var world_flags := {}         # name -> true
@@ -208,6 +209,7 @@ func restore_after_revival() -> void:
 	pending_death = ""
 	current_map = DataLoader.get_config_str("basecamp_map", current_map)
 	wake_at_run_start = false
+	wake_at_respawn = true   # 베이스캠프의 부활 R 에서
 
 
 ## 맵 위 물체 상태 (처치한 적·조사한 곳). kind: "removed" / "done"
