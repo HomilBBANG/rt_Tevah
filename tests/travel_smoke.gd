@@ -105,6 +105,16 @@ func _ready() -> void:
 	await _wait(0.1)
 	check(f.map.map_id == "seam_b" and Vector2i(floori(f.player.position.x / f.tile), floori(f.player.position.y / f.tile)) in [Vector2i(3, 2), Vector2i(2, 1), Vector2i(5, 1)],
 		"이어지는 자리가 벽이면 안쪽·옆 바닥으로 (%s)" % _where())
+	# 이어진 맵이 없는 쪽: 맨 끝 줄이 바닥이어도 맵 밖으로 못 나감 (seam_b 는 아래 가장자리 없음 — 맨 아래 줄을 바닥으로)
+	DataLoader.maps["seam_b"].tiles[5] = "#............#"
+	f.travel("seam_b")
+	await _wait(0.2)
+	f.player.position = Vector2(5.5 * f.tile, 4.5 * f.tile)
+	Input.action_press("move_down")
+	for i in 60:
+		await get_tree().physics_frame
+	Input.action_release("move_down")
+	check(f.map.map_id == "seam_b" and f.player.position.y < 6.0 * f.tile, "이어진 맵이 없으면 맵 밖으로 못 나감 (%s)" % _where())
 	DataLoader.maps.erase("seam_a")
 	DataLoader.maps.erase("seam_b")
 

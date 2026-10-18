@@ -238,6 +238,17 @@ func _build_walls() -> void:
 			shape.shape = rect
 			shape.position = Vector2((start + x) * tile / 2.0, (y + 0.5) * tile)
 			body.add_child(shape)
+	# 맵 바깥 둘레: 보이지 않는 벽 (테두리가 바닥이어도 맵 밖으로 못 나감. 이어진 맵이 있는 쪽은 맨 끝 줄에 닿는 순간 이동하므로 상관없음)
+	var mw := float(map.width) * tile
+	var mh := float(map.height) * tile
+	for r in [Rect2(-tile, -tile, mw + tile * 2, tile), Rect2(-tile, mh, mw + tile * 2, tile),
+			Rect2(-tile, 0, tile, mh), Rect2(mw, 0, tile, mh)]:
+		var bshape := CollisionShape2D.new()
+		var brect := RectangleShape2D.new()
+		brect.size = r.size
+		bshape.shape = brect
+		bshape.position = r.get_center()
+		body.add_child(bshape)
 	# 지나갈 수 없는 오브젝트 (graphics.xlsx Props.solid — 나무 줄기·상자·탁자): 벽처럼 막고 적 시야도 가림
 	for c in VisualData.solid_cells(map):
 		var shape := CollisionShape2D.new()
