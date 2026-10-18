@@ -108,6 +108,54 @@ func _ready() -> void:
 	DataLoader.maps.erase("seam_a")
 	DataLoader.maps.erase("seam_b")
 
+	# 돌아다니는 NPC: 반경 안에서만, 정해진 길은 그 칸들로, 필드가 멈추거나 플레이어가 말 걸 거리면 멈춤
+	DataLoader.config["npc_wander_wait_min"] = 0.05
+	DataLoader.config["npc_wander_wait_max"] = 0.1
+	DataLoader.config["npc_wander_speed"] = 8.0
+	var npc_o := func(id: String, x: int, y: int, extra: Dictionary) -> Dictionary:
+		var d := {"object_id": id, "type": "npc", "ref": "", "name": id, "text": "", "condition": "", "arrive": "", "from": [], "default": false,
+			"once": false, "map_id": "wand", "x": x, "y": y, "patrol_dir": "", "patrol_len": 0, "schedule": [], "face": ""}
+		d.merge(extra, true)
+		return d
+	var wm: Dictionary = mk.call("wand", ["##############", "#............#", "#............#", "#............#", "#............#", "#............#", "#............#", "##############"], {})
+	wm.objects = [npc_o.call("w_cat", 4, 3, {"wander": "radius", "wander_radius": 2}),
+		npc_o.call("w_walker", 9, 1, {"wander": "route", "route": [[9, 1], [12, 1], [12, 5]]})]
+	DataLoader.maps["wand"] = wm
+	f.travel("wand")
+	await _wait(0.2)
+	f.player.position = Vector2(1.5 * f.tile, 6.5 * f.tile)
+	var cat: Dictionary = f.npcs.filter(func(n): return n.data.object_id == "w_cat")[0]
+	var walker: Dictionary = f.npcs.filter(func(n): return n.data.object_id == "w_walker")[0]
+	var start_pos: Vector2 = cat.node.position
+	var inside := true
+	var moved := false
+	var reached := false
+	for i in 240:
+		await get_tree().physics_frame
+		var c := Vector2i(floori(cat.node.position.x / f.tile), floori(cat.node.position.y / f.tile))
+		if absi(c.x - 4) > 2 or absi(c.y - 3) > 2:
+			inside = false
+		if cat.node.position.distance_to(start_pos) > f.tile * 0.5:
+			moved = true
+		if Vector2i(floori(walker.node.position.x / f.tile), floori(walker.node.position.y / f.tile)) == Vector2i(12, 5):
+			reached = true
+	check(moved and inside and cat.pos == cat.node.position, "돌아다니는 NPC: 움직이고 반경 2칸 안에만 (대화 위치도 따라감)")
+	check(reached, "정해진 길: 길의 칸(12,5)까지 걸어감")
+	f.frozen = true
+	var frozen_at: Vector2 = cat.node.position
+	for i in 30:
+		await get_tree().physics_frame
+	check(cat.node.position == frozen_at, "필드가 멈추면(대화·메뉴) 같이 멈춤")
+	f.frozen = false
+	f.player.position = cat.node.position + Vector2(f.tile, 0)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var near_at: Vector2 = cat.node.position
+	for i in 30:
+		await get_tree().physics_frame
+	check(f._near_spot == cat and cat.node.position.distance_to(near_at) < f.tile * 0.6, "플레이어가 말 걸 거리면 서서 기다림")
+	DataLoader.maps.erase("wand")
+
 	SaveManager.delete_all()
 	DataLoader.load_all()   # 진짜 데이터로 되돌림
 	print("[travel_smoke] 실패 %d" % _fail)

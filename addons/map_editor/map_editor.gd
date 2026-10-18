@@ -802,6 +802,17 @@ func _edit_object(o: Dictionary) -> void:
 			_option("바라보는 방향", [["", "↓ 아래 (기본)"], ["up", "↑ 위"], ["left", "← 왼쪽"], ["right", "→ 오른쪽"]],
 				o.get("face", ""), func(v): set_field(o, "face", v))
 			_line("시간대", o.get("schedule", ""), func(v): set_field(o, "schedule", v), "06:00-12:00, 20:00-23:00 (비우면 항상)")
+			_hint("같은 NPC(같은 대화)를 여러 곳에 두고 시간대를 나누면 시간마다 다른 자리에 나타남 (겹치면 변환할 때 경고)")
+			_option("움직임", [["", "제자리"], ["radius", "반경 안에서 돌아다니기"], ["route", "정해진 길 따라 걷기"]], o.get("wander", ""), func(v):
+				set_field(o, "wander", v)
+				_edit_object.call_deferred(o))
+			if o.get("wander", "") == "radius":
+				var wr := _spin("돌아다니는 반경 (칸)", maxi(1, int(o.get("wander_radius", 3))), 1, 40)
+				wr.tooltip_text = "놓은 자리 둘레 이 칸 수 안에서 가끔 걷다 멈춤 (쉬는 시간·속도는 엑셀 Config npc_wander_*)"
+				wr.value_changed.connect(func(v): set_field(o, "wander_radius", int(v)))
+			elif o.get("wander", "") == "route":
+				_line("길 (칸 좌표)", str(o.get("route", "")), func(v): set_field(o, "route", v),
+					"5,6; 9,6; 9,10 — 칸에 마우스를 올리면 좌표. 끝나면 처음으로")
 		"investigate":
 			_section("조사")
 			_option("얻는 것", [["", "(없음)"]] + loot_spots, o.get("ref", ""), func(v): set_field(o, "ref", v))

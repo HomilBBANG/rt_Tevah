@@ -664,6 +664,24 @@ func _draw() -> void:
 			_label(info[0], r.get_center(), Color.WHITE, maxf(10.0, s * 0.3))
 	# 적 순찰 길 (시야 원은 고르거나 마우스를 올린 적만 — 겹쳐서 지저분해지지 않게)
 	var focus := _focus_objects()
+	# 돌아다니는 NPC: 고르거나 마우스를 올리면 반경(점선 사각형) / 길(선)
+	for o in focus:
+		if o.get("type", "") != "npc":
+			continue
+		if o.get("wander", "") == "radius":
+			var rr := maxi(1, int(o.get("wander_radius", 3)))
+			var wr := Rect2(pan + Vector2(int(o.x) - rr, int(o.y) - rr) * s, Vector2(rr * 2 + 1, rr * 2 + 1) * s)
+			draw_rect(wr, Color(0.35, 0.56, 0.82, 0.12))
+			draw_rect(wr, Color(0.55, 0.75, 1.0, 0.8), false, 2.0)
+		elif o.get("wander", "") == "route":
+			var pts := []
+			for part in str(o.get("route", "")).split(";"):
+				var xy := part.strip_edges().split(",")
+				if xy.size() == 2 and xy[0].strip_edges().is_valid_int() and xy[1].strip_edges().is_valid_int():
+					pts.append(_center(int(xy[0]), int(xy[1])))
+			for i in pts.size():
+				draw_line(pts[i], pts[(i + 1) % pts.size()], Color(0.55, 0.75, 1.0, 0.85), 2.0)
+				draw_circle(pts[i], s * 0.12, Color(0.55, 0.75, 1.0))
 	if filters.sight and filters.enemy:
 		for o in map.objects:
 			if o.type != "enemy":

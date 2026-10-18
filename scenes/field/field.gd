@@ -339,6 +339,9 @@ func _build_actors() -> void:
 				_add_circle_shape(n, n.radius)
 				%World.add_child(n)
 				npcs.append({"kind": "npc", "data": o, "pos": pos, "node": n, "active": true, "vanished": false})
+				if str(o.get("wander", "")) in ["radius", "route"]:   # 돌아다니는 NPC (고양이 등)
+					npcs.back().wander = {"home": Vector2i(int(o.x), int(o.y)), "path": [], "route_i": 0,
+						"wait": randf_range(0.5, _wander_cfg("npc_wander_wait_max", 6.0))}
 			"event":
 				events.append({"kind": "event", "data": o, "pos": pos, "tile": Vector2i(int(o.x), int(o.y)),
 					"done": GameState.field_has(map.map_id, "done", o.object_id)})
@@ -410,6 +413,66 @@ func _use_furniture(s: Dictionary) -> void:
 			else:
 				show_message("
 ".join(lines))
+
+
+func _wander_cfg(key: String, default: float) -> float:
+	return float(DataLoader.config.get(key, default))
+
+
+## 돌아다니는 NPC (맵 물체 wander): radius = 놓은 자리 둘레 wander_radius 칸 안의 아무 바닥으로 / route = 정해진 칸들을 차례로(끝나면 처음).
+## 걷고 → npc_wander_wait_min~max 초 쉼. 필드가 멈추면(대화·전투·메뉴·컷신) 같이 멈추고, 플레이어가 말 걸 거리에 있으면 서서 기다림.
+## 플레이어가 서 있는 칸으로는 들어가지 않음. 속도 Config npc_wander_speed (칸/초)
+func _tick_wander(delta: float) -> void:
+	var ptile := Vector2i(floori(player.global_position.x / tile), floori(player.global_position.y / tile))
+	for n in npcs:
+		if not n.has("wander") or not n.active or n.vanished or not is_instance_valid(n.node) or n == _near_spot:
+			continue
+		var wd: Dictionary = n.wander
+		var node: Node2D = n.node
+		if wd.path.is_empty():
+			wd.wait -= delta
+			if wd.wait <= 0.0:
+				wd.path = _wander_path(n)
+				wd.wait = randf_range(_wander_cfg("npc_wander_wait_min", 2.0), _wander_cfg("npc_wander_wait_max", 6.0))
+			continue
+		var next: Vector2i = wd.path[0]
+		if next == ptile:
+			continue   # 플레이어가 비킬 때까지 기다림
+		var dest := _tile_center(next.x, next.y)
+		var step := _wander_cfg("npc_wander_speed", 1.5) * tile * delta
+		var d := dest - node.position
+		if d.length() <= step:
+			node.position = dest
+			wd.path.pop_front()
+		else:
+			node.position += d.normalized() * step
+			node.facing = d.normalized()
+		n.pos = node.position
+
+
+func _wander_path(n: Dictionary) -> Array:
+	var grid := path_grid()
+	var from := Vector2i(floori(n.node.position.x / tile), floori(n.node.position.y / tile))
+	var o: Dictionary = n.data
+	var targets := []
+	if str(o.get("wander", "")) == "route":
+		var pts: Array = o.get("route", [])
+		if pts.is_empty():
+			return []
+		n.wander.route_i = (int(n.wander.route_i) + 1) % pts.size()
+		targets = [Vector2i(int(pts[n.wander.route_i][0]), int(pts[n.wander.route_i][1]))]
+	else:
+		var r := maxi(1, int(o.get("wander_radius", 3)))
+		var home: Vector2i = n.wander.home
+		for i in 8:
+			targets.append(home + Vector2i(randi_range(-r, r), randi_range(-r, r)))
+	for to in targets:
+		if not grid.region.has_point(from) or not grid.region.has_point(to) or grid.is_point_solid(to) or to == from:
+			continue
+		var path: Array = grid.get_id_path(from, to)
+		if path.size() > 1 and (str(o.get("wander", "")) == "route" or path.size() <= maxi(1, int(o.get("wander_radius", 3))) * 3 + 1):
+			return path.slice(1)
+	return []
 
 
 ## 시간대(schedule)에 맞춰 NPC 를 보이거나 숨긴다. 숨은 NPC 는 부딪히지도, 말을 걸 수도 없다.
@@ -516,6 +579,7 @@ func _physics_process(delta: float) -> void:
 	if cause != "":
 		_on_death(cause)
 		return
+	_tick_wander(delta)
 	for e in enemies:
 		if e.grace == 0.0 and e.touch_battle() and e.global_position.distance_to(player.global_position) < player.radius + e.radius:
 			_start_combat(e)

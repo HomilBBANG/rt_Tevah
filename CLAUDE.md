@@ -202,6 +202,7 @@ tools/
   - **저장은 베이스캠프에서만** (`SaveManager.can_save_run()`). 방법은 둘:
     - **잠**: CampActions `kind=sleep` (minutes=60, effects 는 1시간마다), ← → 로 1~`sleep_max_hours` 시간을 조절해(처음 `sleep_default_hours`) 자고 나면 저장. 고양이가 있어도 잠으로 저장된다. 별도 "저장" 버튼은 없다.
     - **고양이**(하나, §15.1)가 와 있으면 고양이에게도: 필드 대화의 효과 `save`.
+  - **돌아다니는 NPC** (2026-10-18, 고양이용): 맵 NPC 물체 `wander` = 비움(제자리) / `radius`(놓은 자리 둘레 `wander_radius` 칸 안 아무 바닥) / `route`(`route` "x,y; x,y" 칸들을 차례로, 끝나면 처음). 걷고 → Config `npc_wander_wait_min~max` 초 쉼, 속도 `npc_wander_speed`(칸/초, 임시 1.5). 길 찾기 path_grid, 필드가 멈추면(대화·전투·메뉴·컷신) 같이 멈추고, 플레이어가 말 걸 거리(_near_spot)면 서서 기다림, 플레이어 칸으로는 안 들어감, 대화 위치(n.pos)도 따라감 (`field._tick_wander`·`_wander_path`). 맵 에디터 NPC 세부 '움직임'·반경·길, 고르면 캔버스에 반경 사각형/길 선. 변환기: wander 값·반경·길(바닥 칸, 2개 이상) 검사, **같은 대화(ref) NPC 가 같은 조건·겹치는 시간대에 두 곳 → 경고** (`warn_npc_overlap` — 시간마다 다른 자리의 고양이). 테스트 travel_smoke.
   - NPC 의 하루 루틴은 맵 물체 `schedule` ("06:00-12:00, 20:00-23:00", 자정 넘김 "22:00-02:00" 가능). 그 시간대에만 나타나고, 시계가 흐르면(탐험·잠) 바로 나타나거나 사라진다. `condition` 과 함께 쓰면 둘 다 맞아야 있다.
   - 이어하기 = 마지막 베이스캠프 저장 (§13.2 미정이라 임시로 이 방식).
   - 월드(`world.json`): 월드 플래그 + `run_count` + `death_count` — 회차가 바뀌어도 유지 (초월적 존재의 부활 인식용).

@@ -1186,7 +1186,7 @@ def read_maps(rep):
         m["file"] = f.name
         m["tiles"] = [str(r) for r in m.get("tiles", [])]
         m["objects"] = [{k: _dlg_str(v) if k not in ("x", "y", "patrol_len", "from", "default", "once", "energy", "radius", "shadow", "enabled", "bb_overrides",
-                                                                         "curtain", "solid", "w", "h", "top_rows") else v for k, v in o.items()}
+                                                                         "curtain", "solid", "w", "h", "top_rows", "wander_radius") else v for k, v in o.items()}
                         for o in m.get("objects", [])]
         maps[f.stem] = m
     for f in sorted(MAPS_DIR.glob("*.txt")):
@@ -1530,6 +1530,12 @@ def validate_field(d, maps, rep, enemies):
             elif t == "enemy" and not all(n["walk_speed"] > 0 and n["run_speed"] > 0
                                           for n in d["Npcs"] if n["npc_id"] == ref):
                 rep.err(w, f"맵의 적 '{ref}' 는 Npcs 의 walk_speed(순찰)·run_speed(추격)가 0보다 커야 함")
+            elif t == "npc" and o.get("wander", "") not in ("", "radius", "route"):
+                rep.err(w, f"NPC 움직임(wander)은 비움(제자리) / radius / route: '{o.get('wander')}'")
+            elif t == "npc" and o.get("wander") == "radius" and int(o.get("wander_radius", 3) or 0) < 1:
+                rep.err(w, "돌아다니는 반경(wander_radius)은 1칸 이상")
+            elif t == "npc" and o.get("wander") == "route" and route_error(o.get("route", ""), floor):
+                rep.err(w, route_error(o.get("route", ""), floor))
             elif t == "npc" and o.get("face", "") not in ("",) + tuple(FACE_DIRS):
                 rep.err(w, f"NPC 의 바라보는 방향(face)은 up / down / left / right: '{o.get('face')}'")
             elif t in ("npc", "event") and (ref not in nodes or nodes[ref]["episode_id"] != ""):
@@ -1560,6 +1566,67 @@ def validate_field(d, maps, rep, enemies):
                     parse_condition(o["condition"])
                 except ExprError as e:
                     rep.err(w, f"condition 문법 오류: {e}")
+
+
+def parse_route(text):
+    """'5,6; 9,6; 9,10' → [[5, 6], [9, 6], [9, 10]] (형식 오류면 None)"""
+    if isinstance(text, list):
+        return text
+    pts = []
+    for part in str(text or "").replace(chr(10), ";").split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        xy = [v.strip() for v in part.split(",")]
+        if len(xy) != 2 or not all(v.lstrip("-").isdigit() for v in xy):
+            return None
+        pts.append([int(xy[0]), int(xy[1])])
+    return pts
+
+
+def route_error(text, floor):
+    pts = parse_route(text)
+    if pts is None:
+        return f"길(route)은 'x,y; x,y; ...' (칸 좌표): '{text}'"
+    if len(pts) < 2:
+        return "정해진 길은 칸 2개 이상"
+    bad = [p for p in pts if not floor(p[0], p[1])]
+    if bad:
+        return f"길의 칸 {bad[0]} 이 바닥이 아님"
+    return ""
+
+
+def schedule_minutes(sched):
+    """[[시작분, 끝분], ...] → 그 시간대의 분 집합 (비면 하루 종일)"""
+    if not sched:
+        return set(range(1440))
+    out = set()
+    for a, b in sched:
+        out.update(range(a, b) if a < b else list(range(a, 1440)) + list(range(0, b)))
+    return out
+
+
+def warn_npc_overlap(maps, rep):
+    """같은 대화(ref)를 쓰는 NPC 가 같은 조건·겹치는 시간대에 두 곳 이상 → 경고 (고양이처럼 하나뿐인 NPC 가 동시에 둘)"""
+    by_ref = {}
+    for mid, m in maps.items():
+        for o in m.get("objects", []):
+            if o.get("type") == "npc" and o.get("ref"):
+                rngs = [parse_time_range(r) for r in split_list(o.get("schedule", ""))]
+                if any(r is None for r in rngs):
+                    continue
+                by_ref.setdefault(o["ref"], []).append((mid, o, schedule_minutes(rngs)))
+    for ref, items in by_ref.items():
+        for i in range(len(items)):
+            for j in range(i + 1, len(items)):
+                (ma, a, sa), (mb, b, sb) = items[i], items[j]
+                if (a.get("condition") or "") != (b.get("condition") or ""):
+                    continue   # 조건이 다르면 동시에 안 나올 수 있음
+                both = sa & sb
+                if both:
+                    t = min(both)
+                    rep.warn(f"맵 {ma} 물체 {a.get('object_id')}",
+                             f"같은 대화 '{ref}' 의 NPC 가 {mb} 의 {b.get('object_id')} 와 같은 시간({t // 60:02d}:{t % 60:02d} 등)에 함께 나옴 — 시간대가 겹치지 않게")
 
 
 WINDOW_SCAN = 12   # core/visual_data.gd 와 같게
@@ -1659,6 +1726,9 @@ def export_maps(d, maps):
                          use_condition=o.get("use_condition", ""), use_fail_text=o.get("use_fail_text", ""),
                          role=o.get("role", ""), effects=o.get("effects", ""),
                          top_rows=max(0, int(o.get("top_rows", 0) or 0)))   # 위쪽 몇 줄은 뒤로 지나감
+            if o.get("type") == "npc":              # 돌아다니기: radius (놓은 자리 둘레) / route (정해진 칸들 차례로)
+                e.update(wander=o.get("wander", ""), wander_radius=int(o.get("wander_radius", 3) or 3),
+                         route=parse_route(o.get("route", "")) or [])
             if o.get("type") == "window":           # 창문: 처음에 커튼을 쳐 두었나, 크기
                 e.update(curtain=bool(o.get("curtain")), w=max(1, int(o.get("w", 1) or 1)), h=max(1, int(o.get("h", 1) or 1)),
                          inside=o.get("inside", ""))   # 바깥 창문의 안쪽 맵 (비우면 가장 가까운 문의 맵) — 그 맵에 켜진 광원이 있으면 불 켜진 창
@@ -1810,6 +1880,7 @@ def _run(path, say):
     data["FieldObjects"] = field_objects(maps)
     validate(data, rep)
     validate_field(data, maps, rep, data.get("_enemy_ids", set()))
+    warn_npc_overlap(maps, rep)
     validate_graphics(data, maps, rep)
     if rep.errors:
         say(f"오류 {len(rep.errors)}개 — JSON을 쓰지 않았습니다.")

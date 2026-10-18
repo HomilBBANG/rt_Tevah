@@ -54,5 +54,8 @@
  "vignette_strength": 0.75,
  "vignette_inner": 0.35,
  "vignette_color": "#000000",
+ "npc_wander_speed": 1.5,
+ "npc_wander_wait_min": 2,
+ "npc_wander_wait_max": 6,
  "opening_dialogue": ""
 }
