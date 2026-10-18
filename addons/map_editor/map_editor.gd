@@ -314,6 +314,8 @@ func _init() -> void:
 			open_map(id)
 		world_button.button_pressed = false)
 	world.notice.connect(_status)
+	world.link_requested.connect(link_maps)
+	world.unlink_requested.connect(unlink_maps)
 	stage.add_child(world)
 	var side := ScrollContainer.new()
 	side.custom_minimum_size.x = 340
@@ -1218,6 +1220,71 @@ func _restore(snap: Dictionary) -> void:
 	dirty = true
 	_refresh_links()
 	_edit_map()
+
+
+## 월드 맵 이어붙이기: a 의 dir 가장자리 → b 를 '이어지는 맵'(칸 어긋남 off), b 의 반대쪽 → a (어긋남 -off). 양쪽 파일에 바로 저장.
+## 그 쪽에 다른 맵이 이어져 있었으면 바꿈 (상태 글자로 알림). 실제로 지나가려면 두 맵 모두 그쪽 맨 끝 줄이 바닥이어야
+func link_maps(a: String, dir: String, b: String, off: int) -> void:
+	var opp: String = {"up": "down", "down": "up", "left": "right", "right": "left"}[dir]
+	var replaced := []
+	for pair in [[a, dir, b, off], [b, opp, a, -off]]:
+		var m := _world_map_dict(pair[0])
+		if m.is_empty():
+			continue
+		if pair[0] == map.get("map_id", ""):
+			checkpoint()
+		if not m.get("edges") is Dictionary:
+			m.edges = {}
+		var old = m.edges.get(pair[1], {})
+		if old is Dictionary and str(old.get("ref", "")) not in ["", pair[2]]:
+			replaced.append("%s %s(%s 대신)" % [pair[0], Canvas.EDGE_NAME.get(pair[1], pair[1]), old.ref])
+		m.edges[pair[1]] = {"ref": pair[2], "arrive": "", "seamless": true}
+		if int(pair[3]) != 0:
+			m.edges[pair[1]].offset = int(pair[3])
+		_write_world_map(pair[0])
+	_status("이어붙임: %s %s ↔ %s (칸 어긋남 %+d)%s — 지나가려면 두 맵 모두 그쪽 맨 끝 줄을 바닥으로" % [a, Canvas.EDGE_NAME.get(dir, dir), b, off,
+		("   ⚠ 바꿈: " + ", ".join(replaced)) if not replaced.is_empty() else ""])
+	_refresh_links()
+	world.refresh(_all_maps, map.get("map_id", ""))
+
+
+## 월드 맵 떼기: a ↔ b 사이 가장자리를 양쪽에서 지움
+func unlink_maps(a: String, b: String) -> void:
+	for pair in [[a, b], [b, a]]:
+		var m := _world_map_dict(pair[0])
+		if m.is_empty() or not m.get("edges") is Dictionary:
+			continue
+		var gone: Array = m.edges.keys().filter(func(d): return m.edges[d] is Dictionary and str(m.edges[d].get("ref", "")) == pair[1])
+		if gone.is_empty():
+			continue
+		if pair[0] == map.get("map_id", ""):
+			checkpoint()
+		for d in gone:
+			m.edges.erase(d)
+		if m.edges.is_empty() and pair[0] != map.get("map_id", ""):
+			m.erase("edges")
+		_write_world_map(pair[0])
+	_status("뗌: %s ↔ %s (가장자리 연결 지움)" % [a, b])
+	_refresh_links()
+	world.refresh(_all_maps, map.get("map_id", ""))
+
+
+func _world_map_dict(id: String) -> Dictionary:
+	if id == map.get("map_id", ""):
+		return map
+	return _all_maps.get(id, {}) if _all_maps.get(id) is Dictionary else {}
+
+
+## 지금 맵은 save(), 다른 맵은 그 파일에 그대로 (에디터 저장과 같은 모양)
+func _write_world_map(id: String) -> void:
+	if id == map.get("map_id", ""):
+		dirty = true
+		save()
+		return
+	var f := FileAccess.open(dir + id + ".json", FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(_all_maps[id], " ", false) + "
+")
 
 
 ## 월드 맵 보이기·숨기기 (보일 때 모든 맵을 다시 읽음 — 지금 맵은 편집 중인 내용)

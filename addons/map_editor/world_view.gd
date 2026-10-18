@@ -5,9 +5,15 @@ extends Control
 ##         묶음 위치는 끌어서 정하고 layout_path(tools/world_layout.json, 에디터 설정 — 게임과 무관)에 저장. 처음엔 자동으로 나란히.
 ##   연결선: 문·통로·이용 → 이동할 맵의 도착 P (출발 쪽 arrive → P 의 이어지는 곳 → 기본 P → start). 없는 맵·P 는 빨강.
 ##   조작: 휠 = 확대·축소, 오른쪽/가운데 끌기 = 화면 이동, 왼쪽 끌기 = 맵(묶음) 옮기기, 두 번 누르기 = 그 맵 편집 (open_requested).
+##   이어붙이기: 끌어 놓을 때 다른 맵 가장자리와 SNAP 칸 안이면 딱 붙이고 link_requested(맵, 방향, 저쪽 맵, 칸 어긋남) — 에디터가 양쪽 맵에
+##         '이어지는 맵' 가장자리를 씀. Shift+끌기 = 그 맵만 묶음에서 떼기 (unlink_requested — 이웃과의 가장자리 지움)
 
 signal open_requested(map_id: String)
 signal notice(text: String)
+signal link_requested(map_id: String, dir: String, other: String, offset: int)
+signal unlink_requested(map_id: String, other: String)
+
+const SNAP := 2                      # 이 칸 수 안으로 가까이 놓으면 이어붙임
 
 const VisualData = preload("res://core/visual_data.gd")
 const GAP := 12                      # 자동 배치 때 묶음 사이 칸
@@ -30,6 +36,7 @@ var _drag := ""                      # 끄는 맵
 var _drag_from := Vector2.ZERO
 var _drag_start := {}                # 끌기 시작 때 묶음 위치들
 var _panning := false
+var _detach := false                 # Shift+끌기: 그 맵만 떼어 옮김
 var _font: Font
 static var _tile_colors := {}        # tile_key → 평균 색
 
@@ -56,7 +63,7 @@ func _init() -> void:
 		queue_redraw())
 	bar.add_child(links)
 	var hint := Label.new()
-	hint.text = "   두 번 누르기 = 편집 · 끌기 = 배치 (가장자리로 이어진 맵은 같이) · 휠 = 확대 · 오른쪽 끌기 = 이동"
+	hint.text = "   두 번 누르기 = 편집 · 끌기 = 배치 (가장자리 가까이 놓으면 이어붙임) · Shift+끌기 = 떼기 · 휠 = 확대 · 오른쪽 끌기 = 이동"
 	hint.modulate = Color(1, 1, 1, 0.6)
 	bar.add_child(hint)
 
@@ -402,6 +409,58 @@ func _draw_links() -> void:
 						draw_line(mid.lerp(tgt, float(i) / n), mid.lerp(tgt, float(i + 1) / n), Color(0.6, 0.9, 1.0, 0.7), 2.0)
 
 
+## 끌어 놓음: (Shift 면 이웃과 떼고) 다른 맵 가장자리 가까이면 딱 붙여 이어붙이기 요청, 배치 저장
+func _drop() -> void:
+	var moved: Array = _drag_start.keys()
+	var cut := []
+	if _detach:
+		for l in _links_of(_drag):
+			if l[0] != _drag and not l[0] in cut:
+				cut.append(l[0])
+	var snap := find_snap(moved)
+	if not snap.is_empty():
+		for g in moved:
+			pos[g] += snap.delta
+	save_layout()   # 먼저 저장 — 에디터가 연결을 바꾼 뒤 월드 맵을 다시 읽음
+	for other in cut:
+		unlink_requested.emit(_drag, other)
+	if not snap.is_empty():
+		var a: String = snap.map
+		var b: String = snap.other
+		var off: int = (pos[a].x - pos[b].x) if snap.dir in ["up", "down"] else (pos[a].y - pos[b].y)
+		link_requested.emit(a, snap.dir, b, off)
+	if _detach or not snap.is_empty():
+		_build_groups()
+	queue_redraw()
+
+
+## 옮긴 맵들(moved) 중 하나의 가장자리가 다른 맵 가장자리와 SNAP 칸 안이고 옆으로 겹치면 → {map, dir, other, delta} (가장 가까운 것)
+func find_snap(moved: Array) -> Dictionary:
+	var best := {}
+	var best_gap := SNAP + 1
+	for m in moved:
+		var ma := Rect2i(pos[m], map_size(maps[m]))
+		for n in pos:
+			if n in moved:
+				continue
+			var nb := Rect2i(pos[n], map_size(maps[n]))
+			var v_overlap := mini(ma.end.y, nb.end.y) - maxi(ma.position.y, nb.position.y)
+			var h_overlap := mini(ma.end.x, nb.end.x) - maxi(ma.position.x, nb.position.x)
+			var cands := []
+			if v_overlap > 0:
+				cands.append(["right", Vector2i(nb.position.x - ma.end.x, 0)])
+				cands.append(["left", Vector2i(nb.end.x - ma.position.x, 0)])
+			if h_overlap > 0:
+				cands.append(["down", Vector2i(0, nb.position.y - ma.end.y)])
+				cands.append(["up", Vector2i(0, nb.end.y - ma.position.y)])
+			for c in cands:
+				var gap: int = absi(c[1].x) + absi(c[1].y)
+				if gap < best_gap:
+					best_gap = gap
+					best = {"map": m, "dir": c[0], "other": n, "delta": c[1]}
+	return best
+
+
 func _arrow(a: Vector2, b: Vector2, col: Color) -> void:
 	draw_line(a, b, Color(col.r, col.g, col.b, 0.85), 2.0, true)
 	draw_circle(a, 3.0, col)
@@ -434,14 +493,15 @@ func _gui_input(event: InputEvent) -> void:
 				_drag = id
 				_drag_from = mb.position
 				_drag_start = {}
+				_detach = mb.shift_pressed
 				if id != "":
-					for g in _groups[_group_of[id]]:
+					for g in ([id] if _detach else _groups[_group_of[id]]):
 						_drag_start[g] = pos[g]
 					notice.emit("%s  (%d × %d칸)" % [id, map_size(maps[id]).x, map_size(maps[id]).y])
 				queue_redraw()
 			else:
 				if _drag != "" and not _drag_start.is_empty() and pos[_drag] != _drag_start[_drag]:
-					save_layout()
+					_drop()
 				_drag = ""
 		accept_event()
 	elif event is InputEventMouseMotion:

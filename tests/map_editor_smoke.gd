@@ -633,6 +633,30 @@ func _ready() -> void:
 	wv._gui_input(wev)
 	await _frames(1)
 	check(ed.map.map_id == "test_field" and not wv.visible and cv.visible, "두 번 누르면 그 맵 편집으로")
+	# 월드 맵 이어붙이기: test_overhead 를 test_field 오른쪽 1칸 떨어진 곳(2칸 아래)에 놓으면 딱 붙고 양쪽 파일에 '이어지는 맵'
+	ed.show_world(true)
+	await _frames(1)
+	var wf_size: Vector2i = wv.map_size(wv.maps.test_field)
+	wv._drag = "test_overhead"
+	wv._drag_start = {"test_overhead": wv.pos.test_overhead}
+	wv._detach = false
+	wv.pos.test_overhead = wv.pos.test_field + Vector2i(wf_size.x + 1, 2)
+	wv._drop()
+	var fo: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_overhead.json"))
+	var ff: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_field.json"))
+	check(wv.pos.test_overhead == wv.pos.test_field + Vector2i(wf_size.x, 2) and fo.edges.left.ref == "test_field" and fo.edges.left.seamless
+		and int(fo.edges.left.offset) == 2 and ff.edges.right.ref == "test_overhead" and int(ff.edges.right.offset) == -2,
+		"월드 맵 이어붙이기: 딱 붙고 양쪽에 이어지는 맵 (칸 어긋남 2 / -2)")
+	check(wv._group_of.test_overhead == wv._group_of.test_field, "붙인 맵은 한 묶음")
+	wv._drag = "test_overhead"
+	wv._drag_start = {"test_overhead": wv.pos.test_overhead}
+	wv._detach = true
+	wv.pos.test_overhead += Vector2i(0, 40)
+	wv._drop()
+	fo = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_overhead.json"))
+	ff = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_field.json"))
+	check(not fo.has("edges") and not ff.get("edges", {}).has("right") and wv._group_of.test_overhead != wv._group_of.test_field, "Shift+끌기로 떼면 양쪽 연결 지움")
+	ed.show_world(false)
 	DirAccess.remove_absolute("user://world_layout_test.json")
 
 	# 맵 삭제: 쓰는 곳(다른 맵의 문) 목록 → 파일 지움, 베이스캠프는 못 지움
