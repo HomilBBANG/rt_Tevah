@@ -592,6 +592,49 @@ func _ready() -> void:
 	ed.undo()
 	cv.tile_layer = "floor"
 
+	# 월드 맵: 모든 맵 한눈에, 가장자리로 이어진 맵은 붙여서, 끌어서 배치(묶음째)·저장, 두 번 누르기 = 편집
+	ed.open_map("test_travel")
+	await _frames(1)
+	ed.world.layout_path = "user://world_layout_test.json"
+	ed.show_world(true)
+	await _frames(2)
+	var wv: Control = ed.world
+	check(wv.visible and not cv.visible and wv.pos.size() == ed.map_ids.size() and wv._thumbs.test_travel.get_size() == Vector2(wv.map_size(ed.map).x, wv.map_size(ed.map).y),
+		"월드 맵: 맵 %d개 + 미니 그림" % wv.pos.size())
+	var tt_size: Vector2i = wv.map_size(wv.maps.test_travel)
+	check(wv.pos.basecamp == wv.pos.test_travel + Vector2i(0, tt_size.y) and wv._group_of.basecamp == wv._group_of.test_travel,
+		"아래 가장자리로 이어진 basecamp 는 test_travel 바로 아래에 붙음 (한 묶음)")
+	var door_o: Dictionary = wv.maps.test_field.objects.filter(func(o): return o.object_id == "fo_to_camp")[0]
+	check(wv.arrival_cell(door_o) != null, "문 → 도착 칸 (연결선)")
+	await _snap("world_map")
+	var before: Vector2i = wv.pos.test_travel
+	var bc_before: Vector2i = wv.pos.basecamp
+	var at: Vector2 = wv.map_rect("test_travel").get_center()
+	var wev := InputEventMouseButton.new()
+	wev.button_index = MOUSE_BUTTON_LEFT
+	wev.pressed = true
+	wev.position = at
+	wv._gui_input(wev)
+	var wmv := InputEventMouseMotion.new()
+	wmv.position = at + Vector2(wv.zoom * 10, wv.zoom * 4)
+	wv._gui_input(wmv)
+	wev = wev.duplicate()
+	wev.pressed = false
+	wev.position = wmv.position
+	wv._gui_input(wev)
+	check(wv.pos.test_travel == before + Vector2i(10, 4) and wv.pos.basecamp == bc_before + Vector2i(10, 4) and FileAccess.file_exists(wv.layout_path),
+		"끌어서 옮기면 묶음이 같이 움직이고 배치 저장")
+	wv.refresh(wv.maps, "test_travel")
+	check(wv.pos.test_travel == before + Vector2i(10, 4), "다시 열어도 배치 유지")
+	wev = wev.duplicate()
+	wev.pressed = true
+	wev.double_click = true
+	wev.position = wv.map_rect("test_field").get_center()
+	wv._gui_input(wev)
+	await _frames(1)
+	check(ed.map.map_id == "test_field" and not wv.visible and cv.visible, "두 번 누르면 그 맵 편집으로")
+	DirAccess.remove_absolute("user://world_layout_test.json")
+
 	# 맵 삭제: 쓰는 곳(다른 맵의 문) 목록 → 파일 지움, 베이스캠프는 못 지움
 	ed.new_map("test_del", 5, 5)
 	ed.new_map("test_del_src", 5, 5)

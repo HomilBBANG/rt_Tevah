@@ -6,6 +6,7 @@ extends VBoxContainer
 ## 게임 실행 중(테스트)에서도 열 수 있도록 에디터 전용 기능은 Engine.is_editor_hint() 로 감싼다.
 
 const Canvas = preload("res://addons/map_editor/map_canvas.gd")
+const WorldView = preload("res://addons/map_editor/world_view.gd")
 const ToolCommon = preload("res://addons/tool_common.gd")
 const ExprRows = preload("res://addons/expr_rows.gd")
 const MapRenderer = preload("res://core/map_renderer.gd")
@@ -142,6 +143,9 @@ var palette_search: LineEdit
 var time_label: Label
 var _gfx_dirty := true
 var overhead_slider: HSlider         # 전경 가림 편집용 투명도 (미리보기 전용)
+var world: Control                   # 월드 맵 (모든 맵 한눈에, world_view.gd)
+var world_button: Button
+var _world_fitted := false
 var lock_box: CheckBox               # 지금 팔레트 층 잠금
 
 
@@ -162,6 +166,12 @@ func _init() -> void:
 	bar.add_child(VSeparator.new())
 	_bar_btn(bar, "새 맵", _ask_new, "새 맵 파일 만들기 (맵 ID: 영문·숫자·_, 너비·높이)")
 	_bar_btn(bar, "맵 삭제", _ask_delete_map, "지금 맵 파일을 지우기 (휴지통으로). 이 맵을 쓰는 곳이 있으면 먼저 보여 줌")
+	world_button = Button.new()
+	world_button.text = "🗺 월드 맵"
+	world_button.toggle_mode = true
+	world_button.tooltip_text = "모든 맵을 한눈에: 가장자리로 이어진 맵은 붙여서, 문·통로 연결은 선으로. 두 번 누르면 그 맵 편집"
+	world_button.toggled.connect(show_world)
+	bar.add_child(world_button)
 	_bar_btn(bar, "저장", save, "지금 맵을 파일로 저장")
 	bar.add_child(VSeparator.new())
 	_bar_btn(bar, "↶", undo, "실행 취소 (Ctrl+Z)")
@@ -296,6 +306,15 @@ func _init() -> void:
 	vp.add_child(renderer)
 	canvas.set_anchors_preset(PRESET_FULL_RECT)
 	stage.add_child(canvas)
+	world = WorldView.new()
+	world.set_anchors_preset(PRESET_FULL_RECT)
+	world.visible = false
+	world.open_requested.connect(func(id):
+		if id != map.get("map_id", ""):
+			open_map(id)
+		world_button.button_pressed = false)
+	world.notice.connect(_status)
+	stage.add_child(world)
 	var side := ScrollContainer.new()
 	side.custom_minimum_size.x = 340
 	side.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED   # 긴 글자는 칸 폭에 맞춰 줄임
@@ -1201,6 +1220,21 @@ func _restore(snap: Dictionary) -> void:
 	_edit_map()
 
 
+## 월드 맵 보이기·숨기기 (보일 때 모든 맵을 다시 읽음 — 지금 맵은 편집 중인 내용)
+func show_world(on: bool) -> void:
+	if world_button and world_button.button_pressed != on:
+		world_button.set_pressed_no_signal(on)
+	if on:
+		_load_all_maps()
+		world.refresh(_all_maps, map.get("map_id", ""))
+		if not _world_fitted:
+			_world_fitted = true
+			world.fit_all.call_deferred()
+	world.visible = on
+	canvas.visible = not on
+	gfx_view.visible = not on and canvas.filters.graphics
+
+
 ## 칠한 그림대로 벽·바닥 맞추기 (예전에 '벽 외형'으로 칠해 지나갈 수 있던 칸 고치기):
 ## 벽 층 그림이 있는 바닥 칸 → 벽, 벽 층 그림 없이 바닥 그림만 있는 벽 칸 → 바닥. 물체·P·S 칸과 창문은 그대로. 실행 취소 가능
 func sync_logic_to_paint() -> int:
@@ -1899,7 +1933,7 @@ func _sync_lock_box() -> void:
 
 
 func _apply_gfx_filters() -> void:
-	gfx_view.visible = canvas.filters.graphics
+	gfx_view.visible = canvas.filters.graphics and not (world != null and world.visible)
 	canvas.graphics = canvas.filters.graphics
 	if renderer:
 		renderer.set_lighting(canvas.filters.lighting)
