@@ -1440,8 +1440,8 @@ def validate_field(d, maps, rep, enemies):
                         rep.err(w, f"'{src}' 는 출발 쪽에서 도착 지점 '{other}' 를 따로 골랐음 (한쪽에서만 정할 것)")
         # 기본 P 가 없는 맵: 들어오는 곳마다 설 P 가 정해져 있어야 한다
         if not has_default:
-            for src, ent in ents.items():
-                if not ent.get("arrive") and src not in claimed:
+            for src, ent in ents.items():   # 이어지는 맵 가장자리는 같은 자리로 들어오므로 P 필요 없음 (못 들어가면 첫 P)
+                if not ent.get("arrive") and src not in claimed and not ent.get("seamless"):
                     rep.err(wm, f"'{src}' 로 들어오면 설 도착 P 가 없음 — 이 맵에 ★ 기본 P 가 없으니, "
                                 f"P 의 '이어지는 곳'에 체크하거나 기본 P 를 두세요")
         occupied = {}
