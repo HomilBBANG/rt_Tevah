@@ -694,10 +694,8 @@ func _draw() -> void:
 				var e := _center(int(o.x) + d.x * int(o.patrol_len), int(o.y) + d.y * int(o.patrol_len))
 				draw_line(c, e, Color(1, 0.5, 0.5, 0.8), 2.0)
 				draw_circle(e, s * 0.12, Color(1, 0.5, 0.5, 0.8))
-	# S (회차 시작). 도착 P 는 모두 물체(arrive) — 예전 맵처럼 기본 P 물체가 없으면 start 를 그린다
-	for key in ["start", "run_start"]:
-		if key == "start" and map.get("objects", []).any(func(x): return x.get("type", "") == "arrive"):
-			continue   # 도착 P 물체가 있으면 start 는 따로 안 그림 (예전 맵만)
+	# S (회차 시작). 도착 P 는 모두 물체(arrive) — start 는 저장용 값이라 그리지 않음 (P 를 다 지우면 P 없는 맵)
+	for key in ["run_start"]:
 		var p = map.get(key)
 		if p is Array and p.size() == 2:
 			var r := Rect2(pan + Vector2(p[0], p[1]) * s, Vector2(s, s)).grow(-s * 0.12)

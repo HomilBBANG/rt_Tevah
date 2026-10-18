@@ -1400,8 +1400,14 @@ def validate_field(d, maps, rep, enemies):
         elif not m.get("start"):
             if m.get("run_start"):
                 m["start"] = m["run_start"]
-            else:
-                rep.err(wm, "도착 P 도 회차 시작 S 도 없음 (P 를 하나 이상 두세요)")
+            else:   # P 없는 맵 (이어지는 가장자리로만 들어옴): 못 들어갈 때를 위해 첫 바닥 칸을 기본 자리로
+                first = next(([x, y] for y, r in enumerate(m["tiles"]) for x, c in enumerate(r) if c == "."), None)
+                if first is None:
+                    rep.err(wm, "바닥 칸이 하나도 없음")
+                else:
+                    m["start"] = first
+                    if not any((e or {}).get("seamless") for e in entrances_to(maps, mid).values()):
+                        rep.warn(wm, f"도착 P 가 없음 — 이 맵으로 들어오면 첫 바닥 칸 {first} 에 섬 (P 를 두거나 이어지는 가장자리로)")
         for key, label in (("start", "도착 P"), ("run_start", "회차 시작 S")):
             pos = m.get(key)
             if pos is None:

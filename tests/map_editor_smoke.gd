@@ -599,6 +599,17 @@ func _ready() -> void:
 	ed.undo()
 	cv.tile_layer = "floor"
 
+	# P 를 다 지운 맵: 저장하면 start 도 비고, 다시 열어도 P 가 되살아나지 않음 (기본 P·P 는 필수 아님)
+	ed.open_map("test_overhead")
+	await _frames(1)
+	cv.select_many(ed.map.objects.filter(func(o): return o.type == "arrive"))
+	ed.delete_selection()
+	ed.save()
+	var nop: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_overhead.json"))
+	ed.open_map("test_field")
+	ed.open_map("test_overhead")
+	check(nop.start == null and not ed.map.objects.any(func(o): return o.type == "arrive"), "P 를 다 지우면 P 없는 맵 (다시 열어도 그대로)")
+
 	# 월드 맵: 모든 맵 한눈에, 가장자리로 이어진 맵은 붙여서, 끌어서 배치(묶음째)·저장, 두 번 누르기 = 편집
 	ed.open_map("test_travel")
 	await _frames(1)

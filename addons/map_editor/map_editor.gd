@@ -408,8 +408,8 @@ func open_map(id: String) -> void:
 		map[key] = [int(pos[0]), int(pos[1])] if pos is Array and pos.size() == 2 else null
 	# 예전 맵 (도착 P 물체가 하나도 없음): 기본 도착 위치(start)를 ★ 기본 P 물체로
 	var ps: Array = map.objects.filter(func(o): return o.type == "arrive")
-	if ps.is_empty():
-		var st: Array = map.start if map.start != null else [1, 1]
+	if ps.is_empty() and map.start is Array and not map.has("edges"):   # 예전 맵만 (P 를 일부러 다 지운 맵은 start 가 비어 있음)
+		var st: Array = map.start
 		map.objects.insert(0, {"object_id": id + "_p", "type": "arrive", "x": st[0], "y": st[1], "ref": "", "name": "기본",
 			"text": "", "patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": "", "default": true})
 	path = p
@@ -467,6 +467,8 @@ func save() -> void:
 		map.start = [int(dp.x), int(dp.y)]   # 기본 P 자리 = start (게임·변환기가 읽음)
 	elif not ps.is_empty():
 		map.start = [int(ps[0].x), int(ps[0].y)]   # 기본 P 가 없으면 첫 P (테스트 플레이 시작 자리)
+	else:
+		map.start = null   # P 가 없는 맵 (이어지는 가장자리로만 들어옴)
 	# 무손실 저장: 맵·물체의 모든 칸을 그대로 쓴다 (에디터가 모르는 칸도). 빈 기본값만 빼서 예전 맵 파일이 그대로 유지되게
 	var out := {"map_id": map.map_id, "tiles": map.tiles, "start": map.get("start"), "run_start": map.get("run_start"),
 		"objects": []}
