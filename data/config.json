@@ -57,7 +57,7 @@
  "npc_wander_speed": 1.5,
  "npc_wander_wait_min": 2,
  "npc_wander_wait_max": 6,
- "view_mode": "iso",
+ "view_mode": "topdown",
  "iso_wall_height": 120,
  "opening_dialogue": ""
 }

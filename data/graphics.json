@@ -72,7 +72,7 @@
    "frames": 1,
    "fps": 6.0,
    "face": "wall_default_face",
-   "face_rows": 1,
+   "face_rows": 2,
    "h": 1
   },
   {
@@ -87,7 +87,7 @@
    "frames": 1,
    "fps": 6.0,
    "face": "wall_wood_face",
-   "face_rows": 2,
+   "face_rows": 3,
    "h": 1
   },
   {
@@ -297,7 +297,7 @@
    "frames": 1,
    "fps": 6.0,
    "face": "forest_face",
-   "face_rows": 1,
+   "face_rows": 2,
    "h": 1
   },
   {
