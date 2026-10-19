@@ -1063,12 +1063,15 @@ func _close_camp() -> void:
 
 
 # ---------------------------------------------------------------- NPC 대화
-func _start_dialogue(npc: Dictionary) -> void:
+## cover = 자동 시작 컷신: 첫 연출이 검게 덮기·색 화면이면 처음부터 덮인 화면으로 (맵이 먼저 보이지 않게)
+func _start_dialogue(npc: Dictionary, cover := false) -> void:
 	frozen = true
 	%Prompt.visible = false
 	_near_spot = {}
 	_dialogue_ui = DialogueScene.instantiate()
 	_dialogue_ui.embedded = true
+	if cover:
+		_dialogue_ui.start_cover = Direction.opening_cover(str(npc.data.ref))
 	_dialogue_ui.finished.connect(_on_dialogue_finished)
 	%Overlay.add_child(_dialogue_ui)
 	StoryRunner.start_dialogue(npc.data.ref)
@@ -1094,7 +1097,7 @@ func _play_cutscenes() -> void:
 		return
 	var id: String = _cutscenes.pop_front()
 	if DataLoader.nodes.has(id):
-		_start_dialogue({"data": {"ref": id}})
+		_start_dialogue({"data": {"ref": id}}, true)
 	else:
 		_play_cutscenes()
 
@@ -1125,32 +1128,36 @@ func _direct_step(s: Dictionary) -> void:
 			elif tw and s.get("wait", true):
 				await tw.finished
 		"camera":
+			# 카메라: from(있으면 그 칸에서 바로 시작) → who(인물·player) 또는 to 칸까지 time 초 동안. who=player 면 도착한 뒤 다시 따라감
 			var cam := _camera()
 			var who := str(s.get("who", ""))
 			var time := float(s.get("time", 1.0))
-			if who == "player":
-				_camera_follow()
-				return
+			if not cam.top_level:
+				var at := cam.get_screen_center_position()
+				cam.top_level = true
+				cam.position_smoothing_enabled = false   # 연출 중에는 정해진 대로 (따라가기로 돌아갈 때 다시 켬)
+				cam.global_position = at
+			var from = s.get("from")
+			if from is Array and from.size() == 2:
+				cam.global_position = _clamp_cam(view_pos(_tile_center(int(from[0]), int(from[1]))))
 			var target: Vector2
-			var actor := _actor(who) if who != "" else null
+			var actor: Node2D = player if who == "player" else (_actor(who) if who != "" else null)
 			if actor:
 				target = actor.global_position
 			else:
 				var to: Array = s.get("to", [0, 0])
 				target = _tile_center(int(to[0]), int(to[1]))
-			target = view_pos(target)
-			if not cam.top_level:
-				var at := cam.get_screen_center_position()
-				cam.top_level = true
-				cam.global_position = at
+			target = _clamp_cam(view_pos(target))
 			if time <= 0.0 or instant:
 				cam.global_position = target
 			else:
 				var tw := create_tween()
-				tw.tween_property(cam, "global_position", target, time).set_trans(Tween.TRANS_SINE)
+				tw.tween_property(cam, "global_position", target, time).set_trans(EASES.get(str(s.get("ease", "smooth")), Tween.TRANS_SINE)) 					.set_ease(Tween.EASE_IN_OUT)
 				_active_tweens.append(tw)
 				await tw.finished
 				_active_tweens.erase(tw)
+			if who == "player":
+				_camera_follow()
 		"vanish":
 			for n in npcs:
 				if n.data.object_id == s.get("who", ""):
@@ -1479,6 +1486,22 @@ func _camera() -> Camera2D:
 	return player.get_node_or_null("Camera2D") if player else null
 
 
+## 카메라 움직임 곡선 (연출 camera 의 ease): smooth = 천천히 시작·끝 / linear = 일정한 속도
+const EASES := {"smooth": Tween.TRANS_SINE, "linear": Tween.TRANS_LINEAR}
+
+
+## 카메라 중심을 맵 끝(카메라 limit) 안으로 — 맵 끝 너머를 노리면 화면이 안 움직이는 구간이 생기지 않게
+func _clamp_cam(p: Vector2) -> Vector2:
+	var cam := _camera()
+	if cam == null:
+		return p
+	var half := get_viewport_rect().size / (2.0 * cam.zoom)
+	var lo := Vector2(cam.limit_left, cam.limit_top) + half
+	var hi := Vector2(cam.limit_right, cam.limit_bottom) - half
+	return Vector2(clampf(p.x, lo.x, hi.x) if lo.x <= hi.x else (lo.x + hi.x) / 2.0,
+		clampf(p.y, lo.y, hi.y) if lo.y <= hi.y else (lo.y + hi.y) / 2.0)
+
+
 ## 카메라가 다시 플레이어를 따라간다
 func _camera_follow() -> void:
 	var cam := _camera()
@@ -1486,6 +1509,7 @@ func _camera_follow() -> void:
 		cam.top_level = false
 		cam.position = Vector2.ZERO
 		cam.offset = Vector2.ZERO
+		cam.position_smoothing_enabled = true
 
 
 # ---------------------------------------------------------------- 전투

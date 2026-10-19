@@ -34,6 +34,7 @@ var over_combat := false
 var start_page := 0
 ## 컷신일 때 '건너뛰기' 버튼을 보일지 (로고는 false — 버튼 없이 Esc 로만 넘김)
 var skip_button := true
+var start_cover := {}            # 덮인 화면으로 시작 (Direction.opening_cover — 자동 시작 컷신·맵 미리보기)
 
 var _pages: Array = []          # [{kind, text, speaker_id}]
 var _page_i := -1
@@ -105,6 +106,13 @@ func _ready() -> void:
 	fade.color = Color(0, 0, 0, 0)
 	add_child(fade)
 	move_child(fade, screen.get_index() + 1)
+	if not start_cover.is_empty():   # 첫 연출이 검게 덮기·색 화면이면 처음부터 덮어 둠 (맵이 먼저 보이지 않게)
+		var cc: Color = start_cover.color
+		if start_cover.layer == "screen":
+			screen.color = Color(cc.r, cc.g, cc.b, 1.0)
+			screen.visible = true
+		else:
+			fade.color = Color(cc.r, cc.g, cc.b, 1.0)
 	subtitle_name = Label.new()
 	subtitle_name.anchor_left = 0.1
 	subtitle_name.anchor_right = 0.9

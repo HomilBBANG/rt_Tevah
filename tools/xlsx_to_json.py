@@ -1089,6 +1089,12 @@ def check_steps(w, steps, field_objs, rep):
                 rep.err(sw, "플레이어는 숨길 수 없음")
             elif who != "player" and who not in people:
                 rep.err(sw, f"인물(who)은 player 또는 맵의 NPC object_id: '{who}'")
+        if do == "camera" and "from" in st:
+            fr = st.get("from")
+            if not (isinstance(fr, list) and len(fr) == 2 and all(isinstance(v, (int, float)) and v >= 0 for v in fr)):
+                rep.err(sw, f"카메라 시작 위치(from)는 [x, y]: '{fr}'")
+        if do == "camera" and str(st.get("ease", "smooth") or "smooth") not in ("smooth", "linear"):
+            rep.err(sw, f"카메라 ease 는 smooth / linear: '{st.get('ease')}'")
         if do == "walk" or (do == "camera" and not st.get("who")):
             to = st.get("to")
             if not (isinstance(to, list) and len(to) == 2 and all(isinstance(v, (int, float)) and v >= 0 for v in to)):

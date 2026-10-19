@@ -14,7 +14,8 @@ extends RefCounted
 ##     music_off {fade}            배경음 끄기
 ##   필드 (탐험 화면이 처리 — 대화 에디터 미리보기에서는 건너뜀):
 ##     walk      {who, to:[x,y], speed, wait}   who = player 또는 맵 물체 object_id(NPC), to 까지 길을 찾아 걷기 (칸/초)
-##     camera    {who 또는 to:[x,y], time}       카메라를 그 칸(또는 그 인물)으로. who = player 면 다시 플레이어를 따라감
+##     camera    {who 또는 to:[x,y], time, from?:[x,y], ease?}  카메라를 그 칸(또는 그 인물)으로 time 초 동안. from 이 있으면 먼저 그 칸으로 바로.
+##                                               who = player 면 플레이어까지 움직인 뒤 다시 따라감. ease = smooth(천천히 시작·끝, 기본) / linear
 ##     vanish    {who}                           그 NPC 를 숨김 (이번에 맵에 있는 동안 — 계속 없애려면 플래그 + 나타나는 조건)
 ##     face      {who, dir}                      바라보는 방향 (up / down / left / right). 걸을 때는 가는 쪽을 저절로 봄
 ## 건너뛰기(대화 화면의 '건너뛰기' 버튼·Esc): 단계에 "_instant": true 를 붙여 바로 끝난 모습으로 (기다림·흔들기·효과음은 생략).
@@ -57,6 +58,29 @@ static func normalize(s: Dictionary) -> Dictionary:
 	for k in s:
 		out[k] = s[k]
 	return out
+
+
+## 자동 시작 컷신이 '덮인 화면'으로 시작해야 하나: 시작 노드에서 (대화 시작·효과 카드를 지나) 처음 만나는 연출 카드의
+## 첫 단계가 검게·하얗게 덮기(fade) 또는 색 화면(screen)이면 → {layer: "fade"/"screen", color}. 아니면 {}.
+## 필드가 열리자마자 맵이 잠깐 보였다가 검게 덮이는 것을 막는다 (맵은 연출이 걷어낼 때 처음 보임).
+static func opening_cover(start_id: String) -> Dictionary:
+	var id := start_id
+	for i in 12:
+		var n: Dictionary = DataLoader.nodes.get(id, {})
+		var kind := str(n.get("kind", ""))
+		if n.is_empty() or not kind in ["start", "effect", "direct"]:
+			return {}
+		if kind == "direct":
+			var steps: Array = n.get("steps", [])
+			if not steps.is_empty():
+				var s := normalize(steps[0])
+				if s.do == "fade" and s.to in ["black", "white"]:
+					return {"layer": "fade", "color": Color.WHITE if s.to == "white" else Color.BLACK}
+				if s.do == "screen":
+					return {"layer": "screen", "color": Color.html(str(s.color)) if Color.html_is_valid(str(s.color)) else Color.BLACK}
+				return {}
+		id = str(n.get("next_node", ""))
+	return {}
 
 
 ## 그림 파일 목록 (art/cutscenes/ 의 png·jpg·webp)

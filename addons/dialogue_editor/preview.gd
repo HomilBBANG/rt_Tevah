@@ -49,8 +49,6 @@ func _start_on_map(node_id: String) -> void:
 	# 서 있는 칸의 이벤트 칸이 먼저 시작하지 않게 (미리볼 카드만)
 	_field._last_tile = Vector2i(floori(_field.player.position.x / _field.tile), floori(_field.player.position.y / _field.tile))
 	%Info.text = "미리보기 (맵 %s): %s   (Esc 로 다시 시작)" % [_map, node_id]
-	await get_tree().process_frame
-	await get_tree().process_frame
 	# 안내 글은 필드 HUD 위에 (맨 위 줄 아래)
 	var layer := CanvasLayer.new()
 	layer.layer = 50
@@ -58,7 +56,7 @@ func _start_on_map(node_id: String) -> void:
 	%Info.reparent(layer, false)
 	%Info.anchor_top = 0.105
 	%Info.anchor_bottom = 0.15
-	_field._start_dialogue({"data": {"ref": node_id}})
+	_field._start_dialogue({"data": {"ref": node_id}}, true)   # 첫 연출이 검게 덮기면 처음부터 덮인 화면 (게임의 자동 시작 컷신처럼)
 	_watch_end()
 
 

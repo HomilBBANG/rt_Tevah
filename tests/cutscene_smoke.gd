@@ -3,6 +3,7 @@ extends Node
 ## 스크린샷 user://cutscene_smoke/.
 ##   Godot_v4.7-stable_win64_console.exe --path . res://tests/cutscene_smoke.tscn
 
+const Direction = preload("res://core/direction.gd")
 const FieldScript = preload("res://scenes/field/field.gd")
 
 var _fail := 0
@@ -69,6 +70,29 @@ func _ready() -> void:
 	check(not f._dialogue_ui.skipping and Sound.music_file == "", "선택지에서 건너뛰기 멈춤, 배경음 끄기도 적용됨")
 	await StoryRunner.choose("tcut_long_c")
 	await _until(func(): return f._dialogue_ui == null, 2.0)
+	# 카메라: 시작 위치(from)에서 바로 → 플레이어까지 천천히 → 도착하면 다시 따라감
+	var cam: Camera2D = f._camera()
+	var cam_done := [false]
+	var go := func():
+		await f._direct_step({"do": "camera", "who": "player", "from": [9, 0], "time": 0.6})
+		cam_done[0] = true
+	go.call()
+	await get_tree().process_frame
+	var start_at := cam.global_position
+	check(cam.top_level and start_at.is_equal_approx(f._clamp_cam(f._tile_center(9, 0))) and not cam.position_smoothing_enabled,
+		"카메라 시작 위치: from 칸에서 바로 (맵 끝 안으로), 연출 중엔 부드럽게 따라가기 끔")
+	await _wait(0.3)
+	check(not cam_done[0], "그다음 플레이어 쪽으로 '시간' 동안 움직이는 중 (작은 테스트 맵은 화면보다 작아 위치는 같음)")
+	await _until(func(): return cam_done[0], 2.0)
+	check(cam_done[0] and not cam.top_level and cam.position_smoothing_enabled, "플레이어에 닿으면 다시 따라감")
+	# 덮인 화면으로 시작: 첫 연출이 검게 덮기면 처음부터 검게 (자동 시작 컷신 — 맵이 먼저 보이지 않게)
+	DataLoader.nodes["tcut_cover"] = {"node_id": "tcut_cover", "kind": "direct", "speaker_id": "", "text": "", "next_node": "EXIT", "on_enter": "",
+		"episode_id": "", "steps": [{"do": "fade", "to": "black", "time": 0.3}, {"do": "fade", "to": "clear", "time": 0.1}]}
+	check(Direction.opening_cover("tcut_cover").get("layer", "") == "fade" and Direction.opening_cover("tcut_b").is_empty(), "덮인 화면 판단: 첫 단계가 검게 덮기")
+	f._start_dialogue({"data": {"ref": "tcut_cover"}}, true)
+	check(f._dialogue_ui.fade.color.a == 1.0, "자동 시작 컷신은 처음 프레임부터 검은 화면")
+	await _until(func(): return f._dialogue_ui == null, 3.0)
+	DataLoader.nodes.erase("tcut_cover")
 	# 도착 칸이 이벤트 영역 안이면 들어오자마자 (문을 나서자마자 컷신)
 	f.map.objects.filter(func(o): return o.type == "event")[0].once = false
 	DataLoader.maps["tcut_map"].start = [3, 3]

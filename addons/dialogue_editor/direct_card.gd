@@ -204,10 +204,37 @@ func _step_box(i: int) -> Control:
 				changed.emit(key))
 			vb.add_child(w)
 		"camera":
-			_who(row, s, [["", "(칸으로)"], ["player", "플레이어 (다시 따라가기)"]], key)
+			_who(row, s, [["", "(칸으로)"], ["player", "플레이어 (도착하면 다시 따라가기)"]], key)
 			if s.get("who", "") == "":
 				_tile(row, s, key)
-			_num(row, "시간", s, "time", 0, 10, key)
+			_num(row, "시간", s, "time", 0, 60, key)
+			var ez := OptionButton.new()
+			for e in [["smooth", "천천히 시작·끝"], ["linear", "일정한 속도"]]:
+				ez.add_item(e[1])
+				if e[0] == str(s.get("ease", "smooth")):
+					ez.select(ez.item_count - 1)
+			ez.tooltip_text = "카메라가 움직이는 느낌"
+			ez.item_selected.connect(func(idx):
+				s.ease = ["smooth", "linear"][idx]
+				changed.emit(key))
+			row.add_child(ez)
+			var row2 := HBoxContainer.new()
+			vb.add_child(row2)
+			var fr := CheckBox.new()
+			fr.text = "시작 위치 (먼저 여기로 바로)"
+			fr.tooltip_text = "켜면 카메라가 이 칸에서 바로 시작해 위의 곳까지 '시간' 동안 움직임.
+예) 맵 위쪽 칸 → 플레이어, 시간 4초 = 위에서 천천히 내려오기 (화면이 덮여 있을 때 하면 자연스러움)"
+			fr.button_pressed = s.get("from") is Array
+			fr.toggled.connect(func(on):
+				if on:
+					s.from = (s.to.duplicate() if s.get("to") is Array else [0, 0])
+				else:
+					s.erase("from")
+				rebuild()
+				changed.emit(key))
+			row2.add_child(fr)
+			if s.get("from") is Array:
+				_tile(row2, s, key, "from")
 		"vanish":
 			_who(row, s, [], key)
 	if s.do in Direction.FIELD_STEPS:
@@ -293,9 +320,9 @@ func _who(row: HBoxContainer, s: Dictionary, first: Array, key: String) -> void:
 	row.add_child(o)
 
 
-func _tile(row: HBoxContainer, s: Dictionary, key: String) -> void:
-	if not s.get("to") is Array or s.to.size() != 2:
-		s.to = [0, 0]
+func _tile(row: HBoxContainer, s: Dictionary, key: String, k := "to") -> void:
+	if not s.get(k) is Array or s[k].size() != 2:
+		s[k] = [0, 0]
 	for j in 2:
 		var l := Label.new()
 		l.text = "xy"[j]
@@ -303,9 +330,9 @@ func _tile(row: HBoxContainer, s: Dictionary, key: String) -> void:
 		var sp := SpinBox.new()
 		sp.min_value = 0
 		sp.max_value = 500
-		sp.value = int(s.to[j])
+		sp.value = int(s[k][j])
 		var jj := j
 		sp.value_changed.connect(func(v):
-			s.to[jj] = int(v)
-			changed.emit(key + ":to"))
+			s[k][jj] = int(v)
+			changed.emit(key + ":" + k))
 		row.add_child(sp)
