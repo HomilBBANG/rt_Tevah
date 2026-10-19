@@ -8,6 +8,10 @@ const Direction = preload("res://core/direction.gd")
 const DIRECT_COLOR := Color(0.16, 0.32, 0.45)
 
 var lookups := {}
+var _step_i := 0   # 지금 그리는 단계 번호 (칸 고르기 창의 카메라 배율)
+
+## 칸 x·y 옆 📍: 맵을 보며 고르기 (대화 에디터가 tile_picker 창을 염) — s[k] = [x, y], other = 같은 단계의 다른 칸, zoom_px = 이 단계에서의 확대 배율
+signal tile_pick_requested(s: Dictionary, k: String, key: String, other: Variant, zoom_px: int)
 
 
 func uses_pages() -> bool:
@@ -58,6 +62,7 @@ func rebuild() -> void:
 
 
 func _step_box(i: int) -> Control:
+	_step_i = i
 	var steps: Array = data.steps
 	var s: Dictionary = Direction.normalize(steps[i])
 	steps[i] = s
@@ -388,3 +393,20 @@ func _tile(row: HBoxContainer, s: Dictionary, key: String, k := "to") -> void:
 			s[k][jj] = int(v)
 			changed.emit(key + ":" + k))
 		row.add_child(sp)
+	var pick := Button.new()
+	pick.text = "📍"
+	pick.tooltip_text = "맵을 보며 칸 고르기 (카메라 화면 테두리도 보임)"
+	var oth: Variant = s.get("from" if k == "to" else "to") if s.do == "camera" else null
+	var zp := _zoom_before(_step_i)
+	pick.pressed.connect(func(): tile_pick_requested.emit(s, k, key, oth, zp))
+	row.add_child(pick)
+
+
+## 단계 i 가 시작할 때의 확대 배율 (그 앞의 '확대·축소' 단계, 없으면 0 = 기본)
+func _zoom_before(i: int) -> int:
+	var z := 0
+	var steps: Array = data.steps
+	for j in mini(i, steps.size()):
+		if str(steps[j].get("do", "")) == "zoom":
+			z = int(steps[j].get("scale", 0))
+	return z

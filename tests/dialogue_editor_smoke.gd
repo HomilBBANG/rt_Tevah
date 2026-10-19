@@ -362,6 +362,27 @@ func _ready() -> void:
 	var dc2: GraphNode = ed.graph.get_node(dc_name)
 	check(dc2 is DirectCard and dc2.data.steps.size() == 2 and dc2.data.steps[0].file == "test_cg.png" and Vector2i(dc2.data.steps[1].to[0], dc2.data.steps[1].to[1]) == Vector2i(3, 4)
 		and dc2.data.next_node == "EXIT", "연출 카드: 그림·걷기 단계, 저장 후 다시 열어도 그대로 (%s → %s)" % [dc2.data.steps if dc2 is DirectCard else dc2, dc2.data.get("next_node", "") if dc2 else ""])
+	# 📍 맵에서 칸 고르기: 맵 그림 + 카메라 화면 테두리 (맵 끝 안으로), 누르면 그 칸
+	dc2.data.steps.append({"do": "zoom", "scale": 10, "time": 0.0})
+	dc2.data.steps.append({"do": "camera", "to": [2, 2], "time": 1.0})
+	dc2.rebuild()
+	var pins: Array = dc2.find_children("*", "Button", true, false).filter(func(b): return b.text == "📍")
+	check(pins.size() == 2, "칸 고르기 버튼 📍 (걷기·카메라)")
+	var picker: Window = ed.open_tile_picker(dc2, dc2.data.steps[3], "to", "t", null, dc2._zoom_before(3))
+	picker.map_id = "test_field"
+	await _frames(3)
+	picker._open("test_field")
+	await _frames(2)
+	var cr: Rect2 = picker.camera_rect(Vector2i(0, 0))
+	check(picker.zoom_px == 10 and cr.size.is_equal_approx(Vector2(1920, 1080) / 2.0) and cr.position.x >= 0.0 and cr.position.y >= 0.0,
+		"카메라 테두리: ×10 이면 화면의 반, 맵 끝 안으로 %s" % cr)
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = picker._pan + (Vector2(5, 3) + Vector2(0.5, 0.5)) * picker.tile * picker._scale
+	picker._on_input(click)
+	await _frames(1)
+	check(dc2.data.steps[3].to == [5, 3] and not is_instance_valid(picker), "맵을 누르면 그 칸이 들어가고 창이 닫힘 %s" % [dc2.data.steps[3].to])
 
 	# ---- 대화 목록: 순서 바꾸기·이름 바꾸기
 	var before: Array = ed._file_names()

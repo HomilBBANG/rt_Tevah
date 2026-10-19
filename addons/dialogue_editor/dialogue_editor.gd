@@ -16,6 +16,7 @@ const DirectCard = preload("res://addons/dialogue_editor/direct_card.gd")
 const ScriptPanel = preload("res://addons/dialogue_editor/script_panel.gd")
 const ScriptPages = preload("res://core/script_pages.gd")
 const Direction = preload("res://core/direction.gd")
+const TilePicker = preload("res://addons/dialogue_editor/tile_picker.gd")
 const ExprRows = preload("res://addons/expr_rows.gd")
 const ToolCommon = preload("res://addons/tool_common.gd")
 ## 카드 만들기 메뉴 / 왼쪽 팔레트 / 그래프 오른쪽 클릭
@@ -36,6 +37,7 @@ const PREVIEW_FILE := "user://dialogue_preview.json"
 const UNDO_LIMIT := 200
 
 var dir := DIALOGUE_DIR              # 테스트에서 바꿔 쓴다
+var _pick_map := ""                   # 칸 고르기 창에서 마지막으로 본 맵
 var preview_map: OptionButton        # 미리볼 맵 ("" = 맵 없이)
 var map_dir := "res://tools/maps/"   # 카드 이름을 바꿀 때 맵의 NPC·이벤트 ref 도 고침 (테스트에서 바꿔 쓴다)
 var dialogue := {}                   # 열린 대화 { dialogue_id, episode_id, text_speed, nodes, choices }
@@ -781,8 +783,40 @@ func _make_card(data: Dictionary, node_choices: Array, pos: Vector2) -> GraphNod
 	card.node_selected_for_edit.connect(func(c): _select(c))
 	card.page_requested.connect(func(c, page): _select(c, page))
 	card.position_offset_changed.connect(func(): _touch("move:" + String(card.name)))
+	if card is DirectCard:
+		card.tile_pick_requested.connect(func(s, k, key, other, zp): open_tile_picker(card, s, k, key, other, zp))
 	graph.add_child(card)
 	return card
+
+
+## 연출 카드의 칸을 맵에서 고르기. 맵 = 지난번에 고른 맵 → 위 줄 '미리볼 맵' → 이 대화의 '방 진입 후' 맵 → Config 시작 맵
+func open_tile_picker(card: GraphNode, s: Dictionary, k: String, key: String, other: Variant = null, zoom_px := 0) -> Window:
+	var w := TilePicker.new()
+	var mid := _pick_map
+	if mid == "" and preview_map and preview_map.selected > 0:
+		mid = preview_map.get_item_text(preview_map.selected)
+	if mid == "":
+		for c in _cards():
+			if c is StartCard and c.data.get("trigger") is Dictionary and str(c.data.trigger.get("map", "")) != "":
+				mid = str(c.data.trigger.map)
+	if mid == "":
+		mid = str(_read_json("res://data/config.json", {}).get("start_map", ""))
+	w.map_id = mid
+	if s.get(k) is Array and s[k].size() == 2:
+		w.current = Vector2i(int(s[k][0]), int(s[k][1]))
+	if other is Array and other.size() == 2:
+		w.other = Vector2i(int(other[0]), int(other[1]))
+	if zoom_px > 0:
+		w.zoom_px = zoom_px
+	w.picked.connect(func(c: Vector2i):
+		_pick_map = w.map_id
+		s[k] = [c.x, c.y]
+		card.rebuild()
+		card.changed.emit(key + ":" + k)
+		_status("칸 (%d, %d) — 맵 %s" % [c.x, c.y, w.map_id]))
+	add_child(w)
+	w.popup_centered()
+	return w
 
 
 func _make_terminal(node_name: String, label: String, pos: Vector2) -> GraphNode:
