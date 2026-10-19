@@ -35,6 +35,7 @@ const PREVIEW_FILE := "user://dialogue_preview.json"
 const UNDO_LIMIT := 200
 
 var dir := DIALOGUE_DIR              # 테스트에서 바꿔 쓴다
+var map_dir := "res://tools/maps/"   # 카드 이름을 바꿀 때 맵의 NPC·이벤트 ref 도 고침 (테스트에서 바꿔 쓴다)
 var dialogue := {}                   # 열린 대화 { dialogue_id, episode_id, text_speed, nodes, choices }
 var path := ""
 var dirty := false
@@ -1150,6 +1151,7 @@ func _edit_node(card: GraphNode) -> void:
 	_box_mode = "node"
 	_clear_inspector()
 	var d: Dictionary = card.data
+	_id_row(card)
 	if card is DirectCard:
 		_title("🎬 연출")
 		_section("기본")
@@ -1160,8 +1162,6 @@ func _edit_node(card: GraphNode) -> void:
 연출 중에는 대사 상자가 숨고 플레이어는 움직일 수 없습니다.")
 		_section("결과")
 		_target("다음 갈 곳", d, "next_node", card)
-		_section("고급", false)
-		_line("카드 ID", d.node_id, func(v): _rename_node(card, v))
 		return
 	if card is StartCard:
 		_title("▶ 대화 시작")
@@ -1192,8 +1192,6 @@ func _edit_node(card: GraphNode) -> void:
 			_box.add_child(mv)
 		_section("결과")
 		_target("그 외 갈 곳", d, "next_node", card)
-		_section("고급", false)
-		_line("카드 ID", d.node_id, func(v): _rename_node(card, v))
 		return
 	if card is FuncCard:
 		var branch: bool = d.kind == "branch"
@@ -1205,8 +1203,6 @@ func _edit_node(card: GraphNode) -> void:
 		_target("맞으면 갈 곳" if branch else "다음 갈 곳", d, "next_node", card)
 		if branch:
 			_target("아니면 갈 곳", d, "fail_next", card)
-		_section("고급", false)
-		_line("카드 ID", d.node_id, func(v): _rename_node(card, v))
 		return
 	_title("📝 대본 블록")
 	_section("기본")
@@ -1215,8 +1211,6 @@ func _edit_node(card: GraphNode) -> void:
 	_expr("이 블록에 들어올 때 효과", "effect", d.get("on_enter", ""), _setter(d, "on_enter", "on_enter:" + d.node_id))
 	_target("다음 갈 곳 (선택지가 없을 때)", d, "next_node", card)
 	_hint("선택지가 있으면 '다음 →' 대신 선택지가 나옵니다.")
-	_section("고급", false)
-	_line("카드 ID", d.node_id, func(v): _rename_node(card, v))
 
 
 func _edit_choice(card: GraphNode, index: int) -> void:
@@ -1297,16 +1291,53 @@ func _edit_choice(card: GraphNode, index: int) -> void:
 	_line("choice_id", c.choice_id, _setter(c, "choice_id", key + ":id"))
 
 
-func _rename_node(card: GraphNode, new_id: String) -> void:
+## 카드 이름(ID) 칸: 맨 위에 늘 보임. 바꾸면 이 대화·다른 대화 파일의 연결과 맵의 NPC·이벤트·가구(대화) 를 함께 고침
+func _id_row(card: GraphNode) -> void:
+	var row := HBoxContainer.new()
+	var l := Label.new()
+	l.text = "카드 이름"
+	l.tooltip_text = "카드 ID (영문·숫자·_). 다른 대화와 겹치면 안 됩니다"
+	row.add_child(l)
+	var e := LineEdit.new()
+	e.text = card.data.node_id
+	e.size_flags_horizontal = SIZE_EXPAND_FILL
+	e.tooltip_text = "바꾸면 이 카드로 오는 연결(다른 대화 포함)·맵의 NPC·이벤트·가구(대화)·goto: 도 함께 바뀝니다"
+	row.add_child(e)
+	var b := Button.new()
+	b.text = "이름 바꾸기"
+	b.pressed.connect(func(): _rename_node(card, e.text))
+	e.text_submitted.connect(func(v): _rename_node(card, v))
+	row.add_child(b)
+	inspector.add_child(row)
+
+
+## 카드 ID 바꾸기. 규칙: 영문·숫자·_, 이 대화·다른 대화 파일·엑셀 노드와 겹치지 않음.
+## 이 대화의 연결·goto 를 고치고 저장한 뒤, 다른 대화 파일의 연결·goto 와 맵 파일의 npc·event·furniture ref 도 고친다.
+func _rename_node(card: GraphNode, new_id: String) -> bool:
 	new_id = new_id.strip_edges()
 	var old: String = card.data.node_id
-	if new_id == old or new_id == "" or graph.get_node_or_null(NodePath(new_id)) != null:
-		return
+	if new_id == old or new_id == "":
+		return false
+	if not RegEx.create_from_string("^[A-Za-z0-9_]+$").search(new_id) or new_id in ["EXIT"]:
+		_status("⛔ 카드 이름은 영문·숫자·_ 만: " + new_id)
+		return false
+	var taken := _other_file_ids()
+	var dup_old := taken.has(old)   # 다른 대화에도 같은 이름이 있음 (예전 ID 중복) → 다른 파일·맵은 어느 쪽을 가리키는지 몰라 안 고침
+	for n in lookups.get("nodes", []):
+		taken[str(n[0])] = true
+	for c in _cards():
+		taken.erase(c.data.node_id)   # 이 대화의 (변환 때) 이름은 아래에서 따로
+	if graph.get_node_or_null(NodePath(new_id)) != null or taken.has(new_id):
+		_status("⛔ 이미 있는 이름이라 바꿀 수 없음: " + new_id)
+		return false
 	for other in _cards():
 		for port in other.out_ports.size():
 			var tgt: Array = other.port_target(port)
 			if tgt[0].get(tgt[1], "") == old:
 				tgt[0][tgt[1]] = new_id
+		_rename_goto(other.data, old, new_id)
+		for c in other.choices:
+			_rename_goto(c, old, new_id)
 	card.data.node_id = new_id
 	for c in card.choices:
 		c.node_id = new_id
@@ -1316,6 +1347,81 @@ func _rename_node(card: GraphNode, new_id: String) -> void:
 		other.rebuild()
 	_sync_connections()
 	_touch()
+	save()
+	if dup_old:
+		_status("카드 이름 %s → %s   (다른 대화에도 %s 가 있어서 그쪽 연결·맵은 그대로 — 이 카드를 쓰던 맵 이벤트·NPC 는 직접 다시 고르세요)" % [old, new_id, old])
+	else:
+		var touched := _rename_in_files(old, new_id)
+		_status("카드 이름 %s → %s%s" % [old, new_id, ("   (함께 고친 파일: %s)" % ", ".join(touched)) if not touched.is_empty() else ""])
+	if _selected_card == card:
+		_edit_node(card)
+	return true
+
+
+## 효과 글의 goto:old → goto:new (on_enter·effects·fail_effects)
+func _rename_goto(d: Dictionary, old: String, new_id: String) -> bool:
+	var rx := RegEx.create_from_string("goto:" + old + "(?![A-Za-z0-9_])")
+	var changed := false
+	for k in ["on_enter", "effects", "fail_effects"]:
+		if d.get(k) is String and rx.search(d[k]):
+			d[k] = rx.sub(d[k], "goto:" + new_id, true)
+			changed = true
+	return changed
+
+
+## 다른 대화 파일·맵 파일에서 old 를 가리키는 곳을 new_id 로 → 고친 파일 이름들
+func _rename_in_files(old: String, new_id: String) -> Array:
+	var out := []
+	for name in _file_names():
+		if name == dialogue.get("dialogue_id", ""):
+			continue
+		var d = _read_json(dir + name + ".json", null)
+		if not d is Dictionary:
+			continue
+		var changed := false
+		for n in d.get("nodes", []):
+			for k in ["next_node", "fail_next"]:
+				if str(n.get(k, "")) == old:
+					n[k] = new_id
+					changed = true
+			for r in n.get("routes", []):
+				if r is Dictionary and str(r.get("next_node", "")) == old:
+					r.next_node = new_id
+					changed = true
+			changed = _rename_goto(n, old, new_id) or changed
+		for c in d.get("choices", []):
+			for k in ["next_node", "fail_next"]:
+				if str(c.get(k, "")) == old:
+					c[k] = new_id
+					changed = true
+			changed = _rename_goto(c, old, new_id) or changed
+		if changed and _write_json(dir + name + ".json", d):
+			out.append(name + ".json")
+	var mdir := map_dir
+	for f in DirAccess.get_files_at(mdir):
+		if not f.ends_with(".json"):
+			continue
+		var m = _read_json(mdir + f, null)
+		if not m is Dictionary:
+			continue
+		var changed := false
+		for o in m.get("objects", []):
+			if o is Dictionary and str(o.get("type", "")) in ["npc", "event", "furniture"] and str(o.get("ref", "")) == old:
+				o.ref = new_id
+				changed = true
+		if changed and _write_json(mdir + f, m):
+			out.append("맵 " + f)
+	return out
+
+
+func _write_json(p: String, d: Variant) -> bool:
+	var f := FileAccess.open(p, FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_string(JSON.stringify(d, " ", false) + "
+")
+	f.close()
+	return true
 
 
 # ---------------------------------------------------------------- 변환·검사·미리보기
@@ -1647,29 +1753,156 @@ func _expr(label: String, mode: String, value: String, on_change: Callable) -> v
 ## 갈 곳 고르기: 대화 끝 / 엔딩 / 이 대화의 카드 / 다른 대화·엑셀의 노드 (같은 에피소드 범위만)
 func _target(label: String, d: Dictionary, key: String, card: GraphNode) -> void:
 	var episode: String = dialogue.get("episode_id", "")
-	var opts := [["", "(없음 · 연결선으로 정함)"]]
+	var specials := [["", "(없음 · 연결선으로 정함)"]]
 	if episode == "":
-		opts.append(["EXIT", "대화 끝 (EXIT)"])
+		specials.append(["EXIT", "대화 끝 (EXIT)"])
 	for e in lookups.get("endings", []):
 		if episode != "" and e[1] == episode:
-			opts.append(["END:" + e[0], "엔딩: " + e[0]])
-	var here := {}
-	for c in _cards():
-		var id: String = c.data.node_id
-		here[id] = true
-		if c is StartCard:
-			continue   # 대화 시작 카드로는 이을 수 없음 (들어오는 점 없음)
-		var what: String = "(연출)" if c is DirectCard else (("(조건 분기)" if c.data.kind == "branch" else "(효과 카드)") if c is FuncCard else c.summary().left(18))
-		opts.append([id, "이 대화: %s — %s" % [id, what]])
-	for n in lookups.get("nodes", []):
-		if not here.has(n[0]) and n[1] == episode:
-			opts.append([n[0], "다른 곳: %s — %s" % [n[0], n[2]]])
+			specials.append(["END:" + e[0], "엔딩: " + e[0]])
+	var groups := _target_groups(episode)
 	var cur: String = d.get(key, "")
-	if cur != "" and not opts.any(func(o): return o[0] == cur):
-		opts.append([cur, "⚠ %s (없는 곳)" % cur])
-	_option(label, opts.map(func(o): return o[0]), opts.map(func(o): return o[1]), cur, func(v):
+	var known := specials.any(func(o): return o[0] == cur)
+	for g in groups:
+		known = known or g.items.any(func(o): return o[0] == cur)
+	if cur != "" and not known:
+		specials.append([cur, "⚠ %s (없는 곳)" % cur])
+	var l := Label.new()
+	l.text = label
+	_box.add_child(l)
+	var b := Button.new()
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.clip_text = true
+	b.text = _target_label(cur, specials, groups) + "  ▾"
+	b.tooltip_text = "누르면 대화별로 묶인 목록에서 고름 (찾기 칸으로 이름·대사 검색)"
+	b.pressed.connect(func(): _open_target_picker(b, specials, groups, cur, func(v):
 		d[key] = v
-		_after_target_change(card))
+		_after_target_change(card)))
+	_box.add_child(b)
+
+
+## 갈 곳 후보를 대화(파일)별로 묶음 — 대화 목록 순서(_order), 지금 대화가 맨 위. 묶음 안은 카드 위치 순서(왼쪽 → 오른쪽, 위 → 아래 = 흐름 순서).
+## 대화 시작 카드는 이을 수 없어 빠짐. 엑셀 Nodes 의 노드는 '엑셀' 묶음.
+func _target_groups(episode: String) -> Array:
+	var groups := []
+	var in_files := {}
+	var here: String = str(dialogue.get("dialogue_id", ""))
+	var mine := []
+	for c in _cards():
+		in_files[c.data.node_id] = true
+		if c is StartCard:
+			continue
+		var what: String = "(연출)" if c is DirectCard else (("(조건 분기)" if c.data.kind == "branch" else "(효과 카드)") if c is FuncCard else c.summary().left(22))
+		mine.append([c.data.node_id, "%s — %s" % [c.data.node_id, what], c.position_offset])
+	groups.append({"title": "💬 %s  (지금 대화)" % here, "items": _by_pos(mine), "open": true})
+	for name in _file_names():
+		if name == here:
+			continue
+		var fd = _read_json(dir + name + ".json", {})
+		if not fd is Dictionary or str(fd.get("episode_id", "")) != episode:
+			for n in (fd.get("nodes", []) if fd is Dictionary else []):
+				in_files[str(n.get("node_id", ""))] = true
+			continue
+		var items := []
+		for n in fd.get("nodes", []):
+			in_files[str(n.get("node_id", ""))] = true
+			if str(n.get("kind", "")) == "start":
+				continue
+			var k := str(n.get("kind", ""))
+			var what := "(연출)" if k == "direct" else ("(조건 분기)" if k == "branch" else ("(효과 카드)" if k == "effect" else ""))
+			if what == "":
+				var pages: Array = n.get("pages", []) if n.get("pages") is Array else []
+				what = ScriptPages.parse_text(str(pages[0].get("text", "")) if not pages.is_empty() else str(n.get("text", ""))).text.left(22)
+			var pos = n.get("pos", [0, 0])
+			items.append([str(n.node_id), "%s — %s" % [n.node_id, what], Vector2(float(pos[0]), float(pos[1])) if pos is Array and pos.size() == 2 else Vector2.ZERO])
+		if not items.is_empty():
+			groups.append({"title": "💬 " + name, "items": _by_pos(items), "open": false})
+	var excel := []
+	for n in lookups.get("nodes", []):
+		if not in_files.has(n[0]) and n[1] == episode:
+			excel.append([n[0], "%s — %s" % [n[0], n[2]]])
+	if not excel.is_empty():
+		groups.append({"title": "📄 엑셀 (Nodes 시트)", "items": excel, "open": false})
+	return groups
+
+
+## 카드 위치 순서 (흐름: 왼쪽 → 오른쪽, 같은 줄이면 위 → 아래) → [[값, 표시]]
+func _by_pos(items: Array) -> Array:
+	items.sort_custom(func(a, b): return a[2].x < b[2].x - 1.0 or (absf(a[2].x - b[2].x) <= 1.0 and a[2].y < b[2].y))
+	return items.map(func(it): return [it[0], it[1]])
+
+
+func _target_label(cur: String, specials: Array, groups: Array) -> String:
+	for o in specials:
+		if o[0] == cur:
+			return o[1]
+	for g in groups:
+		for o in g.items:
+			if o[0] == cur:
+				return o[1]
+	return cur
+
+
+## 갈 곳 고르기 창: 찾기 칸 + 대화별로 접히는 목록 (지금 대화와 지금 고른 곳이 든 대화는 펼침)
+func _open_target_picker(anchor: Control, specials: Array, groups: Array, cur: String, on_pick: Callable) -> void:
+	var pop := PopupPanel.new()
+	var vb := VBoxContainer.new()
+	vb.custom_minimum_size = Vector2(460, 520)
+	pop.add_child(vb)
+	var find := LineEdit.new()
+	find.placeholder_text = "찾기 (카드 이름·대사)"
+	find.clear_button_enabled = true
+	vb.add_child(find)
+	var tree := Tree.new()
+	tree.hide_root = true
+	tree.size_flags_vertical = SIZE_EXPAND_FILL
+	vb.add_child(tree)
+	var fill := func(q: String) -> void:
+		tree.clear()
+		var root := tree.create_item()
+		q = q.strip_edges().to_lower()
+		for o in specials:
+			if q == "" or o[1].to_lower().contains(q):
+				var it := tree.create_item(root)
+				it.set_text(0, o[1])
+				it.set_metadata(0, o[0])
+				if o[0] == cur:
+					it.select(0)
+		for g in groups:
+			var items: Array = g.items.filter(func(o): return q == "" or o[1].to_lower().contains(q))
+			if items.is_empty():
+				continue
+			var gi := tree.create_item(root)
+			gi.set_text(0, "%s  (%d)" % [g.title, items.size()])
+			gi.set_custom_color(0, Color("8fb8ff"))
+			gi.collapsed = not (g.open or q != "" or items.any(func(o): return o[0] == cur))
+			for o in items:
+				var it := tree.create_item(gi)
+				it.set_text(0, o[1])
+				it.set_metadata(0, o[0])
+				if o[0] == cur:
+					it.select(0)
+	fill.call("")
+	find.text_changed.connect(func(t): fill.call(t))
+	tree.item_activated.connect(func():
+		var it := tree.get_selected()
+		if it and it.get_metadata(0) != null:
+			pop.hide()
+			on_pick.call(str(it.get_metadata(0))))
+	tree.item_mouse_selected.connect(func(_p, _b):   # 대화 이름 = 펼치기·접기, 카드 = 고르기
+		var it := tree.get_selected()
+		if it == null:
+			return
+		if it.get_metadata(0) == null:
+			it.collapsed = not it.collapsed
+			it.deselect(0)
+			return
+		pop.hide()
+		on_pick.call(str(it.get_metadata(0))))
+	pop.popup_hide.connect(pop.queue_free)
+	add_child(pop)
+	var r := anchor.get_global_rect()
+	pop.popup(Rect2i(Vector2i(r.position.x, r.end.y), Vector2i(460, 520)))
+	find.grab_focus()
 
 
 ## 아무것도 고르지 않았을 때 오른쪽 칸 안내

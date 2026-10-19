@@ -26,8 +26,13 @@ func _ready() -> void:
 		w.close()
 	var original: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "npc1.json"))
 
+	DirAccess.make_dir_recursive_absolute("user://test_dialogue_maps/")
+	var tm := FileAccess.open("user://test_dialogue_maps/tm.json", FileAccess.WRITE)
+	tm.store_string(JSON.stringify({"map_id": "tm", "tiles": ["..."], "objects": [{"object_id": "tm_ev", "type": "event", "x": 0, "y": 0, "ref": "fd_npc1_fail"}]}))
+	tm.close()
 	ed = Editor.new()
 	ed.dir = TEST_DIR
+	ed.map_dir = "user://test_dialogue_maps/"
 	ed.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
 	bg.color = Color(0.13, 0.14, 0.17)
@@ -73,6 +78,20 @@ func _ready() -> void:
 	# 이름 바꾸기: 다른 카드의 연결도 따라감
 	ed._rename_node(ed.graph.get_node("fd_npc1_fail"), "npc1_fail_renamed")
 	check(card.choices[0].fail_next == "npc1_fail_renamed", "노드 이름 바꾸면 연결도 따라감")
+	var tmap: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("user://test_dialogue_maps/tm.json"))
+	check(tmap.objects[0].ref == "npc1_fail_renamed", "맵의 이벤트가 가리키던 카드 이름도 함께 바뀜")
+	var cat_id: String = (JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "cat.json")).nodes[0].node_id)
+	check(not ed._rename_node(ed.graph.get_node("npc1_fail_renamed"), cat_id) and ed.graph.get_node_or_null("npc1_fail_renamed") != null,
+		"다른 대화의 카드 이름과 겹치면 안 바뀜 (%s)" % cat_id)
+	check(not ed._rename_node(ed.graph.get_node("npc1_fail_renamed"), "한글 이름"), "영문·숫자·_ 가 아니면 안 바뀜")
+	# 갈 곳 목록: 대화별 묶음 (지금 대화가 맨 위·펼침, 다른 대화는 접힘), 묶음 안은 카드 위치 순서
+	var groups: Array = ed._target_groups("")
+	check(groups.size() >= 2 and "지금 대화" in groups[0].title and groups[0].open and groups.slice(1).all(func(g): return not g.open)
+		and groups.any(func(g): return "cat" in g.title), "갈 곳: 대화별 묶음 %s" % [groups.map(func(g): return g.title)])
+	var xs: Array = groups[0].items.map(func(o): return ed.graph.get_node(NodePath(o[0])).position_offset.x)
+	var sorted_xs := xs.duplicate()
+	sorted_xs.sort()
+	check(xs == sorted_xs and not groups[0].items.any(func(o): return ed.graph.get_node(NodePath(o[0])) is StartCard), "묶음 안 = 왼쪽부터 (흐름 순서), 대화 시작 카드는 빠짐")
 	ed.save()
 	var after: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "npc1.json"))
 	check(after.nodes.size() == 4 and after.choices.size() == 5, "저장: 노드 4, 선택지 5")
