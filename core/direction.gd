@@ -4,6 +4,8 @@ extends RefCounted
 ##   화면 (대화 화면이 처리 — 어디서든):
 ##     image     {file, fade}      직접 만든 그림을 화면 가득 (art/cutscenes/<file>). 대사 상자는 그 위에 뜬다
 ##     image_off {fade}            그림 내리기
+##     screen    {color, fade}     색 화면 (검은 화면·아무 색, "#RRGGBB") — 그림 칸처럼 대사 상자 아래, 그 위에 글을 띄울 수 있음
+##     screen_off {fade}           색 화면 내리기
 ##     fade      {to, time}        to = black / white (화면 덮기) / clear (걷기)
 ##     shake     {power, time}     화면 흔들기 (power 1~3)
 ##     wait      {time}            기다리기 (초)
@@ -21,12 +23,12 @@ extends RefCounted
 const CUTSCENE_DIR := "res://art/cutscenes/"
 const SFX_DIR := "res://audio/sfx/"
 const BGM_DIR := "res://audio/bgm/"
-const SCREEN_STEPS := ["image", "image_off", "fade", "shake", "wait", "sound", "music", "music_off"]
+const SCREEN_STEPS := ["image", "image_off", "screen", "screen_off", "fade", "shake", "wait", "sound", "music", "music_off"]
 const FIELD_STEPS := ["walk", "camera", "vanish", "face"]
 const DIRS := ["up", "down", "left", "right"]
 const DIR_VEC := {"up": Vector2.UP, "down": Vector2.DOWN, "left": Vector2.LEFT, "right": Vector2.RIGHT}
 const LABEL := {
-	"image": "🖼 그림 띄우기", "image_off": "그림 내리기", "fade": "페이드 (검게·하얗게·걷기)", "shake": "화면 흔들기",
+	"image": "🖼 그림 띄우기", "image_off": "그림 내리기", "screen": "■ 색 화면 띄우기", "screen_off": "색 화면 내리기", "fade": "페이드 (검게·하얗게·걷기)", "shake": "화면 흔들기",
 	"wait": "기다리기", "sound": "🔊 효과음", "music": "🎵 배경음 틀기", "music_off": "배경음 끄기",
 	"walk": "🚶 걷게 하기 (필드)", "face": "↻ 바라보기 (필드)", "camera": "🎥 카메라 옮기기 (필드)", "vanish": "NPC 숨기기 (필드)",
 }
@@ -35,6 +37,8 @@ const FADE_TO := ["black", "white", "clear"]
 const DEFAULTS := {
 	"image": {"file": "", "fade": 0.5},
 	"image_off": {"fade": 0.5},
+	"screen": {"color": "#000000", "fade": 0.5},
+	"screen_off": {"fade": 0.5},
 	"fade": {"to": "black", "time": 0.6},
 	"shake": {"power": 1.0, "time": 0.4},
 	"wait": {"time": 1.0},

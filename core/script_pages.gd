@@ -5,12 +5,18 @@ extends RefCounted
 ## 페이지: { page_id, display, speaker_id, text, speed, advance, auto_wait }
 ##   display   — narration(상황 묘사 상자) / bubble(말풍선, 화자 필요) / system(시스템 메시지 상자)
 ##               / subtitle(자막 — 상자 없이 화면 아래 글자만, 영상 자막처럼. 화자는 있어도 되고 없어도 됨)
+##               / free(자유 위치 글자 — 상자 없이 화면 아무 곳에: x·y = 화면의 % (0~100, 글자 묶음의 기준점),
+##                 align = left(기준점에서 오른쪽으로) / center / right(기준점에서 왼쪽으로), 세로는 기준점이 가운데,
+##                 size = 글자 크기 px(1920×1080 기준), color = "#RRGGBB")
 ##   speed     — "" = 기본 (대화 파일 text_speed → Config text_speed_default) / instant / slow / normal / fast / 숫자(초당 글자 수)
 ##   advance   — input(입력 대기, 기본) / auto(다 나오고 auto_wait 초 뒤 자동 넘김)
 ##   text 안의 {w=0.5} = 그 자리에서 0.5초 멈춤. 빈 줄 = 문단, 줄바꿈 = 강제 줄바꿈, 나머지는 자동 줄바꿈.
 
-const DISPLAYS := ["narration", "bubble", "system", "subtitle"]
-const DISPLAY_LABEL := {"narration": "상황 묘사", "bubble": "말풍선", "system": "시스템 메시지", "subtitle": "자막 (대화창 없이)"}
+const DISPLAYS := ["narration", "bubble", "system", "subtitle", "free"]
+const DISPLAY_LABEL := {"narration": "상황 묘사", "bubble": "말풍선", "system": "시스템 메시지", "subtitle": "자막 (대화창 없이)", "free": "자유 위치 글자"}
+const ALIGNS := ["left", "center", "right"]
+## 자유 위치 글자의 기본값
+const FREE_DEFAULTS := {"x": 50.0, "y": 50.0, "size": 38, "align": "center", "color": "#FFFFFF"}
 ## 화자를 쓰는 표시 (말풍선은 꼭, 자막은 골라도 되고 안 골라도 됨)
 const WITH_SPEAKER := ["bubble", "subtitle"]
 const SPEEDS := ["instant", "slow", "normal", "fast"]
@@ -37,7 +43,7 @@ static func normalize(p: Dictionary, index := 0) -> Dictionary:
 	var display: String = str(p.get("display", ""))
 	if not display in DISPLAYS:
 		display = "bubble" if sp != "" else "narration"
-	return {
+	var out := {
 		"page_id": str(p.get("page_id", "")) if str(p.get("page_id", "")) != "" else "p%d" % (index + 1),
 		"display": display,
 		"speaker_id": sp if display in WITH_SPEAKER else "",
@@ -46,6 +52,13 @@ static func normalize(p: Dictionary, index := 0) -> Dictionary:
 		"advance": "auto" if str(p.get("advance", "")) == "auto" else "input",
 		"auto_wait": float(p.get("auto_wait", 1.0)) if str(p.get("auto_wait", "")) != "" else 1.0,
 	}
+	if display == "free":   # 자유 위치 글자: 위치·크기·정렬·색
+		out.x = clampf(float(p.get("x", FREE_DEFAULTS.x)), 0.0, 100.0)
+		out.y = clampf(float(p.get("y", FREE_DEFAULTS.y)), 0.0, 100.0)
+		out.size = maxi(8, int(p.get("size", FREE_DEFAULTS.size)))
+		out.align = str(p.get("align", "")) if str(p.get("align", "")) in ALIGNS else FREE_DEFAULTS.align
+		out.color = str(p.get("color", "")) if Color.html_is_valid(str(p.get("color", ""))) else FREE_DEFAULTS.color
+	return out
 
 
 ## 기본값만 가진 페이지인가 (편집기가 예전 형식 — pages 없이 — 으로 저장해도 되는지)

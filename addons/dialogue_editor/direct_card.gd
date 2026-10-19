@@ -137,8 +137,19 @@ func _step_box(i: int) -> Control:
 					thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 					thumb.custom_minimum_size = Vector2(240, 135)
 					vb.add_child(thumb)
-		"image_off":
+		"image_off", "screen_off":
 			_num(row, "사라지는 시간", s, "fade", 0, 10, key)
+		"screen":
+			var cp := ColorPickerButton.new()
+			cp.color = Color.html(str(s.color)) if Color.html_is_valid(str(s.color)) else Color.BLACK
+			cp.edit_alpha = false
+			cp.custom_minimum_size = Vector2(60, 28)
+			cp.tooltip_text = "화면 색 (검은 화면이면 검정)"
+			cp.color_changed.connect(func(c):
+				s.color = "#" + c.to_html(false).to_upper()
+				changed.emit(key))
+			row.add_child(cp)
+			_num(row, "나타나는 시간", s, "fade", 0, 10, key)
 		"fade":
 			var o := OptionButton.new()
 			for t in [["black", "검게 덮기"], ["white", "하얗게 덮기"], ["clear", "걷기 (다시 보이게)"]]:

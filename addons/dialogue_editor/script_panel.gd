@@ -102,6 +102,95 @@ func move_page(from: int, to: int) -> void:
 	_after_change("page_move", to)
 
 
+## 자유 위치 글자: 가로·세로 위치(화면 %), 글자 크기, 정렬, 색 + 작은 화면 미리보기(누르면 그 자리로)
+func _free_row(p: Dictionary, i: int) -> Control:
+	var box := VBoxContainer.new()
+	var row := HBoxContainer.new()
+	box.add_child(row)
+	var key := "page_free:%s:%d" % [card.data.node_id, i]
+	var spins := {}
+	for f in [["x", "가로 %", 0, 100], ["y", "세로 %", 0, 100], ["size", "크기", 8, 200]]:
+		var l := Label.new()
+		l.text = f[1]
+		row.add_child(l)
+		var sp := SpinBox.new()
+		sp.min_value = f[2]
+		sp.max_value = f[3]
+		sp.step = 1
+		sp.value = float(p.get(f[0], ScriptPages.FREE_DEFAULTS[f[0]]))
+		sp.tooltip_text = "글자 묶음의 기준점: 화면 왼쪽 위 = 0, 오른쪽·아래 끝 = 100" if f[0] != "size" else "글자 크기 (px, 1920×1080 기준)"
+		var k: String = f[0]
+		sp.value_changed.connect(func(v):
+			p[k] = int(v) if k == "size" else v
+			changed.emit(key)
+			_free_preview_update.call_deferred(box, p))
+		row.add_child(sp)
+		spins[k] = sp
+	var al := OptionButton.new()
+	for a in [["left", "왼쪽 맞춤 (기준점부터 →)"], ["center", "가운데"], ["right", "오른쪽 맞춤 (← 기준점까지)"]]:
+		al.add_item(a[1])
+		if a[0] == str(p.get("align", "center")):
+			al.select(al.item_count - 1)
+	al.item_selected.connect(func(ai):
+		p.align = ScriptPages.ALIGNS[ai]
+		changed.emit(key)
+		_free_preview_update.call_deferred(box, p))
+	row.add_child(al)
+	var cp := ColorPickerButton.new()
+	cp.color = Color.html(str(p.get("color", "#FFFFFF"))) if Color.html_is_valid(str(p.get("color", ""))) else Color.WHITE
+	cp.edit_alpha = false
+	cp.custom_minimum_size = Vector2(48, 28)
+	cp.tooltip_text = "글자 색"
+	cp.color_changed.connect(func(c):
+		p.color = "#" + c.to_html(false).to_upper()
+		changed.emit(key)
+		_free_preview_update.call_deferred(box, p))
+	row.add_child(cp)
+	# 미리보기: 16:9 작은 화면, 누르면 그 자리가 기준점
+	var pv := ColorRect.new()
+	pv.name = "FreePreview"
+	pv.color = Color(0.05, 0.05, 0.07)
+	pv.custom_minimum_size = Vector2(256, 144)
+	pv.size_flags_horizontal = SIZE_SHRINK_BEGIN
+	pv.tooltip_text = "누르면 그 자리로 옮김 (화면 1920×1080 을 줄인 모습)"
+	pv.gui_input.connect(func(ev):
+		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+			spins.x.value = roundf(clampf(ev.position.x / pv.size.x, 0, 1) * 100.0)
+			spins.y.value = roundf(clampf(ev.position.y / pv.size.y, 0, 1) * 100.0))
+	var t := Label.new()
+	t.name = "T"
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pv.add_child(t)
+	var dot := ColorRect.new()
+	dot.name = "Dot"
+	dot.color = Color("c58cff")
+	dot.size = Vector2(5, 5)
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pv.add_child(dot)
+	box.add_child(pv)
+	_free_preview_update.call_deferred(box, p)
+	return box
+
+
+func _free_preview_update(box: Control, p: Dictionary) -> void:
+	var pv: Control = box.get_node_or_null("FreePreview")
+	if pv == null:
+		return
+	var k := pv.custom_minimum_size.x / 1920.0
+	var t: Label = pv.get_node("T")
+	t.text = ScriptPages.parse_text(str(p.get("text", ""))).text
+	t.add_theme_font_size_override("font_size", maxi(4, int(float(p.get("size", 38)) * k)))
+	var c := str(p.get("color", "#FFFFFF"))
+	t.add_theme_color_override("font_color", Color.html(c) if Color.html_is_valid(c) else Color.WHITE)
+	var al := str(p.get("align", "center"))
+	t.horizontal_alignment = {"left": HORIZONTAL_ALIGNMENT_LEFT, "right": HORIZONTAL_ALIGNMENT_RIGHT}.get(al, HORIZONTAL_ALIGNMENT_CENTER)
+	t.reset_size()
+	var at := Vector2(float(p.get("x", 50)) / 100.0, float(p.get("y", 50)) / 100.0) * pv.custom_minimum_size
+	var px := at.x - (t.size.x / 2.0 if al == "center" else (t.size.x if al == "right" else 0.0))
+	t.position = Vector2(px, at.y - t.size.y / 2.0)
+	pv.get_node("Dot").position = at - Vector2(2, 2)
+
+
 func _after_change(key: String, focus := -1) -> void:
 	card.rebuild()
 	changed.emit(key + ":" + card.data.node_id)
@@ -153,7 +242,7 @@ func _page_box(i: int) -> Control:
 	var panel := PanelContainer.new()
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.16, 0.18, 0.22)
-	sb.border_color = {"narration": Color("c9c9c9"), "bubble": Color("8fb8ff"), "system": Color("7a7a7a"), "subtitle": Color("ffd27a")}[p.display]
+	sb.border_color = {"narration": Color("c9c9c9"), "bubble": Color("8fb8ff"), "system": Color("7a7a7a"), "subtitle": Color("ffd27a"), "free": Color("c58cff")}[p.display]
 	sb.border_width_left = 4
 	sb.set_corner_radius_all(4)
 	sb.set_content_margin_all(8)
@@ -176,13 +265,17 @@ func _page_box(i: int) -> Control:
 	for d in ScriptPages.DISPLAYS:
 		disp.add_item(ScriptPages.DISPLAY_LABEL[d])
 	disp.select(ScriptPages.DISPLAYS.find(p.display))
-	disp.tooltip_text = "상황 묘사 = 밝은 상자 / 말풍선 = 화자의 대사 / 시스템 메시지 = 검은 상자 / 자막 = 상자 없이 화면 아래 글자만 (인트로·영상 자막)"
+	disp.tooltip_text = "상황 묘사 = 밝은 상자 / 말풍선 = 화자의 대사 / 시스템 메시지 = 검은 상자 / 자막 = 상자 없이 화면 아래 글자만 (인트로·영상 자막) / 자유 위치 글자 = 상자 없이 화면 아무 곳에 (위치·크기·정렬·색)"
 	disp.item_selected.connect(func(k):
 		p.display = ScriptPages.DISPLAYS[k]
 		if p.display == "bubble" and p.speaker_id == "" and not speakers.is_empty():
 			p.speaker_id = speakers[0][0]
 		elif not p.display in ScriptPages.WITH_SPEAKER:
 			p.speaker_id = ""
+		if p.display == "free":
+			for fk in ScriptPages.FREE_DEFAULTS:
+				if not p.has(fk):
+					p[fk] = ScriptPages.FREE_DEFAULTS[fk]
 		_after_change("page_display", i))
 	row.add_child(disp)
 	# 화자 (말풍선일 때만)
@@ -254,6 +347,10 @@ func _page_box(i: int) -> Control:
 	var gap := Control.new()
 	gap.size_flags_horizontal = SIZE_EXPAND_FILL
 	row.add_child(gap)
+	var free_box: Control = null
+	if p.display == "free":
+		free_box = _free_row(p, i)
+		vb.add_child(free_box)
 	# 본문
 	var te := TextEdit.new()
 	te.text = p.text
@@ -273,6 +370,8 @@ func _page_box(i: int) -> Control:
 	show_warn.call()
 	te.text_changed.connect(func():
 		p.text = te.text
+		if free_box != null:
+			_free_preview_update(free_box, p)
 		show_warn.call()
 		card.rebuild()
 		changed.emit("page_text:%s:%d" % [card.data.node_id, i]))

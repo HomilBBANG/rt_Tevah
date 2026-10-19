@@ -15,7 +15,7 @@ extends Control
 const ChoiceButton = preload("res://ui/choice_button.gd")
 const ScriptPages = preload("res://core/script_pages.gd")
 const Direction = preload("res://core/direction.gd")
-const KIND_OF := {"narration": "situation", "bubble": "dialogue", "system": "system", "subtitle": "subtitle"}
+const KIND_OF := {"narration": "situation", "bubble": "dialogue", "system": "system", "subtitle": "subtitle", "free": "free"}
 
 ## 탐험 필드 위에 겹쳐 띄운 NPC 대화가 끝남 (embedded 일 때만)
 signal finished
@@ -58,6 +58,7 @@ var _type_wait := 0.0
 var _auto_left := -1.0          # 자동 넘김까지 남은 초 (-1 = 없음)
 # 🎬 연출 (core/direction.gd): 그림 칸·페이드 칸은 배경 바로 위, 대사 상자 아래 (검은 화면·그림 위에 글을 띄울 수 있게)
 var cg: TextureRect
+var screen: ColorRect           # 색 화면 (연출 screen — 그림 칸 위, 페이드 아래)
 var fade: ColorRect
 var directing := false
 var cutscene := false           # 이 대화에서 연출 카드를 한 번이라도 돌렸나 (건너뛰기 버튼이 보임)
@@ -66,6 +67,7 @@ var skip_btn: Button
 # 자막 (상자 없이 화면 아래 글자 — 영상 자막처럼)
 var subtitle: Label
 var subtitle_name: Label
+var free_text: Label             # 자유 위치 글자 (상자 없이 화면 아무 곳에 — 페이지 display free)
 var _tweens: Array = []
 
 
@@ -90,12 +92,19 @@ func _ready() -> void:
 	cg.visible = false
 	add_child(cg)
 	move_child(cg, $Scene.get_index() + 1)
+	screen = ColorRect.new()
+	screen.set_anchors_preset(PRESET_FULL_RECT)
+	screen.mouse_filter = MOUSE_FILTER_IGNORE
+	screen.color = Color(0, 0, 0, 0)
+	screen.visible = false
+	add_child(screen)
+	move_child(screen, cg.get_index() + 1)
 	fade = ColorRect.new()
 	fade.set_anchors_preset(PRESET_FULL_RECT)
 	fade.mouse_filter = MOUSE_FILTER_IGNORE
 	fade.color = Color(0, 0, 0, 0)
 	add_child(fade)
-	move_child(fade, cg.get_index() + 1)
+	move_child(fade, screen.get_index() + 1)
 	subtitle_name = Label.new()
 	subtitle_name.anchor_left = 0.1
 	subtitle_name.anchor_right = 0.9
@@ -126,6 +135,12 @@ func _ready() -> void:
 	subtitle.mouse_filter = MOUSE_FILTER_IGNORE
 	subtitle.visible = false
 	add_child(subtitle)
+	free_text = Label.new()
+	free_text.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	free_text.add_theme_constant_override("outline_size", 10)
+	free_text.mouse_filter = MOUSE_FILTER_IGNORE
+	free_text.visible = false
+	add_child(free_text)
 	skip_btn = Button.new()
 	skip_btn.text = "건너뛰기 ▶▶"
 	skip_btn.tooltip_text = "컷신을 건너뜁니다 (Esc). 선택지가 나오면 멈춥니다"
@@ -220,7 +235,7 @@ func _on_node_shown(node: Dictionary, _speaker_name: String) -> void:
 		var parsed := ScriptPages.parse_text(p.text)
 		_pages.append({"kind": KIND_OF[p.display], "text": parsed.text, "pauses": parsed.pauses, "speaker_id": p.speaker_id,
 			"cps": ScriptPages.cps(p.speed, DataLoader.config, node.get("text_speed", "")),
-			"advance": p.advance, "auto_wait": p.auto_wait})
+			"advance": p.advance, "auto_wait": p.auto_wait, "free": p if p.display == "free" else {}})
 
 
 func _on_choices_shown(entries: Array) -> void:
@@ -299,7 +314,7 @@ func _on_direction(steps: Array) -> void:
 	_auto_left = -1.0
 	_type_label = null
 	_clear_choices()
-	for n in [%SituationBox, %SystemBox, %Bubble, %PrevBubble, %PortraitLeft, %PortraitRight, %DicePanel, %AdvanceHint, subtitle, subtitle_name]:
+	for n in [%SituationBox, %SystemBox, %Bubble, %PrevBubble, %PortraitLeft, %PortraitRight, %DicePanel, %AdvanceHint, subtitle, subtitle_name, free_text]:
 		n.visible = false
 	var dim: float = $Scene.color.a
 	if embedded:
@@ -333,6 +348,14 @@ func _do_step(s: Dictionary) -> void:
 		"image_off":
 			await _tween(cg, "modulate:a", 0.0, float(s.fade))
 			cg.visible = false
+		"screen":
+			var sc := Color.html(str(s.color)) if Color.html_is_valid(str(s.color)) else Color.BLACK
+			screen.color = Color(sc.r, sc.g, sc.b, screen.color.a if screen.visible else 0.0)
+			screen.visible = true
+			await _tween(screen, "color:a", 1.0, float(s.fade))
+		"screen_off":
+			await _tween(screen, "color:a", 0.0, float(s.fade))
+			screen.visible = false
 		"fade":
 			if s.to != "clear":
 				var c := Color.WHITE if s.to == "white" else Color.BLACK
@@ -401,6 +424,7 @@ func _show_page(p: Dictionary) -> void:
 	%SituationBox.visible = p.kind == "situation"
 	subtitle.visible = p.kind == "subtitle"
 	subtitle_name.visible = p.kind == "subtitle" and p.speaker_id != ""
+	free_text.visible = p.kind == "free"
 	%SystemBox.visible = p.kind == "system"
 	%DicePanel.visible = false
 	var is_dialogue: bool = p.kind == "dialogue"
@@ -423,12 +447,38 @@ func _show_page(p: Dictionary) -> void:
 			subtitle_name.add_theme_color_override("font_color", Color.html(nc) if Color.html_is_valid(nc) else Color("ffd27a"))
 		"dialogue":
 			_show_dialogue(p)
+		"free":
+			_place_free(p.text, p.get("free", {}))
 	match p.kind:
 		"situation": _begin_typing(%SituationText, p)
 		"system": _begin_typing(%SystemText, p)
 		"subtitle": _begin_typing(subtitle, p)
+		"free": _begin_typing(free_text, p)
 		"dialogue": _begin_typing(%Bubble.text_label(), p)
 		_: _page_done()
+
+
+## 자유 위치 글자: 기준점 = 화면의 x·y %, 정렬에 따라 오른쪽/양쪽/왼쪽으로 자라고 세로는 가운데
+func _place_free(text: String, f: Dictionary) -> void:
+	free_text.text = text
+	free_text.add_theme_font_size_override("font_size", int(f.get("size", 38)))
+	var c := str(f.get("color", "#FFFFFF"))
+	free_text.add_theme_color_override("font_color", Color.html(c) if Color.html_is_valid(c) else Color.WHITE)
+	var al := str(f.get("align", "center"))
+	free_text.horizontal_alignment = {"left": HORIZONTAL_ALIGNMENT_LEFT, "right": HORIZONTAL_ALIGNMENT_RIGHT}.get(al, HORIZONTAL_ALIGNMENT_CENTER)
+	var ax := float(f.get("x", 50.0)) / 100.0
+	var ay := float(f.get("y", 50.0)) / 100.0
+	free_text.anchor_left = ax
+	free_text.anchor_right = ax
+	free_text.anchor_top = ay
+	free_text.anchor_bottom = ay
+	free_text.offset_left = 0
+	free_text.offset_right = 0
+	free_text.offset_top = 0
+	free_text.offset_bottom = 0
+	free_text.grow_horizontal = {"left": GROW_DIRECTION_END, "right": GROW_DIRECTION_BEGIN}.get(al, GROW_DIRECTION_BOTH)
+	free_text.grow_vertical = GROW_DIRECTION_BOTH
+	free_text.reset_size()
 
 
 ## 글자를 한 자씩 내보내기 시작 (속도 0 = 즉시)

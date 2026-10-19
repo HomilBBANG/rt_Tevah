@@ -94,6 +94,35 @@ func _ready() -> void:
 	DataLoader.nodes.erase("tsp_sub")
 	await get_tree().process_frame
 
+	# 자유 위치 글자: 화면 % 자리, 정렬·크기·색 (빠진 칸은 기본값)
+	var fr := ScriptPages.normalize({"display": "free", "text": "x", "x": 150, "align": "nope"})
+	check(fr.display == "free" and fr.x == 100.0 and fr.y == 50.0 and fr.align == "center" and fr.size == 38 and fr.color == "#FFFFFF"
+		and not ScriptPages.is_plain(fr), "자유 위치 글자: 범위 밖 x 는 100, 틀린 정렬·빠진 칸은 기본값")
+	DataLoader.nodes["tsp_free"] = {"node_id": "tsp_free", "speaker_id": "", "text": "", "next_node": "EXIT", "on_enter": "", "kind": "",
+		"text_speed": "", "pages": [{"display": "free", "text": "(테스트) 왼쪽 위", "speed": "instant", "x": 10, "y": 20, "align": "left", "size": 50, "color": "#FF0000"}]}
+	var pf: Control = DialogueScene.instantiate()
+	pf.embedded = true
+	pf.size = Vector2(1920, 1080)
+	add_child(pf)
+	pf.set_process(false)
+	await StoryRunner.start_dialogue("tsp_free")
+	await get_tree().process_frame
+	var ft: Label = pf.free_text
+	check(ft.visible and ft.text == "(테스트) 왼쪽 위" and not pf.subtitle.visible and not pf.get_node("%SituationBox").visible
+		and not pf.get_node("%Bubble").visible, "자유 위치 글자 페이지: 상자 없이 그 글자만")
+	check(is_equal_approx(ft.anchor_left, 0.1) and is_equal_approx(ft.anchor_top, 0.2) and ft.grow_horizontal == Control.GROW_DIRECTION_END
+		and ft.get_theme_font_size("font_size") == 50 and ft.get_theme_color("font_color").is_equal_approx(Color.RED),
+		"자리 = 화면 10%·20%, 왼쪽 맞춤은 오른쪽으로 자람, 크기 50·빨강")
+	# 연출 색 화면: 그림 칸 위·페이드 아래, 대사 상자 아래
+	await pf._do_step({"do": "screen", "color": "#203040", "fade": 0.0})
+	check(pf.screen.visible and pf.screen.color.is_equal_approx(Color("203040")) and pf.screen.get_index() > pf.cg.get_index()
+		and pf.screen.get_index() < pf.fade.get_index() and pf.screen.get_index() < pf.free_text.get_index(), "색 화면: 그 색으로 화면을 덮음 (글자는 그 위)")
+	await pf._do_step({"do": "screen_off", "fade": 0.0})
+	check(not pf.screen.visible and pf.screen.color.a == 0.0, "색 화면 내리기")
+	pf.queue_free()
+	DataLoader.nodes.erase("tsp_free")
+	await get_tree().process_frame
+
 	# 시작 페이지 (에디터 미리보기)
 	var play2: Control = DialogueScene.instantiate()
 	play2.embedded = true

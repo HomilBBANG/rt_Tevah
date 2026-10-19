@@ -41,13 +41,13 @@ NODE_KINDS = {"", "line", "effect", "branch", "start", "direct"}
 # 시작 카드의 자동 시작 (trigger.when): 로고 / 타이틀 이전 / 타이틀 이후 / 새 게임 시작 후 / 방 진입 후
 TRIGGER_WHENS = {"logo", "before_title", "after_title", "new_game", "map_enter"}
 # direct = 🎬 연출 카드: steps [{do, ...}] 를 차례로 (core/direction.gd 와 같은 규칙)
-DIRECT_STEPS = {"image", "image_off", "fade", "shake", "wait", "sound", "music", "music_off", "walk", "camera", "vanish", "face"}
+DIRECT_STEPS = {"image", "image_off", "screen", "screen_off", "fade", "shake", "wait", "sound", "music", "music_off", "walk", "camera", "vanish", "face"}
 CUTSCENE_DIR = ROOT / "art" / "cutscenes"
 AUDIO_DIRS = {"sound": ROOT / "audio" / "sfx", "music": ROOT / "audio" / "bgm"}
 FACE_DIRS = {"up", "down", "left", "right"}
 # start = 대화 시작 카드 (NPC 대화 파일마다 하나). routes 를 위에서부터 보고 조건이 맞는 첫 길로, 없으면 next_node(그 외).
 # 대본 페이지 (core/script_pages.gd 와 같은 규칙). 노드의 pages 가 없으면 speaker_id·text 로 페이지 1개.
-PAGE_DISPLAYS = {"narration", "bubble", "system", "subtitle"}   # subtitle = 자막 (상자 없이 화면 아래)
+PAGE_DISPLAYS = {"narration", "bubble", "system", "subtitle", "free"}   # free = 자유 위치 글자 (x·y %, size, align, color)   # subtitle = 자막 (상자 없이 화면 아래)
 PAGE_SPEEDS = {"", "instant", "slow", "normal", "fast"}
 PAUSE_RE = re.compile(r"\{w=(\d+(?:\.\d+)?)\}")
 CHOICE_TYPES = {"", "normal", "item", "dice", "combat"}
@@ -1016,7 +1016,17 @@ def check_pages(w, n, chars, rep):
         disp = str(p.get("display", "") or "")
         sp = str(p.get("speaker_id", "") or "")
         if disp not in PAGE_DISPLAYS:
-            rep.err(pw, f"display 는 narration / bubble / system / subtitle: '{disp}'")
+            rep.err(pw, f"display 는 narration / bubble / system / subtitle / free: '{disp}'")
+        elif disp == "free":
+            for k in ("x", "y"):
+                if k in p and not (_is_number(p[k]) and 0 <= float(p[k]) <= 100):
+                    rep.err(pw, f"자유 위치 글자의 {k} 는 0~100 (화면 %): '{p[k]}'")
+            if "size" in p and not _is_pos_number(p["size"]):
+                rep.err(pw, f"글자 크기(size)는 양수: '{p['size']}'")
+            if str(p.get("align", "center") or "center") not in ("left", "center", "right"):
+                rep.err(pw, f"align 은 left / center / right: '{p.get('align')}'")
+            if p.get("color") and not re.fullmatch(r"#?[0-9A-Fa-f]{6}", str(p["color"])):
+                rep.err(pw, f"글자 색(color)은 #RRGGBB: '{p['color']}'")
         elif disp == "bubble" and not sp:
             rep.err(pw, "말풍선 페이지에 화자(speaker_id)가 없음")
         if sp and sp not in chars:
@@ -1069,6 +1079,8 @@ def check_steps(w, steps, field_objs, rep):
                 rep.err(sw, f"소리 파일이 없음: audio/{folder}/{f}")
         if do == "face" and str(st.get("dir", "down")) not in FACE_DIRS:
             rep.err(sw, f"바라보는 방향은 up / down / left / right: '{st.get('dir')}'")
+        if do == "screen" and not re.fullmatch(r"#?[0-9A-Fa-f]{6}", str(st.get("color", "#000000"))):
+            rep.err(sw, f"색 화면의 color 는 #RRGGBB: '{st.get('color')}'")
         if do == "fade" and str(st.get("to", "black")) not in ("black", "white", "clear"):
             rep.err(sw, f"fade 의 to 는 black / white / clear: '{st.get('to')}'")
         if do in ("walk", "vanish", "face") or (do == "camera" and st.get("who")):
