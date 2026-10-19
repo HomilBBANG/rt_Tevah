@@ -14,6 +14,7 @@ var f: Node
 func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute("user://travel_smoke")
 	_load_fixture_maps()
+	DataLoader.config["view_mode"] = "topdown"   # 키 입력을 격자 방향으로 검사 (쿼터뷰의 화면 기준 이동은 graphics_smoke)
 	SaveManager.save_dir = "user://test_saves/"
 	SaveManager.delete_all()
 	SaveManager.begin_run()

@@ -170,6 +170,24 @@ static func cell_keys(map: Dictionary, x: int, y: int) -> Dictionary:
 	return out
 
 
+## 쿼터뷰 벽 블록 그림: {top: 윗면 타일, face: 옆면 타일}. 칠한 타일이 앞면 타일이면 그 앞면을 가진 벽 타일이 윗면
+static func wall_keys(map: Dictionary, x: int, y: int) -> Dictionary:
+	var rows: Array = map.get("tiles", [])
+	var vis: Dictionary = map.get("visual", {}) if map.get("visual") is Dictionary else {}
+	var cells = (vis.get("layers", {}) if vis.get("layers") is Dictionary else {}).get("wall", {})
+	var key: String = str(cells.get("%d,%d" % [x, y], "")) if cells is Dictionary else ""
+	if key == "" or not tiles().has(key):
+		key = _map_default(vis, "default_wall", "wall", "wall_default")
+	var base := key
+	if face_keys().has(key):
+		for k in tiles():
+			if str(tiles()[k].get("face", "")) == key:
+				base = k
+				break
+	var f = tiles().get(base, {}).get("face")
+	return {"top": base, "face": str(f) if f != null and str(f) != "" and tiles().has(str(f)) else key}
+
+
 ## 앞면(벽면) 타일 이름들 — 어떤 벽 타일의 face 로 쓰이는 것 (칠해서 직접 쓴 것도 앞면)
 static func face_keys() -> Dictionary:
 	var out := {}

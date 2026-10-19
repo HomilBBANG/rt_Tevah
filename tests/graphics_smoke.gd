@@ -5,6 +5,7 @@ extends Node
 
 const FieldScript = preload("res://scenes/field/field.gd")
 const VisualData = preload("res://core/visual_data.gd")
+const IsoView = preload("res://core/iso_view.gd")
 const MapRendererScript = preload("res://core/map_renderer.gd")
 
 var _fail := 0
@@ -12,6 +13,7 @@ var _fail := 0
 
 func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute("user://graphics_smoke")
+	DataLoader.config["view_mode"] = "topdown"   # 렌더러(네모 화면) 검사 — 쿼터뷰는 _iso_test
 	SaveManager.save_dir = "user://test_saves/"
 	SaveManager.delete_all()
 	SaveManager.begin_run()
@@ -285,6 +287,7 @@ func _ready() -> void:
 	await _overhead_test()
 	await _outside_window_test()
 	await _wall_lamp_test()
+	await _iso_test()
 	DataLoader.maps.erase("tback")
 	DataLoader.maps.erase("twin")
 	DataLoader.maps.erase("tgfx")
@@ -381,6 +384,40 @@ func _overhead_test() -> void:
 	DataLoader.maps.erase("tover2")
 	of = null
 	DataLoader.maps.erase("tover")
+
+
+## 쿼터뷰 (view_mode iso): 네모 세계는 숨기고 마름모 화면 — 벽 블록·플레이어 그림·카메라, 화면 기준 이동, 규칙(충돌)은 그대로
+func _iso_test() -> void:
+	DataLoader.config["view_mode"] = "iso"
+	var im := _map("indoor")
+	im.map_id = "tiso"
+	DataLoader.maps["tiso"] = im
+	GameState.clock = 12 * 60.0
+	FieldScript.next_map_id = "tiso"
+	var f: Node = load("res://scenes/field/field.tscn").instantiate()
+	add_child(f)
+	await _wait(0.4)
+	var iv: Node2D = f.iso
+	check(iv != null and not f.get_node("%World").visible and iv.sorted.get_child_count() > 3 and f.player.sprite.get_parent() == iv.player_proxy
+		and f._camera() == iv.camera and iv.camera.is_current(), "쿼터뷰: 네모 세계 숨김, 벽 블록 줄·인물이 Y 정렬, 플레이어 그림·카메라는 iso 쪽")
+	var ld: Vector2 = iv.logic_dir(Vector2(0, -1)).normalized()
+	check(ld.x < -0.6 and ld.y < -0.6, "화면 기준 이동: W(화면 위) = 네모 세계 왼쪽 위 대각선")
+	f.player.position = f._tile_center(3, 3)
+	await get_tree().physics_frame
+	var before: Vector2 = f.player.position
+	Input.action_press("move_right")
+	for i in 20:
+		await get_tree().physics_frame
+	Input.action_release("move_right")
+	var moved: Vector2 = f.player.position - before
+	check(moved.x > 1.0 and moved.y < -1.0 and absf(iv.player_proxy.position.y - IsoView.iso(f.player.position).y) < 1.0,
+		"D(화면 오른쪽) = 네모 세계 오른쪽 위로, 그림도 iso 자리")
+	f.player.position = f._tile_center(3, 2)
+	await _wait(0.3)
+	await _snap("iso_view")
+	f.queue_free()
+	DataLoader.maps.erase("tiso")
+	DataLoader.config["view_mode"] = "topdown"
 
 
 ## 벽걸이등: 광원을 벽 칸에 — 그림은 벽에, 빛은 그 벽 앞 바닥 가장자리에서 (뒷벽 높은 곳이어도 아래 바닥으로)

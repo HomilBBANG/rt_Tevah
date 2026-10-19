@@ -27,6 +27,7 @@ const SlotPicker = preload("res://ui/save_slot_picker.gd")
 const NpcScript = preload("res://scenes/field/field_npc.gd")
 const FurnitureScript = preload("res://scenes/field/field_furniture.gd")
 const VignetteScript = preload("res://ui/vignette.gd")
+const IsoView = preload("res://core/iso_view.gd")
 const PlayerScript = preload("res://scenes/field/field_player.gd")
 const EnemyScript = preload("res://scenes/field/field_enemy.gd")
 
@@ -57,6 +58,7 @@ var _cutscenes: Array = []       # 차례를 기다리는 자동 시작 컷신 (
 var held_light: PointLight2D     # 손에 든 아이템의 빛 (Items.light, 예: 손전등) — 플레이어를 따라가며 바라보는 쪽을 비춤   # 연출 중인 걷기·카메라 (건너뛰기 때 바로 끝냄)
 var player: CharacterBody2D
 var enemies: Array = []
+var iso: Node2D = null           # 쿼터뷰 화면 (Config view_mode = "iso") — 네모 세계는 숨기고 여기서 마름모로 그림
 var furniture: Array = []        # 기타 가구 [{kind: "furniture", data, pos, rect, node, body, done}] (역할이 있으면 spots 에도)
 var spots: Array = []            # 상호작용 지점 [{ kind: "spot"/"camp"/"exit", data, pos, done }]
 var npcs: Array = []             # NPC [{ kind: "npc", data, pos, node, active }] — active: 지금 시간대에 있음
@@ -207,8 +209,33 @@ func load_map(map_id: String) -> void:
 	%MapView.tile = tile
 	%MapView.spots = spots
 	%MapView.queue_redraw()
+	_build_iso()
 	frozen = false
 	_update_hud()
+
+
+## 쿼터뷰: Config view_mode = "iso" 면 네모 세계(%World·렌더러 그림·MapView)를 숨기고 iso_view 로 그림 (규칙은 그대로)
+func _build_iso() -> void:
+	var on := str(DataLoader.config.get("view_mode", "topdown")) == "iso"
+	%World.visible = not on
+	%MapView.visible = not on
+	if not on:
+		if iso:
+			iso.queue_free()
+			iso = null
+		return
+	renderer.hide_for_iso()
+	if iso == null:
+		iso = IsoView.new()
+		iso.name = "IsoView"
+		add_child(iso)
+	iso.build(self)
+	iso.sync()
+
+
+## 화면에 보이는 자리 (쿼터뷰면 iso 변환) — 컷신 카메라용
+func view_pos(p: Vector2) -> Vector2:
+	return IsoView.iso(p) if iso else p
 
 
 ## 지나갈 수 없는 칸: 벽(#)과 빈 공간(공백)
@@ -1107,6 +1134,7 @@ func _direct_step(s: Dictionary) -> void:
 			else:
 				var to: Array = s.get("to", [0, 0])
 				target = _tile_center(int(to[0]), int(to[1]))
+			target = view_pos(target)
 			if not cam.top_level:
 				var at := cam.get_screen_center_position()
 				cam.top_level = true
@@ -1385,6 +1413,8 @@ func _process(delta: float) -> void:
 	if held_light and is_instance_valid(held_light) and player:
 		held_light.rotation = player.facing.angle()   # 바라보는 쪽을 비춤
 	_update_roof()
+	if iso:
+		iso.sync()
 	# 브레이크포인트에 걸린 몬스터가 있으면 모두 멈춤 (Unreal 처럼)
 	if not ai_paused:
 		for e in enemies:
@@ -1440,6 +1470,8 @@ func ai_snapshot() -> Dictionary:
 
 
 func _camera() -> Camera2D:
+	if iso and iso.camera and is_instance_valid(iso.camera):
+		return iso.camera
 	return player.get_node_or_null("Camera2D") if player else null
 
 

@@ -1,6 +1,7 @@
 extends CharacterBody2D
 ## 탐험 중 플레이어 (아트 전 placeholder: 원 + 바라보는 방향 표시)
 
+const IsoView = preload("res://core/iso_view.gd")
 var field: Node          # field.gd
 var radius := 23.0
 var sprite: Sprite2D     # 캐릭터 그림 (Config player_sprite — 없으면 원 도형). 발 = 충돌 원 아래쪽
@@ -18,6 +19,8 @@ func _physics_process(_delta: float) -> void:
 		velocity = Vector2.ZERO
 		return
 	var dir := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	if field.iso and dir != Vector2.ZERO:   # 쿼터뷰: 화면 기준 (W = 화면 위) → 네모 세계 방향
+		dir = IsoView.logic_dir(dir).normalized() * dir.length()
 	# 무게: 무거우면 느려지고 최대 무게면 못 움직인다 (GameState.carry_speed_mult)
 	velocity = dir * (run_speed if Input.is_action_pressed("run") else speed) * GameState.carry_speed_mult()
 	if dir != Vector2.ZERO:
@@ -55,9 +58,10 @@ func setup_sprite() -> void:
 func _animate(delta: float, moving: bool) -> void:
 	if sprite == null:
 		return
-	if facing.x > 0.1:
+	var fx := facing.x - facing.y if field and field.iso else facing.x   # 쿼터뷰: 화면에서 오른쪽으로 가는지
+	if fx > 0.1:
 		sprite.flip_h = true   # 원래 그림이 왼쪽을 봄
-	elif facing.x < -0.1:
+	elif fx < -0.1:
 		sprite.flip_h = false
 	if sprite.hframes < 2:
 		return

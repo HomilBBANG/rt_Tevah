@@ -329,6 +329,14 @@ func set_roofs_visible(v: bool) -> void:
 	_roof_root.visible = v
 
 
+## 쿼터뷰(iso_view)일 때: 네모 그림은 모두 숨기고 환경광(CanvasModulate)·햇빛만 남김 — 광원은 iso_view 가 복사
+func hide_for_iso() -> void:
+	for l in layers:
+		layers[l].visible = false
+	for n in [_bg, _occ_root, props_root, _marker_root, _roof_root, overhead, _light_root]:
+		n.visible = false
+
+
 ## 에디터: 전경 가림 보이기·숨기기 / 미리보기 투명도 (맵 데이터와 게임 출력에는 영향 없음)
 func set_overhead_visible(v: bool) -> void:
 	overhead.visible = v
