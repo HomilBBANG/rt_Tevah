@@ -360,6 +360,14 @@ static func inside_lit(map: Dictionary, o: Dictionary, maps: Dictionary) -> bool
 	return false
 
 
+## 광원이 벽 칸에 있나 (벽걸이등) — 빛은 그 벽 앞 바닥 가장자리에서 (window_light 와 같은 규칙)
+static func light_on_wall(map: Dictionary, o: Dictionary) -> bool:
+	var rows: Array = map.get("tiles", [])
+	var x := int(o.get("x", -1))
+	var y := int(o.get("y", -1))
+	return y >= 0 and y < rows.size() and x >= 0 and x < String(rows[y]).length() and String(rows[y])[x] == "#"
+
+
 ## 크기가 있는 물체(가구·창문)가 차지하는 칸, 나머지는 놓은 칸 하나
 static func object_cells(o: Dictionary) -> Array:
 	if str(o.get("type", "")) in ["furniture", "window"]:

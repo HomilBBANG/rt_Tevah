@@ -120,7 +120,7 @@ FURNITURE_ROLES = {"", "investigate", "pickup", "use", "talk"}   # 장식 / 조�
 PROPS_DIR = ROOT / "art" / "props"
 LIGHT_SHAPES = {"", "point", "cone"}   # light = 광원 (그래픽만)
 # 칠하지 않고 물체에 씀: door = 문(exit) 그림 (닫힘 key, 열림 key_open), marker = 조사 지점 반짝이, window = 창문 (커튼 key_curtain)
-OBJECT_ART_LAYERS = {"door", "marker", "window", "camp"}   # camp = 거점 그림
+OBJECT_ART_LAYERS = {"door", "marker", "window", "camp", "lamp"}   # camp = 거점 그림, lamp = 벽걸이등
 # 그래픽 층: 바닥 / 바닥 장식 / 벽 외형 / 지붕 (인물 위 — 집 안에 들어가면 사라짐) / 전경 가림 (인물 위, 늘 보임 — 충돌·시야·빛 차단 없음)
 TILE_LAYERS = {"floor", "detail", "wall", "roof", "overhead"}
 TILES_DIR = ROOT / "art" / "tiles"
@@ -1247,7 +1247,7 @@ def validate_graphics(d, maps, rep):
     for t in d["Tiles"]:
         w = loc("Tiles", t)
         if t["layer"] not in TILE_LAYERS | OBJECT_ART_LAYERS:
-            rep.err(w, f"layer 는 floor / detail / wall / roof / overhead (칠하기) 또는 door (문 그림) / marker (조사 반짝이) / window (창문) / camp (거점): '{t['layer']}'")
+            rep.err(w, f"layer 는 floor / detail / wall / roof / overhead (칠하기) 또는 door (문 그림) / marker (조사 반짝이) / window (창문) / camp (거점) / lamp (벽걸이등): '{t['layer']}'")
         if t["layer"] == "window" and not t["tile_key"].endswith("_curtain") and t["tile_key"] + "_curtain" not in tiles:
             rep.warn(w, f"창문 '{t['tile_key']}' 의 커튼 그림 '{t['tile_key']}_curtain' 이 없음 (커튼을 쳐도 같은 그림)")
         if t["layer"] == "door" and not t["tile_key"].endswith("_open") and t["tile_key"] + "_open" not in tiles:
@@ -1513,6 +1513,12 @@ def validate_field(d, maps, rep, enemies):
                             if (cx, cy) in occupied:
                                 rep.err(w, f"창문 칸 ({cx}, {cy}) 에 이미 {occupied[(cx, cy)]} 가 있음")
                             occupied[(cx, cy)] = oid
+            elif o.get("type") == "light" and 0 <= y < len(m["tiles"]) and 0 <= x < len(m["tiles"][y]) and m["tiles"][y][x] == "#":
+                wall1 = lambda cx, cy: 0 <= cy < len(m["tiles"]) and 0 <= cx < len(m["tiles"][cy]) and m["tiles"][cy][cx] == "#"
+                if not window_reaches_floor(floor, wall1, x, y, 1, 1):   # 벽걸이등: 옆이나 아래(뒷벽)에 비출 바닥이 있어야
+                    rep.err(w, f"벽에 건 광원 ({x}, {y}) 옆에 바닥이 없고 뒷벽도 아님 (빛이 나갈 곳)")
+                elif (x, y) in occupied and occupied[(x, y)] != oid:
+                    rep.err(w, f"위치 ({x}, {y}) 에 이미 {occupied[(x, y)]} 가 있음")
             elif not floor(x, y):
                 rep.err(w, f"위치 ({x}, {y}) 가 바닥이 아님")
             elif (x, y) in occupied and occupied[(x, y)] != oid:

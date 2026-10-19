@@ -280,6 +280,7 @@ func _ready() -> void:
 	DataLoader.maps.erase("tfur")
 	await _overhead_test()
 	await _outside_window_test()
+	await _wall_lamp_test()
 	DataLoader.maps.erase("tback")
 	DataLoader.maps.erase("twin")
 	DataLoader.maps.erase("tgfx")
@@ -376,6 +377,37 @@ func _overhead_test() -> void:
 	DataLoader.maps.erase("tover2")
 	of = null
 	DataLoader.maps.erase("tover")
+
+
+## 벽걸이등: 광원을 벽 칸에 — 그림은 벽에, 빛은 그 벽 앞 바닥 가장자리에서 (뒷벽 높은 곳이어도 아래 바닥으로)
+func _wall_lamp_test() -> void:
+	var lm := _map("indoor")
+	lm.map_id = "tlamp"
+	lm.tiles = ["##############", "##############", "##############", "#......#....# ", "#......#....# ", "#............ ", "##############"]
+	var lamp := func(id: String, x: int, y: int, on: bool) -> Dictionary:
+		return {"object_id": id, "type": "light", "ref": "", "name": id, "text": "", "condition": "", "arrive": "", "from": [], "default": false,
+			"once": false, "map_id": "tlamp", "x": x, "y": y, "patrol_dir": "", "patrol_len": 0, "schedule": [],
+			"preset": "wall_sconce", "color": "#FFC880", "energy": 1.0, "radius": 4.0, "shadow": true, "enabled": on}
+	lm.objects = [lamp.call("tl_on", 3, 1, true), lamp.call("tl_off", 9, 2, false)]
+	lm.start = [3, 4]
+	lm.run_start = [3, 4]
+	DataLoader.maps["tlamp"] = lm
+	GameState.clock = 22 * 60.0
+	FieldScript.next_map_id = "tlamp"
+	var f: Node = load("res://scenes/field/field.tscn").instantiate()
+	add_child(f)
+	await _wait(0.3)
+	var r: Node2D = f.renderer
+	var on_light: PointLight2D = r.lights.filter(func(p): return p.get_meta("object_id") == "tl_on")[0]
+	check(absf(on_light.position.y - 3.06 * f.tile) < 1.0 and absf(on_light.position.x - 3.5 * f.tile) < 1.0 and on_light.enabled,
+		"벽걸이등: 뒷벽에 걸어도 빛은 그 아래 바닥 가장자리에서 (%.2f칸)" % (on_light.position.y / f.tile))
+	check(r.markers.has("tl_on") and r.markers.tl_on.kind == "lamp" and r.markers.tl_on.sprite.material != null
+		and r.markers.tl_off.sprite.material == null, "벽걸이등 그림: 켜진 등은 밝게, 꺼진 등은 방과 같이")
+	f.player.position = f._tile_center(3, 4)
+	await _wait(0.2)
+	await _snap("wall_lamp_night")
+	f.queue_free()
+	DataLoader.maps.erase("tlamp")
 
 
 ## 실외 맵의 창문(건물 바깥): 햇빛을 내보내지 않음. 문이 이어진 안쪽 맵에 켜진 광원이 있으면 불 켜진 창 (밤에 따뜻한 빛)

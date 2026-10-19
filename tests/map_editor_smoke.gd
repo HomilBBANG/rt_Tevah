@@ -456,6 +456,7 @@ func _ready() -> void:
 	ed.set_tool("floor")
 	cv.apply_tool(Vector2i(5, 0))
 	check(cv.is_wall(Vector2i(5, 0)), "창문 칸은 바닥으로 칠해지지 않음")
+	check(cv.fits("light", Vector2i(6, 0)) and not cv.fits("light", Vector2i(0, 0)), "광원은 벽 칸에도 놓임 (벽걸이등 — 비출 바닥이 있는 벽만)")
 	var tall := {"object_id": "tw_tall", "type": "window", "x": 5, "y": 3, "w": 1, "h": 2}
 	check(cv.fits("window", Vector2i(5, 3), tall), "1×2 창문: 두 칸 모두 벽이면 놓임")
 	tall.h = 3

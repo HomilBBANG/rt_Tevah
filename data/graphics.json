@@ -475,6 +475,20 @@
    "fps": 6.0,
    "face": "",
    "face_rows": 1
+  },
+  {
+   "tile_key": "wall_lamp",
+   "name": "벽걸이등",
+   "layer": "lamp",
+   "file": "test_tiles.png",
+   "atlas_x": 1,
+   "atlas_y": 10,
+   "casts_shadow": false,
+   "note": "벽에 건 광원(type=light 를 벽 칸에) 그림 — 켜져 있으면 빛 영향 없이 밝게",
+   "frames": 1,
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1
   }
  ],
  "light_presets": [
@@ -527,6 +541,16 @@
    "shadow": true,
    "shape": "cone",
    "note": "임시값 (지금은 놓인 자리에 고정)"
+  },
+  {
+   "preset_id": "wall_sconce",
+   "name": "벽걸이등",
+   "color": "#FFC880",
+   "energy": 1.0,
+   "radius": 4.0,
+   "shadow": true,
+   "shape": "point",
+   "note": "임시값 — 벽 칸에 놓는 등"
   }
  ],
  "props": [

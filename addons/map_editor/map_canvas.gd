@@ -112,6 +112,9 @@ func fits(type: String, t: Vector2i, o: Dictionary = {}) -> bool:
 			if not is_floor(c) or (not there.is_empty() and there != o):
 				return false
 		return true
+	if type == "light" and is_wall(t):   # 벽걸이등: 벽 칸도 됨 (옆이나 아래 뒷벽 너머에 비출 바닥이 있어야)
+		var there := object_at(t)
+		return (there.is_empty() or there == o) and VisualData.window_light(map, {"x": t.x, "y": t.y}).dir != Vector2i.ZERO
 	if type == "window":   # 창문: w × h 칸이 모두 벽 + 옆에 바닥이 있거나, 뒷벽(아래로 벽만 이어지다 바닥)
 		var wo := {"x": t.x, "y": t.y, "w": o.get("w", 1), "h": o.get("h", 1)}
 		for c in VisualData.furniture_cells(wo):
@@ -234,8 +237,8 @@ func apply_tool(t: Vector2i, first := true) -> void:
 ## 칠하기 한 칸. 물체·P·S 가 있는 칸은 벽·빈 공간으로 안 바뀜
 func _paint(t: Vector2i, ch: String) -> void:
 	var o := object_at(t)
-	if not o.is_empty() and o.get("type", "") == "window":
-		return   # 창문 칸은 벽 그대로
+	if not o.is_empty() and (o.get("type", "") == "window" or (o.get("type", "") == "light" and is_wall(t))):
+		return   # 창문·벽걸이등 칸은 벽 그대로
 	if ch != "." and (not o.is_empty() or _is_marker(t, "start") or _is_marker(t, "run_start")):
 		return
 	if ch != "#":   # 바닥·빈 공간이 된 칸에는 벽 그림을 남기지 않음 (벽처럼 보이는데 지나가지는 일이 없게)

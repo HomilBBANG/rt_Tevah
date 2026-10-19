@@ -205,6 +205,9 @@ func build_markers() -> void:
 		elif o.get("type") == "investigate":
 			key = spark
 			kind = "spark"
+		elif o.get("type") == "light" and VisualData.light_on_wall(map, o):   # 벽걸이등 그림 (Tiles layer lamp)
+			key = VisualData.default_art("lamp")
+			kind = "lamp"
 		elif o.get("type") == "camp":   # 거점: 텐트 그림 (Tiles layer camp)
 			key = VisualData.default_art("camp")
 			kind = "camp"
@@ -243,6 +246,14 @@ func build_markers() -> void:
 			var wh := maxi(1, int(o.get("h", 1)))
 			s.position = (Vector2(float(o.x), float(o.y)) + Vector2(ww, wh) / 2.0) * tile
 			s.scale = Vector2(ww, wh) * (tile / px)
+		if kind == "lamp":   # 켜진 등은 빛 영향 없이 밝게, 꺼지면 방과 같이
+			s.visible = true
+			if o.get("enabled", true) != false:
+				var lm := CanvasItemMaterial.new()
+				lm.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+				s.material = lm
+			else:
+				s.modulate = Color(0.55, 0.55, 0.55)
 		if kind == "spark":
 			var mat := CanvasItemMaterial.new()
 			mat.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED   # 어두워도 보이는 반짝임
@@ -480,6 +491,10 @@ func rebuild_lights() -> void:
 			continue
 		var p := make_light(o, tile)
 		p.position = Vector2((float(o.x) + 0.5) * tile, (float(o.y) + 0.5) * tile)
+		if VisualData.light_on_wall(map, o):   # 벽걸이등: 벽 속은 그림자에 갇히므로 그 벽 앞 바닥 가장자리에서 비춤
+			var wl := VisualData.window_light(map, {"x": o.x, "y": o.y})
+			if wl.dir != Vector2i.ZERO:
+				p.position = (wl.origin + Vector2(wl.dir) * 0.06) * tile
 		p.set_meta("object_id", o.get("object_id", ""))
 		_light_root.add_child(p)
 		lights.append(p)
