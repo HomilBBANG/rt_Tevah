@@ -287,6 +287,7 @@ func _ready() -> void:
 	await _overhead_test()
 	await _outside_window_test()
 	await _wall_lamp_test()
+	await _roof_test()
 	await _iso_test()
 	DataLoader.maps.erase("tback")
 	DataLoader.maps.erase("twin")
@@ -449,6 +450,52 @@ func _wall_lamp_test() -> void:
 	await _snap("wall_lamp_night")
 	f.queue_free()
 	DataLoader.maps.erase("tlamp")
+
+
+## 비스듬한 지붕 (지붕 모양): 맞배 / 정면 박공 / 모임+굴뚝 / 자동(좁으면 정면 박공) / 평면(타일 그대로). 지붕 칸은 바닥, 그 아래 2줄이 벽 앞면
+func _roof_test() -> void:
+	var tiles := []
+	for y in 30:
+		tiles.append("..................................")
+	var roof := {}
+	var wall := {}
+	var houses := [[1, 7, "roof_green"], [10, 5, "roof_slate"], [17, 7, "roof_red"], [26, 4, "roof_brown"]]
+	for h in houses:
+		for x in range(h[0], h[0] + h[1]):
+			for y in range(6, 9):
+				roof["%d,%d" % [x, y]] = h[2]
+			for y in [9, 10]:
+				tiles[y] = tiles[y].substr(0, x) + "#" + tiles[y].substr(x + 1)
+				wall["%d,%d" % [x, y]] = "wall_wood"
+	var rm := {"map_id": "troof", "width": 34, "height": 30, "tiles": tiles, "start": [12, 13], "run_start": [12, 13], "edges": {}, "objects": [],
+		"visual": {"layers": {"roof": roof, "wall": wall}, "roof_style": {"1,6": {"shape": "gable", "chimney": true}, "10,7": {"shape": "front", "chimney": false},
+			"18,8": {"shape": "hip", "chimney": true}}}, "environment": {"profile": "outdoor"}}
+	DataLoader.maps["troof"] = rm
+	GameState.clock = 12 * 60.0
+	FieldScript.next_map_id = "troof"
+	var f: Node = load("res://scenes/field/field.tscn").instantiate()
+	add_child(f)
+	await _wait(0.3)
+	var r: Node2D = f.renderer
+	var shapes := []
+	for reg in r.roof_regions:
+		var sh: Node2D = reg.layer.get_child(1)
+		shapes.append([sh.shape, sh.chimney, reg.layer.get_child(0).visible])
+	shapes.sort_custom(func(a, b): return str(a) < str(b))
+	check(shapes == [["", false, false], ["front", false, false], ["gable", true, false], ["hip", true, false]],
+		"지붕 모양: 맵 roof_style 이 그 묶음에 (맞배+굴뚝·정면 박공·모임+굴뚝·자동), 타일은 숨기고 직접 그림 %s" % [shapes])
+	var green := VisualData.tile_color("roof_green")
+	check(green.g > green.r and green.g > green.b, "지붕 색 = 칠한 지붕 타일의 평균 색 (%s)" % green)
+	f.player.position = f._tile_center(15, 9)
+	await _wait(1.0)
+	await _snap("roof_styles")
+	rm.visual.roof_style["26,6"] = {"shape": "flat", "chimney": false}
+	f.load_map("troof")
+	await _wait(0.2)
+	var flat: Array = r.roof_regions.filter(func(reg): return reg.cells.has(Vector2i(26, 6)))
+	check(flat.size() == 1 and flat[0].layer.get_child(0).visible and flat[0].layer.get_child(1).shape == "flat", "평면 = 예전처럼 칠한 타일 그대로")
+	f.queue_free()
+	DataLoader.maps.erase("troof")
 
 
 ## 실외 맵의 창문(건물 바깥): 햇빛을 내보내지 않음. 문이 이어진 안쪽 맵에 켜진 광원이 있으면 불 켜진 창 (밤에 따뜻한 빛)

@@ -14,6 +14,7 @@ signal stroke_started             # 한 번의 누름(칠하기·옮기기)이 �
 signal request(action: String)    # 단축키
 signal activated(obj: Dictionary) # 더블클릭
 signal notice(text: String)       # 상태 글자 (영역 옮기기를 못 할 때 등)
+signal roof_picked(t: Vector2i)    # '지붕 모양' 도구로 지붕 칸을 누름
 
 const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop", "window", "furniture", "respawn", "stairs"]
 const VisualData = preload("res://core/visual_data.gd")
@@ -195,6 +196,11 @@ func apply_tool(t: Vector2i, first := true) -> void:
 		"select":
 			if first:
 				select(visible_object_at(t))
+		"roof_style":
+			if first and VisualData.roof_cells(map).has(t):
+				roof_picked.emit(t)
+			elif first:
+				notice.emit("지붕이 칠해진 칸을 누르세요 (타일 팔레트 '지붕' 층)")
 		"erase":
 			if not first:
 				return

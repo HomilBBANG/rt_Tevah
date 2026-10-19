@@ -708,6 +708,24 @@ func _ready() -> void:
 	var home_p: Array = ed.map.objects.filter(func(x): return x.type == "arrive" and ust[0].object_id in x.get("from", []))
 	check(home_p.size() == 1 and Vector2i(int(home_p[0].x), int(home_p[0].y)) != Vector2i(2, 2), "아래층: 계단 옆 P 가 위층 계단에서 이어짐")
 
+	# 지붕 모양 도구: 지붕 칸을 누르면 그 묶음의 모양·굴뚝 → visual.roof_style (묶음 칸 하나에)
+	ed.map.visual.layers["roof"] = {"1,1": "roof_red", "2,1": "roof_red", "3,1": "roof_red"}
+	ed.canvas.tool = "roof_style"
+	ed.canvas.apply_tool(Vector2i(2, 1))
+	await _frames(1)
+	var chim: Array = ed.inspector.get_children().filter(func(c): return c is CheckBox and c.text == "굴뚝")
+	check(chim.size() == 1, "지붕 모양: 지붕 칸을 누르면 오른쪽 칸에 모양·굴뚝")
+	if chim.size() == 1:
+		chim[0].button_pressed = true
+	check(ed.map.visual.get("roof_style", {}).get("2,1", {}).get("chimney", false) == true, "굴뚝을 켜면 roof_style 에 기록 %s" % [ed.map.visual.get("roof_style")])
+	ed._edit_roof(Vector2i(3, 1))
+	await _frames(1)
+	chim = ed.inspector.get_children().filter(func(c): return c is CheckBox and c.text == "굴뚝")
+	check(chim.size() == 1 and chim[0].button_pressed, "같은 집 다른 칸을 눌러도 같은 설정")
+	chim[0].button_pressed = false
+	check(not ed.map.visual.has("roof_style"), "기본값(자동·굴뚝 없음)으로 돌리면 기록을 지움")
+	ed.canvas.tool = "select"
+
 	# 변환·검사 (실제 프로젝트 데이터 — 원본 tools/maps 는 안 건드림)
 	check(ed.run_convert() and "변환 완료" in ed.log_view.text, "변환·검사 실행")
 

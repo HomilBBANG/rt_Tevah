@@ -219,10 +219,33 @@ func _rebuild_roofs(ts: TileSet, scale_k: float) -> void:
 		var shade := ShadeView.RoofShade.new()
 		shade.cells = region
 		shade.tile = tile
+		var style := VisualData.roof_style(map, region)
+		shade.shape = style.shape
+		shade.chimney = style.chimney
+		shade.roof_color = VisualData.tile_color(cells[start])
+		shade.wall_color = _roof_wall_color(region)
+		tl.visible = style.shape == "flat"   # 비스듬한 지붕은 직접 그림 (타일은 색만)
 		holder.add_child(shade)
 		holder.modulate.a = roof_alpha
 		_roof_root.add_child(holder)
 		roof_regions.append({"cells": region, "layer": holder, "open": false})
+
+
+## 지붕 바로 아래(맨 아래 줄 가운데) 벽의 색 — 정면 박공 세모를 벽과 같은 색으로. 벽이 아니면 회벽색
+func _roof_wall_color(region: Dictionary) -> Color:
+	var bottom := -(1 << 30)
+	for c in region:
+		bottom = maxi(bottom, c.y)
+	var xs: Array = []
+	for c in region:
+		if c.y == bottom:
+			xs.append(c.x)
+	xs.sort()
+	var x: int = xs[xs.size() / 2]
+	var keys := VisualData.cell_keys(map, x, bottom + 1)
+	if str(keys.wall) != "":
+		return VisualData.tile_color(str(keys.wall), Color(0.76, 0.72, 0.63))
+	return Color(0.76, 0.72, 0.63)
 
 
 ## 문·조사 지점 그림 (Tiles 에 그림이 없으면 만들지 않음 — 필드의 MapView 가 예전 도형으로 그림)

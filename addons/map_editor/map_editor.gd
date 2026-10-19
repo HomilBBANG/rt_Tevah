@@ -22,7 +22,7 @@ const TOOL_GROUPS := [
 	["위치", [["arrive", "도착 P"], ["respawn", "부활 R"], ["run_start", "시작 S"]]],
 	["물체", [["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["event", "이벤트"], ["furniture", "가구"]]],
 	["이동", [["exit", "문"], ["passage", "통로"], ["transit", "이용"], ["stairs", "계단"]]],
-	["그래픽", [["tile", "타일"], ["tile_erase", "타일 지우기"], ["prop", "오브젝트"], ["light", "광원"], ["window", "창문"]]],
+	["그래픽", [["tile", "타일"], ["tile_erase", "타일 지우기"], ["prop", "오브젝트"], ["light", "광원"], ["window", "창문"], ["roof_style", "지붕 모양"]]],
 	["", [["erase", "지우개"]]],
 ]
 const TOOL_TIPS := {
@@ -41,6 +41,7 @@ const TOOL_TIPS := {
 	"event": "이벤트 칸: 밟으면 대화(컷신) 시작. 게임에서는 안 보임. 오른쪽 칸에서 대화·한 번만·나타나는 조건",
 	"exit": "문: E 로 열고, 열린 문으로 걸어 들어가면 이동. 오른쪽 칸에서 이동할 맵. 벽 칸에 놓으면 그 칸이 저절로 바닥이 됨",
 	"passage": "통로: 밟으면 바로 이동 (길·동굴 입구)",
+	"roof_style": "지붕 모양: 지붕 칸을 누르면 그 집(이어진 지붕 묶음)의 모양을 오른쪽 칸에서 고름 — 자동·맞배·정면 박공·모임·평면, 굴뚝",
 	"stairs": "계단: 밟으면 이어진 층으로 이동. 오른쪽 칸 '⬆ 위층 만들기'로 같은 모양의 위층 맵과 서로 이어진 계단·도착 P 를 한 번에",
 	"transit": "이용: E 를 눌러야 이동 (사다리·엘리베이터 등). 이름이 안내에 나옴",
 	"erase": "지우개: 클릭한 물체(또는 S)를 지움. 벽은 바닥으로 칠해서 지움",
@@ -282,6 +283,7 @@ func _init() -> void:
 		dirty = true
 		_status("수정됨 (저장 안 함)"))
 	canvas.selection_changed.connect(_edit_object)
+	canvas.roof_picked.connect(_edit_roof)
 	canvas.stroke_started.connect(func():
 		_pending_snap = _snapshot()
 		_last_ck = "")
@@ -1238,6 +1240,55 @@ func _restore(snap: Dictionary) -> void:
 	dirty = true
 	_refresh_links()
 	_edit_map()
+
+
+## 지붕 모양 (집 한 채 = 칸 t 가 든 지붕 묶음): visual.roof_style 에 그 묶음 칸 하나로 적음 (묶음 안 다른 칸의 기록은 지움)
+func _edit_roof(t: Vector2i) -> void:
+	var cells := VisualData.roof_cells(map)
+	var region := {}
+	var todo: Array = [t]
+	region[t] = true
+	while not todo.is_empty():
+		var c: Vector2i = todo.pop_back()
+		for d in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			if cells.has(c + d) and not region.has(c + d):
+				region[c + d] = true
+				todo.append(c + d)
+	var style := VisualData.roof_style(map, region)
+	_clear_inspector()
+	_title("지붕  (%d, %d) — %d칸" % [t.x, t.y, region.size()])
+	_hint("비스듬한 시점의 지붕을 칠한 지붕 타일 색의 기와로 그립니다. 처마는 지붕 칸 아래 벽 위로 조금 나옵니다.")
+	var put := func(shape: String, chim: bool) -> void:
+		checkpoint("roof_style")
+		if not map.get("visual") is Dictionary:
+			map.visual = {}
+		var rs: Dictionary = map.visual.get("roof_style", {}) if map.visual.get("roof_style") is Dictionary else {}
+		for k in rs.keys():
+			var xy := str(k).split(",")
+			if xy.size() == 2 and region.has(Vector2i(int(xy[0]), int(xy[1]))):
+				rs.erase(k)
+		if shape != "" or chim:
+			rs["%d,%d" % [t.x, t.y]] = {"shape": shape, "chimney": chim}
+		if rs.is_empty():
+			map.visual.erase("roof_style")
+		else:
+			map.visual.roof_style = rs
+		dirty = true
+		_gfx_dirty = true
+		canvas.queue_redraw()
+	var cur := {"shape": style.shape, "chimney": style.chimney}
+	_section("모양")
+	_option("지붕", VisualData.ROOF_SHAPES, style.shape, func(v):
+		cur.shape = v
+		put.call(cur.shape, cur.chimney))
+	var ch := CheckBox.new()
+	ch.text = "굴뚝"
+	ch.button_pressed = style.chimney
+	ch.toggled.connect(func(v):
+		cur.chimney = v
+		put.call(cur.shape, cur.chimney))
+	inspector.add_child(ch)
+	_hint("자동 = 폭이 5칸 이하로 좁으면 정면 박공, 아니면 맞배. ㄱ자처럼 꺾인 지붕은 네모 덩어리마다 그립니다.")
 
 
 ## 위층·아래층 만들기: 계단 o 의 방향(dir)대로 이 맵과 같은 모양(타일·벽·바닥·장식 그림, 환경)의 새 맵 <맵>_2f / _b1 을 만들고,

@@ -20,6 +20,7 @@ const LOGIC_OF_LAYER := {"wall": "#", "floor": "."}
 static var _data := {}
 static var _tiles := {}
 static var _tex := {}         # file → Texture2D
+static var _tile_color := {}  # tile_key → 평균 색 (지붕 기와 색)
 
 
 ## 다시 읽기 (변환 뒤 에디터에서)
@@ -27,6 +28,7 @@ static func reload() -> void:
 	_data = {}
 	_tiles = {}
 	_tex = {}
+	_tile_color = {}
 
 
 static func data() -> Dictionary:
@@ -263,6 +265,46 @@ static func overhead_cells(map: Dictionary) -> Dictionary:
 		if tiles().has(key) and str(tiles()[key].get("layer", "")) == "overhead":
 			out[c] = key
 	return out
+
+
+## 타일 그림의 평균 색 (지붕을 그 색의 기와로 그릴 때). 그림이 없으면 fallback
+static func tile_color(key: String, fallback := Color(0.45, 0.35, 0.3)) -> Color:
+	if _tile_color.has(key):
+		return _tile_color[key]
+	var col := fallback
+	var reg := tile_region(key)
+	if not reg.is_empty():
+		var img: Image = reg[0].get_image()
+		if img and not img.is_empty():
+			if img.is_compressed():
+				img.decompress()
+			var r: Rect2 = reg[1]
+			var sum := Vector3.ZERO
+			var n := 0
+			for y in range(int(r.position.y), int(r.end.y)):
+				for x in range(int(r.position.x), int(r.end.x)):
+					if x < img.get_width() and y < img.get_height():
+						var c := img.get_pixel(x, y)
+						if c.a > 0.5:
+							sum += Vector3(c.r, c.g, c.b)
+							n += 1
+			if n > 0:
+				col = Color(sum.x / n, sum.y / n, sum.z / n)
+	_tile_color[key] = col
+	return col
+
+
+## 지붕 모양 (집 한 채 = 지붕 묶음 cells): 맵 visual.roof_style {"x,y": {shape, chimney}} 중 그 묶음 안 칸에 적힌 것.
+## shape: "" 자동(좁으면 정면 박공, 아니면 맞배) / gable 맞배 / front 정면 박공 / hip 모임 / flat 예전(타일 그대로 + 위에서 본 음영)
+const ROOF_SHAPES := [["", "자동"], ["gable", "맞배지붕 (용마루 가로)"], ["front", "정면 박공 (세모가 앞)"], ["hip", "모임지붕"], ["flat", "평면 (칠한 타일 그대로)"]]
+static func roof_style(map: Dictionary, cells: Dictionary) -> Dictionary:
+	var rs = (map.get("visual", {}) if map.get("visual") is Dictionary else {}).get("roof_style", {})
+	if rs is Dictionary:
+		for k in rs:
+			var xy := str(k).split(",")
+			if xy.size() == 2 and cells.has(Vector2i(int(xy[0]), int(xy[1]))) and rs[k] is Dictionary:
+				return {"key": str(k), "shape": str(rs[k].get("shape", "")), "chimney": bool(rs[k].get("chimney", false))}
+	return {"key": "", "shape": "", "chimney": false}
 
 
 ## 지붕 칸 {Vector2i: tile_key} — 맵 안, 있는 지붕 타일(layer=roof)만. 이어진 칸 묶음 하나 = 집 한 채
