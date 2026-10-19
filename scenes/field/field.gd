@@ -693,6 +693,8 @@ func _update_near_spot() -> void:
 			var nm: String = str(best.data.get("name", ""))
 			if nm == "":
 				nm = str(best.data.get("label", ""))   # 가구는 이름이 없으면 표시 메모
+			if nm == "" and best.kind == "window":
+				nm = "창문"
 			%Prompt.text = "[E / Space]  %s: %s%s" % [verb, nm, extra]
 
 

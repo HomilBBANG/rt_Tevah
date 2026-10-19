@@ -560,7 +560,9 @@ static func window_texture() -> Texture2D:
 				var ang := absf(v.angle())
 				var side := 1.0 - smoothstep(deg_to_rad(35.0), deg_to_rad(105.0), ang)   # 옆으로 갈수록 서서히
 				var fall := pow(1.0 - smoothstep(0.0, 1.0, d), 1.6)       # 멀수록 서서히 (끝이 딱 끊기지 않게)
-				img.set_pixel(x, y, Color(1, 1, 1, WINDOW_PEAK * side * fall))
+				# 창문 쪽(뒤)으로도 가까운 곳은 은은하게 — 창 아래 벽면과 창 앞에 선 캐릭터 윗몸 (벽 앞면은 빛을 받는 면)
+				var back := 0.8 * pow(1.0 - smoothstep(0.0, 0.32, Vector2(v.x * 0.8, v.y).length()), 1.3)
+				img.set_pixel(x, y, Color(1, 1, 1, WINDOW_PEAK * maxf(side * fall, back)))
 		_window_tex = ImageTexture.create_from_image(img)
 	return _window_tex
 
