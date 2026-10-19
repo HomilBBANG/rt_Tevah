@@ -1530,9 +1530,12 @@ def validate_field(d, maps, rep, enemies):
                     rep.err(w, f"위치 ({x}, {y}) 에 이미 {occupied[(x, y)]} 가 있음")
             elif not floor(x, y):
                 rep.err(w, f"위치 ({x}, {y}) 가 바닥이 아님")
+            elif o.get("type") == "event":
+                pass   # 이벤트 = 보이지 않는 밟는 영역 — P·문 등 다른 물체와 겹쳐도 됨 (자리를 차지하지 않음)
             elif (x, y) in occupied and occupied[(x, y)] != oid:
                 rep.err(w, f"위치 ({x}, {y}) 에 이미 {occupied[(x, y)]} 가 있음")
-            occupied[(x, y)] = oid
+            if o.get("type") != "event":
+                occupied[(x, y)] = oid
             t = o.get("type", "")
             ref = o.get("ref", "")
             if t not in FIELD_TYPES:
