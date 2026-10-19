@@ -12,7 +12,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "floor_grass",
@@ -26,7 +27,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "floor_dirt",
@@ -40,7 +42,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "floor_wood",
@@ -54,7 +57,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "wall_default",
@@ -68,7 +72,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "wall_default_face",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "wall_wood",
@@ -82,7 +87,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "wall_wood_face",
-   "face_rows": 2
+   "face_rows": 2,
+   "h": 1
   },
   {
    "tile_key": "decal_crack",
@@ -96,7 +102,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "decal_blood",
@@ -110,7 +117,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "roof_red",
@@ -124,7 +132,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "roof_slate",
@@ -138,7 +147,38 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
+  },
+  {
+   "tile_key": "door_tall",
+   "name": "나무 문 (2칸 높이)",
+   "layer": "door",
+   "file": "test_tiles.png",
+   "atlas_x": 0,
+   "atlas_y": 11,
+   "casts_shadow": false,
+   "note": "문 그림 16x32 — 문 칸 위 벽 칸까지 올라감 (충돌은 문 칸만)",
+   "frames": 1,
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1,
+   "h": 2
+  },
+  {
+   "tile_key": "door_tall_open",
+   "name": "나무 문 (2칸 높이, 열림)",
+   "layer": "door",
+   "file": "test_tiles.png",
+   "atlas_x": 1,
+   "atlas_y": 11,
+   "casts_shadow": false,
+   "note": "문 그림 16x32 — 문 칸 위 벽 칸까지 올라감 (충돌은 문 칸만)",
+   "frames": 1,
+   "fps": 6.0,
+   "face": "",
+   "face_rows": 1,
+   "h": 2
   },
   {
    "tile_key": "door_wood",
@@ -152,7 +192,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "door_wood_open",
@@ -166,7 +207,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "sparkle",
@@ -180,7 +222,8 @@
    "frames": 4,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "water",
@@ -194,7 +237,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "fence_wood",
@@ -208,7 +252,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "roof_brown",
@@ -222,7 +267,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "roof_green",
@@ -236,7 +282,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "forest",
@@ -250,7 +297,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "forest_face",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "wall_default_face",
@@ -264,7 +312,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "wall_wood_face",
@@ -278,7 +327,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "forest_face",
@@ -292,7 +342,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "window_wood",
@@ -306,7 +357,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "window_wood_curtain",
@@ -320,7 +372,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "overhead_black",
@@ -334,7 +387,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "lintel_wood",
@@ -348,7 +402,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "road_curve_ws",
@@ -362,7 +417,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "road_curve_wn",
@@ -376,7 +432,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "road_curve_es",
@@ -390,7 +447,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "road_curve_en",
@@ -404,7 +462,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "road_fill_ne",
@@ -418,7 +477,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "road_fill_nw",
@@ -432,7 +492,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "road_fill_se",
@@ -446,7 +507,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "road_fill_sw",
@@ -460,7 +522,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "camp_tent",
@@ -474,7 +537,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   },
   {
    "tile_key": "wall_lamp",
@@ -488,7 +552,8 @@
    "frames": 1,
    "fps": 6.0,
    "face": "",
-   "face_rows": 1
+   "face_rows": 1,
+   "h": 1
   }
  ],
  "light_presets": [

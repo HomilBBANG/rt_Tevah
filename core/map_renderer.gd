@@ -246,6 +246,8 @@ func build_markers() -> void:
 		s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		s.position = Vector2((float(o.x) + 0.5) * tile, (float(o.y) + 0.5) * tile)
 		s.scale = Vector2.ONE * (tile / px) * (0.9 if kind == "spark" else 1.0)
+		if kind == "door" and fr[1].size.y > px:   # 키 큰 문 그림 (Tiles h): 밑은 문 칸 바닥, 위로 벽 칸까지
+			s.position.y -= (fr[1].size.y / px - 1.0) * tile / 2.0
 		if kind == "camp":   # 거점 텐트: 1.5배, 밑변은 칸 바닥에
 			s.scale *= 1.5
 			s.position.y -= tile * 0.25

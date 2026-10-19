@@ -223,7 +223,8 @@ static func tile_frame(key: String, frame: int) -> Array:
 	if tex == null:
 		return []
 	var px := art_px()
-	return [tex, Rect2((int(t.get("atlas_x", 0)) + frame) * px, int(t.get("atlas_y", 0)) * px, px, px)]
+	var hh := maxi(1, int(t.get("h", 1)) if t.get("h") != null else 1)   # 그림 높이(칸) — 2칸 높이 문
+	return [tex, Rect2((int(t.get("atlas_x", 0)) + frame) * px, int(t.get("atlas_y", 0)) * px, px, px * hh)]
 
 
 ## 전경 가림 칸 {Vector2i: tile_key} — 맵 안, 있는 overhead 타일만 (없는·다른 층 타일은 변환기가 오류로 잡음)

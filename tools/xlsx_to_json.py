@@ -82,7 +82,7 @@ SCHEMA = {
     "StatusEffects": ("status_id", ["status_id", "name", "description"], {}),
     # 그래픽 (기획 tevah_pixelart_2d_lighting_map_editor_spec_v1.0): 픽셀아트 타일, 광원 프리셋, 시간대 환경광
     "Tiles": ("tile_key", ["tile_key", "name", "layer", "file"], {"atlas_x": (int, 0), "atlas_y": (int, 0), "frames": (int, 1), "fps": (float, 6.0),
-                                                                  "face_rows": (int, 1)}),
+                                                                  "face_rows": (int, 1), "h": (int, 1)}),
     "LightPresets": ("preset_id", ["preset_id", "name", "color", "energy", "radius"], {"energy": (float, None), "radius": (float, None)}),
     "DayNight": ("profile_id", ["profile_id", "hour", "ambient"], {"hour": (float, None), "sun_energy": (float, 0.0)}),
     # 오브젝트 그림 (나무·가구): 놓은 칸 = 왼쪽 아래, foot_w·foot_h 칸 차지. solid = 지나갈 수 없음(+적 시야 막음)
@@ -161,7 +161,8 @@ OPTIONAL = {
     # 상태이상: scope part(부위)/whole(전체), tick_mode·tick_amount 시간마다 효과(미정이면 빈칸), death_cause 사망 원인
     # frames·fps: 애니메이션 (atlas_x 부터 오른쪽으로 frames 장, 초당 fps 장 — 조사 반짝이 등)
     # face·face_rows: 비스듬한 탑뷰 — 벽 타일 아래(남쪽) face_rows 칸 안에 바닥이 있으면 face(앞면) 타일로 그림
-    "Tiles": ["atlas_x", "atlas_y", "casts_shadow", "note", "frames", "fps", "face", "face_rows"],
+    # h: 그림 높이(칸) — 2칸 높이 문 등 (atlas_y 부터 아래로 h 칸)
+    "Tiles": ["atlas_x", "atlas_y", "casts_shadow", "note", "frames", "fps", "face", "face_rows", "h"],
     "LightPresets": ["shadow", "shape", "note"],
     "Props": ["foot_w", "foot_h", "solid", "casts_shadow", "note"],
     "DayNight": ["sun_color", "sun_energy", "note"],
@@ -1254,6 +1255,8 @@ def validate_graphics(d, maps, rep):
             rep.warn(w, f"문 '{t['tile_key']}' 의 열린 그림 '{t['tile_key']}_open' 이 없음 (열려도 같은 그림)")
         if t["frames"] is not None and t["frames"] < 1:
             rep.err(w, "frames 는 1 이상")
+        if t.get("h") is not None and t["h"] < 1:
+            rep.err(w, "h(그림 높이 칸)는 1 이상")
         if t["face"] and (t["face"] not in tiles or tiles[t["face"]]["layer"] != "wall" or t["layer"] != "wall"):
             rep.err(w, f"face 는 벽(wall) 타일의 앞면 = 있는 wall 타일: '{t['face']}'")
         if not (TILES_DIR / t["file"]).exists():
