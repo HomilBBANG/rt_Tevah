@@ -171,10 +171,10 @@ func _ready() -> void:
 			advance())
 	_update_status()
 	if embedded:
-		# 필드 위 대화: 체력·정신력·시간 표시와 메뉴는 숨기고, 뒤의 필드가 비치게
+		# 필드 위 대화: 체력·정신력·시간 표시와 메뉴는 숨기고, 뒤의 필드가 그대로 보이게 (어둡게·푸르게 덮지 않음)
 		%Stats.visible = false
 		%MenuButton.visible = false
-		$Scene.color.a = 0.55
+		$Scene.color.a = 0.0
 	if over_combat:
 		%InventoryButton.visible = false
 		$Scene.color.a = 0.35

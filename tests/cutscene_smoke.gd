@@ -116,14 +116,15 @@ func _ready() -> void:
 	check(f._cam_target == null and f.zoom_px() == 5, "대화가 끝나면 확대·따라가기 원래대로")
 	# 덮인 화면으로 시작: 첫 연출이 검게 덮기면 처음부터 검게 (자동 시작 컷신 — 맵이 먼저 보이지 않게)
 	DataLoader.nodes["tcut_cover"] = {"node_id": "tcut_cover", "kind": "direct", "speaker_id": "", "text": "", "next_node": "EXIT", "on_enter": "",
-		"episode_id": "", "steps": [{"do": "fade", "to": "black", "time": 0.3}, {"do": "fade", "to": "clear", "time": 0.1}]}
+		"episode_id": "", "steps": [{"do": "fade", "to": "black", "time": 1.0}, {"do": "fade", "to": "clear", "time": 0.1}]}
 	check(Direction.opening_cover("tcut_cover").get("layer", "") == "fade" and Direction.opening_cover("tcut_b").is_empty(), "덮인 화면 판단: 첫 단계가 검게 덮기")
 	f._start_dialogue({"data": {"ref": "tcut_cover"}}, true)
 	check(f._dialogue_ui.fade.color.a == 1.0, "자동 시작 컷신은 처음 프레임부터 검은 화면")
 	check(lb.is_open() or lb.get_node("Top").anchor_bottom >= 0.0, "대화가 시작되면 띠가 밀려 들어옴")
 	await _wait(0.4)
 	check(lb.is_open() and not f._dialogue_ui.get_node("Letterbox").visible, "대화·연출 중 띠 (필드의 띠 하나만)")
-	await _until(func(): return f._dialogue_ui == null, 3.0)
+	check(f._dialogue_ui.get_node("Scene").color.a == 0.0, "필드 위 대화는 화면을 어둡게·푸르게 덮지 않음")
+	await _until(func(): return f._dialogue_ui == null, 4.0)
 	DataLoader.nodes.erase("tcut_cover")
 	await _wait(0.4)
 	check(not lb.is_open(), "대화가 끝나면 띠가 빠짐")
