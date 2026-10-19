@@ -94,6 +94,26 @@ func _ready() -> void:
 	DataLoader.nodes.erase("tsp_sub")
 	await get_tree().process_frame
 
+	# 같은 사람이 이어서 말하면 같은 말풍선 (지난 대사 안 띄움), 다른 사람이 말하면 지난 대사가 회색으로
+	DataLoader.nodes["tsp_same"] = {"node_id": "tsp_same", "speaker_id": "", "text": "", "next_node": "EXIT", "on_enter": "", "kind": "",
+		"text_speed": "", "pages": [{"display": "bubble", "speaker_id": "char_cat", "text": "(테스트) 하나", "speed": "instant"},
+			{"display": "bubble", "speaker_id": "char_cat", "text": "(테스트) 둘", "speed": "instant"},
+			{"display": "bubble", "speaker_id": GameState.protagonist_id, "text": "(테스트) 셋", "speed": "instant"}]}
+	var pb: Control = DialogueScene.instantiate()
+	pb.embedded = true
+	add_child(pb)
+	pb.set_process(false)
+	await StoryRunner.start_dialogue("tsp_same")
+	await get_tree().process_frame
+	pb.advance()
+	check(pb.get_node("%Bubble").visible and pb.get_node("%Bubble").text_label().text == "(테스트) 둘" and not pb.get_node("%PrevBubble").visible,
+		"같은 사람이 이어서: 같은 말풍선, 지난 대사 안 뜸")
+	pb.advance()
+	check(pb.get_node("%PrevBubble").visible, "다른 사람이 말하면 지난 대사(회색)가 뜸")
+	pb.queue_free()
+	DataLoader.nodes.erase("tsp_same")
+	await get_tree().process_frame
+
 	# 자유 위치 글자: 화면 % 자리, 정렬·크기·색 (빠진 칸은 기본값)
 	var fr := ScriptPages.normalize({"display": "free", "text": "x", "x": 150, "align": "nope"})
 	check(fr.display == "free" and fr.x == 100.0 and fr.y == 50.0 and fr.align == "center" and fr.size == 38 and fr.color == "#FFFFFF"

@@ -584,8 +584,9 @@ func _show_dialogue(p: Dictionary) -> void:
 		side = SIDES[i]
 	var line := {"text": p.text, "speaker_id": p.speaker_id, "side": side}
 	# 같은 노드를 다시 보여줄 때(아이템 사용 후 등)는 대사 기록을 밀지 않는다
+	# 같은 사람이 이어서 말하면 같은 말풍선에 대사만 바뀜 — 지난 대사(회색 말풍선)는 띄우지 않음
 	if not _cur_line.is_empty() and _cur_line != line:
-		_prev_line = _cur_line
+		_prev_line = {} if _cur_line.speaker_id == line.speaker_id else _cur_line
 	_cur_line = line
 
 	# 초상화: 다른 NPC가 말할 때만 회색. 주인공이 말할 때는 둘 다 그대로.
