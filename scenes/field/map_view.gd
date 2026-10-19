@@ -44,7 +44,7 @@ func _draw_tiles() -> void:
 
 func _draw_spots() -> void:
 	for s in spots:
-		if s.kind in ["exit", "spot", "window", "camp"] and art_ids.has(str(s.data.object_id)):
+		if s.kind in ["exit", "spot", "window", "camp", "passage"] and art_ids.has(str(s.data.object_id)):
 			continue
 		if s.kind == "furniture":
 			continue   # 가구는 field_furniture 가 그림

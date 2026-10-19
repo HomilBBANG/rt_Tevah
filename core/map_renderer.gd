@@ -22,6 +22,7 @@ extends Node2D
 const VisualData = preload("res://core/visual_data.gd")
 const WindowView = preload("res://core/window_view.gd")
 const DoorView = preload("res://core/door_view.gd")
+const ShadeView = preload("res://core/shade_view.gd")
 const LIGHT_TEX_SIZE := 256
 
 var map := {}
@@ -50,6 +51,7 @@ var _roof_root: Node2D
 static var _cone_tex: Texture2D
 var _bg: ColorRect
 var _occ_root: Node2D
+var _wall_shade: Node2D          # 집 입체감: 벽 앞면 그늘·모서리·바닥 그림자 (core/shade_view.gd)
 var _light_root: Node2D
 var _modulate: CanvasModulate
 var _sun: DirectionalLight2D
@@ -68,6 +70,9 @@ func _init() -> void:
 		t.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(t)
 		layers[l] = t
+	_wall_shade = ShadeView.WallShade.new()
+	_wall_shade.name = "WallShade"
+	add_child(_wall_shade)
 	_occ_root = Node2D.new()
 	_occ_root.name = "Occluders"
 	add_child(_occ_root)
@@ -153,6 +158,24 @@ func rebuild_tiles() -> void:
 	for c in pc:
 		if pc[c].get("casts_shadow", false):
 			shadow_cells[c] = true   # 빛을 막는 오브젝트 (나무·상자) — 차지하는 칸
+	var walls := {}
+	var floors := {}
+	for y in rows.size():
+		for x in String(rows[y]).length():
+			var ch := String(rows[y])[x]
+			if ch == "#":
+				walls[Vector2i(x, y)] = true
+			elif ch == ".":
+				floors[Vector2i(x, y)] = true
+	_wall_shade.tile = tile
+	_wall_shade.faces = face_cells
+	_wall_shade.walls = walls
+	_wall_shade.floors = floors
+	var rc := {}
+	for c in VisualData.roof_cells(map):
+		rc[c] = true
+	_wall_shade.roofs = rc
+	_wall_shade.queue_redraw()
 	var face_tops := {}   # 앞면 묶음의 맨 위 칸 (위가 앞면이 아님) — 벽 너머 방의 빛이 새지 않게
 	for c in face_cells:
 		if not face_cells.has(c + Vector2i.UP):
@@ -183,17 +206,23 @@ func _rebuild_roofs(ts: TileSet, scale_k: float) -> void:
 				if cells.has(n) and not _roof_cell.has(n):
 					_roof_cell[n] = idx
 					todo.append(n)
+		var holder := Node2D.new()   # 지붕 한 채 = 타일 + 경사 음영 (같이 사라짐·나타남)
+		holder.name = "Roof_%d" % idx
 		var tl := TileMapLayer.new()
-		tl.name = "Roof_%d" % idx
 		tl.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		tl.tile_set = ts
 		tl.scale = Vector2(scale_k, scale_k)
 		for c in region:
 			if _keys.has(cells[c]):
 				tl.set_cell(c, _keys[cells[c]][0], _keys[cells[c]][1])
-		tl.modulate.a = roof_alpha
-		_roof_root.add_child(tl)
-		roof_regions.append({"cells": region, "layer": tl, "open": false})
+		holder.add_child(tl)
+		var shade := ShadeView.RoofShade.new()
+		shade.cells = region
+		shade.tile = tile
+		holder.add_child(shade)
+		holder.modulate.a = roof_alpha
+		_roof_root.add_child(holder)
+		roof_regions.append({"cells": region, "layer": holder, "open": false})
 
 
 ## 문·조사 지점 그림 (Tiles 에 그림이 없으면 만들지 않음 — 필드의 MapView 가 예전 도형으로 그림)
@@ -230,6 +259,11 @@ func build_markers() -> void:
 		elif o.get("type") == "light" and VisualData.light_on_wall(map, o):   # 벽걸이등 그림 (Tiles layer lamp)
 			key = VisualData.default_art("lamp")
 			kind = "lamp"
+		elif o.get("type") == "stairs":   # 계단 (층 이동): 올라가는 / 내려가는 그림 (Tiles layer stairs)
+			key = "stairs_down" if str(o.get("dir", "")) == "down" else "stairs_up"
+			if not VisualData.tiles().has(key):
+				key = VisualData.default_art("stairs")
+			kind = "stairs"
 		elif o.get("type") == "camp":   # 거점: 텐트 그림 (Tiles layer camp)
 			key = VisualData.default_art("camp")
 			kind = "camp"
@@ -333,7 +367,7 @@ func set_roofs_visible(v: bool) -> void:
 func hide_for_iso() -> void:
 	for l in layers:
 		layers[l].visible = false
-	for n in [_bg, _occ_root, props_root, _marker_root, _roof_root, overhead, _light_root]:
+	for n in [_bg, _wall_shade, _occ_root, props_root, _marker_root, _roof_root, overhead, _light_root]:
 		n.visible = false
 
 

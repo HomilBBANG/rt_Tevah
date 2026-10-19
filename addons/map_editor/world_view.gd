@@ -18,7 +18,7 @@ const SNAP := 2                      # 이 칸 수 안으로 가까이 놓으면
 const VisualData = preload("res://core/visual_data.gd")
 const GAP := 12                      # 자동 배치 때 묶음 사이 칸
 const ROW_WIDTH := 420               # 자동 배치 한 줄 너비 (칸)
-const TRAVEL_COLOR := {"exit": Color("c08850"), "passage": Color("6fa8dc"), "transit": Color("d8b060")}
+const TRAVEL_COLOR := {"exit": Color("c08850"), "passage": Color("6fa8dc"), "transit": Color("d8b060"), "stairs": Color("e0b070")}
 const OPPOSITE := {"up": "down", "down": "up", "left": "right", "right": "left"}
 
 var maps := {}                       # map_id → 맵 (에디터가 넘겨줌, 지금 맵은 편집 중인 내용)

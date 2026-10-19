@@ -15,20 +15,20 @@ signal request(action: String)    # 단축키
 signal activated(obj: Dictionary) # 더블클릭
 signal notice(text: String)       # 상태 글자 (영역 옮기기를 못 할 때 등)
 
-const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop", "window", "furniture", "respawn"]
+const OBJECT_TYPES := ["enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop", "window", "furniture", "respawn", "stairs"]
 const VisualData = preload("res://core/visual_data.gd")
-const TRAVEL_TYPES := ["exit", "passage", "transit"]
+const TRAVEL_TYPES := ["exit", "passage", "transit", "stairs"]
 const COLORS := {
 	"enemy": Color("d05050"), "investigate": Color("e8c35a"), "npc": Color("5a8fd0"),
 	"camp": Color("5fae6a"), "exit": Color("a07850"),
-	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"), "event": Color("c070d0"), "light": Color("f5d76e"), "prop": Color("9a8a70"), "window": Color("8ec0e0"), "furniture": Color.WHITE, "respawn": Color("c060c0"),
+	"passage": Color("6fa8dc"), "transit": Color("c8a060"), "arrive": Color("3fae5f"), "event": Color("c070d0"), "light": Color("f5d76e"), "prop": Color("9a8a70"), "window": Color("8ec0e0"), "furniture": Color.WHITE, "respawn": Color("c060c0"), "stairs": Color("b08860"),
 }
-const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P", "event": "!!", "light": "빛", "prop": "◆", "window": "창", "furniture": "가", "respawn": "R"}
+const LETTER := {"enemy": "적", "investigate": "조", "npc": "N", "camp": "거", "exit": "문", "passage": "통", "transit": "이", "arrive": "P", "event": "!!", "light": "빛", "prop": "◆", "window": "창", "furniture": "가", "respawn": "R", "stairs": "계"}
 const EDGE_NAME := {"up": "위", "down": "아래", "left": "왼쪽", "right": "오른쪽"}
 const DIR := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 ## 표시 필터 묶음: 물체 종류 → 필터 이름
 const FILTER_OF := {"enemy": "enemy", "investigate": "investigate", "npc": "npc", "camp": "camp",
-	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive", "event": "event", "light": "light", "prop": "props", "window": "light", "furniture": "furniture", "respawn": "arrive"}
+	"exit": "travel", "passage": "travel", "transit": "travel", "arrive": "arrive", "event": "event", "light": "light", "prop": "props", "window": "light", "furniture": "furniture", "respawn": "arrive", "stairs": "travel"}
 const PAINT_TOOLS := ["wall", "floor", "void", "tile", "tile_erase"]   # 끌어서 칠하는 도구 (tile = 그래픽 층)
 
 var map := {}                 # { map_id, tiles: [String], start, run_start, objects: [...], edges }

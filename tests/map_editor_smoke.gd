@@ -691,6 +691,23 @@ func _ready() -> void:
 	check(ed.delete_map("test_del_src") and not "test_del_src" in ed.map_ids and not ed.map.is_empty() and ed.map.map_id != "test_del_src", "지금 연 맵 삭제 → 다른 맵이 열림")
 	check(not ed.delete_map(ed.basecamp_id), "베이스캠프는 못 지움")
 
+	# 계단 + 위층 만들기: 같은 모양의 새 맵, 같은 자리 반대 계단, 양쪽 도착 P 가 서로 이어짐
+	ed.new_map("test_house", 6, 5)
+	ed.map.visual = {"layers": {"wall": {"0,0": "wall_wood"}}}
+	var st := {"object_id": "house_st", "type": "stairs", "x": 2, "y": 2, "ref": "", "name": "", "text": "",
+		"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}
+	ed.map.objects.append(st)
+	ed.make_floor(st)
+	await _frames(2)
+	check(FileAccess.file_exists(TEST_DIR + "test_house_2f.json") and st.ref == "test_house_2f", "위층 만들기: test_house_2f 맵 + 계단 연결")
+	var up: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_DIR + "test_house_2f.json"))
+	var ust: Array = up.objects.filter(func(x): return x.type == "stairs")
+	var up_p: Array = up.objects.filter(func(x): return x.type == "arrive")
+	check(ust.size() == 1 and ust[0].ref == "test_house" and ust[0].dir == "down" and int(ust[0].x) == 2 and int(ust[0].y) == 2, "위층: 같은 자리에 내려가는 계단 %s" % [ust])
+	check(up_p.size() == 1 and "house_st" in up_p[0].from and up.tiles == ed.map.tiles and up.visual.layers.wall.has("0,0"), "위층: 계단 옆 P(이어지는 곳 = 아래 계단)·같은 모양")
+	var home_p: Array = ed.map.objects.filter(func(x): return x.type == "arrive" and ust[0].object_id in x.get("from", []))
+	check(home_p.size() == 1 and Vector2i(int(home_p[0].x), int(home_p[0].y)) != Vector2i(2, 2), "아래층: 계단 옆 P 가 위층 계단에서 이어짐")
+
 	# 변환·검사 (실제 프로젝트 데이터 — 원본 tools/maps 는 안 건드림)
 	check(ed.run_convert() and "변환 완료" in ed.log_view.text, "변환·검사 실행")
 

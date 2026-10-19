@@ -353,8 +353,8 @@ func _build_actors() -> void:
 				if GameState.field_has(map.map_id, "removed", o.object_id) or GameState.field_has(map.map_id, "gone", o.object_id):
 					continue   # 처치함 / 플레이어를 쫓아 다른 맵으로 떠남
 				_spawn_enemy(o)
-			"investigate", "camp", "exit", "passage", "transit":
-				var kind: String = "spot" if o.type == "investigate" else o.type
+			"investigate", "camp", "exit", "passage", "transit", "stairs":
+				var kind: String = "spot" if o.type == "investigate" else ("passage" if o.type == "stairs" else o.type)   # 계단 = 밟으면 이동 (통로처럼)
 				spots.append({"kind": kind, "data": o, "pos": pos,
 					"done": GameState.field_has(map.map_id, "done", o.object_id)})
 				if o.type == "exit":
@@ -717,6 +717,8 @@ func _update_near_spot() -> void:
 				extra = "   —   열린 문으로 걸어가면 나감"
 			if best.kind == "passage":
 				extra = "   —   걸어 들어가면 이동"
+				if str(best.data.get("type", "")) == "stairs":
+					verb = "계단"
 			var nm: String = str(best.data.get("name", ""))
 			if nm == "":
 				nm = str(best.data.get("label", ""))   # 가구는 이름이 없으면 표시 메모

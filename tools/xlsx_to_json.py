@@ -115,17 +115,17 @@ OPTIONAL_SHEETS = {"PlayerParts", "NpcParts", "NpcAttacks", "EquipSlots", "Statu
                    "Survival", "CampActions", "Revivals", "DeathCauses"}
 # 맵 물체: exit 문(E 로 열고 걸어 들어가면 이동) / passage 통로(밟으면 이동) / transit 이용(사다리 등, E 로 이동) /
 #         arrive 도착 지점 (이동할 때 arrive 로 고르면 P 대신 여기 도착)
-FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop", "window", "furniture", "respawn"}   # prop = 오브젝트 그림, window = 창문 (벽 칸 위), furniture = 기타 가구 (흰 사각형)
+FIELD_TYPES = {"enemy", "investigate", "npc", "camp", "exit", "passage", "transit", "arrive", "event", "light", "prop", "window", "furniture", "respawn", "stairs"}   # prop = 오브젝트 그림, window = 창문 (벽 칸 위), furniture = 기타 가구 (흰 사각형)
 FURNITURE_ROLES = {"", "investigate", "pickup", "use", "talk"}   # 장식 / 조사 / 줍기 / 사용 / 대화
 PROPS_DIR = ROOT / "art" / "props"
 LIGHT_SHAPES = {"", "point", "cone"}   # light = 광원 (그래픽만)
 # 칠하지 않고 물체에 씀: door = 문(exit) 그림 (닫힘 key, 열림 key_open), marker = 조사 지점 반짝이, window = 창문 (커튼 key_curtain)
-OBJECT_ART_LAYERS = {"door", "marker", "window", "camp", "lamp"}   # camp = 거점 그림, lamp = 벽걸이등
+OBJECT_ART_LAYERS = {"door", "marker", "window", "camp", "lamp", "stairs"}   # stairs = 계단 물체 그림   # camp = 거점 그림, lamp = 벽걸이등
 # 그래픽 층: 바닥 / 바닥 장식 / 벽 외형 / 지붕 (인물 위 — 집 안에 들어가면 사라짐) / 전경 가림 (인물 위, 늘 보임 — 충돌·시야·빛 차단 없음)
 TILE_LAYERS = {"floor", "detail", "wall", "roof", "overhead"}
 TILES_DIR = ROOT / "art" / "tiles"
 LIGHT_NUMS = ("energy", "radius")   # event = 밟으면 대화(컷신)
-TRAVEL_TYPES = {"exit", "passage", "transit"}
+TRAVEL_TYPES = {"exit", "passage", "transit", "stairs"}   # stairs = 계단 (밟으면 이동, 층 사이)
 EDGE_DIRS = {"up", "down", "left", "right"}
 CAMP_KINDS = {"", "sleep"}   # sleep: 1시간 단위로 골라 자고, 자고 나면 저장 (effects 는 1시간마다)
 PATROL_DIRS = {"": (0, 0), "up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
@@ -1248,7 +1248,7 @@ def validate_graphics(d, maps, rep):
     for t in d["Tiles"]:
         w = loc("Tiles", t)
         if t["layer"] not in TILE_LAYERS | OBJECT_ART_LAYERS:
-            rep.err(w, f"layer 는 floor / detail / wall / roof / overhead (칠하기) 또는 door (문 그림) / marker (조사 반짝이) / window (창문) / camp (거점) / lamp (벽걸이등): '{t['layer']}'")
+            rep.err(w, f"layer 는 floor / detail / wall / roof / overhead (칠하기) 또는 door (문 그림) / marker (조사 반짝이) / window (창문) / camp (거점) / lamp (벽걸이등) / stairs (계단 물체): '{t['layer']}'")
         if t["layer"] == "window" and not t["tile_key"].endswith("_curtain") and t["tile_key"] + "_curtain" not in tiles:
             rep.warn(w, f"창문 '{t['tile_key']}' 의 커튼 그림 '{t['tile_key']}_curtain' 이 없음 (커튼을 쳐도 같은 그림)")
         if t["layer"] == "door" and not t["tile_key"].endswith("_open") and t["tile_key"] + "_open" not in tiles:
@@ -1727,7 +1727,7 @@ def export_maps(d, maps):
         tiles = [r.ljust(width, " ") for r in m["tiles"]]   # 짧은 줄의 나머지는 빈 공간
         objects = []
         for o in m["objects"]:
-            e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition", "arrive", "face", "look")}   # look = 문 그림 (Tiles layer=door)
+            e = {k: o.get(k, "") for k in ("object_id", "type", "ref", "name", "text", "condition", "arrive", "face", "look", "dir")}   # dir = 계단 up/down   # look = 문 그림 (Tiles layer=door)
             e["from"] = arrive_from(o)   # 도착 P: 이어지는 곳 (object_id / "맵:방향")
             e["default"] = bool(o.get("default"))   # 기본 도착 P
             e["once"] = bool(o.get("once"))         # 이벤트 칸: 한 번만

@@ -119,6 +119,30 @@ func _ready() -> void:
 	DataLoader.maps.erase("seam_a")
 	DataLoader.maps.erase("seam_b")
 
+	# 계단 (stairs): 밟으면 이어진 층으로, 그 층의 계단 옆 P (from = 이 계단)
+	var fl := ["#######", "#.....#", "#.....#", "#.....#", "#######"]
+	DataLoader.maps["st_1f"] = mk.call("st_1f", fl, {})
+	DataLoader.maps["st_2f"] = mk.call("st_2f", fl, {})
+	DataLoader.maps["st_1f"].objects = [{"object_id": "st_up", "type": "stairs", "x": 3, "y": 2, "ref": "st_2f", "dir": ""},
+		{"object_id": "st_1f_p", "type": "arrive", "x": 3, "y": 3, "from": ["st_down"]}]
+	DataLoader.maps["st_2f"].objects = [{"object_id": "st_down", "type": "stairs", "x": 3, "y": 2, "ref": "st_1f", "dir": "down"},
+		{"object_id": "st_2f_p", "type": "arrive", "x": 3, "y": 3, "from": ["st_up"]}]
+	f.travel("st_1f")
+	await _wait(0.2)
+	f.player.position = Vector2(1.5 * f.tile, 2.5 * f.tile)
+	await get_tree().physics_frame
+	_teleport(3, 2)
+	await _wait(0.3)
+	check(f.map.map_id == "st_2f" and _at(3, 3), "계단을 밟으면 위층 계단 옆 P 로 (%s)" % _where())
+	await _snap("stairs_2f")
+	_teleport(1, 1)
+	await _wait(0.1)
+	_teleport(3, 2)
+	await _wait(0.3)
+	check(f.map.map_id == "st_1f" and _at(3, 3), "위층 계단으로 다시 아래층 (%s)" % _where())
+	DataLoader.maps.erase("st_1f")
+	DataLoader.maps.erase("st_2f")
+
 	# 돌아다니는 NPC: 반경 안에서만, 정해진 길은 그 칸들로, 필드가 멈추거나 플레이어가 말 걸 거리면 멈춤
 	DataLoader.config["npc_wander_wait_min"] = 0.05
 	DataLoader.config["npc_wander_wait_max"] = 0.1

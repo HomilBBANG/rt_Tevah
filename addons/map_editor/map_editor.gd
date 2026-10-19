@@ -21,7 +21,7 @@ const TOOL_GROUPS := [
 	["칠하기", [["wall", "벽"], ["floor", "바닥"], ["void", "빈 공간"]]],
 	["위치", [["arrive", "도착 P"], ["respawn", "부활 R"], ["run_start", "시작 S"]]],
 	["물체", [["enemy", "적"], ["investigate", "조사"], ["npc", "NPC"], ["camp", "거점"], ["event", "이벤트"], ["furniture", "가구"]]],
-	["이동", [["exit", "문"], ["passage", "통로"], ["transit", "이용"]]],
+	["이동", [["exit", "문"], ["passage", "통로"], ["transit", "이용"], ["stairs", "계단"]]],
 	["그래픽", [["tile", "타일"], ["tile_erase", "타일 지우기"], ["prop", "오브젝트"], ["light", "광원"], ["window", "창문"]]],
 	["", [["erase", "지우개"]]],
 ]
@@ -40,7 +40,8 @@ const TOOL_TIPS := {
 	"camp": "베이스캠프 거점 (식사·물·씻기·잠 메뉴, 엑셀 CampActions)",
 	"event": "이벤트 칸: 밟으면 대화(컷신) 시작. 게임에서는 안 보임. 오른쪽 칸에서 대화·한 번만·나타나는 조건",
 	"exit": "문: E 로 열고, 열린 문으로 걸어 들어가면 이동. 오른쪽 칸에서 이동할 맵. 벽 칸에 놓으면 그 칸이 저절로 바닥이 됨",
-	"passage": "통로: 밟으면 바로 이동 (계단·길·동굴 입구)",
+	"passage": "통로: 밟으면 바로 이동 (길·동굴 입구)",
+	"stairs": "계단: 밟으면 이어진 층으로 이동. 오른쪽 칸 '⬆ 위층 만들기'로 같은 모양의 위층 맵과 서로 이어진 계단·도착 P 를 한 번에",
 	"transit": "이용: E 를 눌러야 이동 (사다리·엘리베이터 등). 이름이 안내에 나옴",
 	"erase": "지우개: 클릭한 물체(또는 S)를 지움. 벽은 바닥으로 칠해서 지움",
 	"tile": "타일 붓: 왼쪽 '타일 팔레트'에서 층·타일을 고르고 끌어서 칠함. 벽 층 = 그 칸이 벽(지나갈 수 없음), 바닥 층 = 바닥, 나머지 층은 그림만. □ 사각형·Shift 로 채우기",
@@ -97,7 +98,7 @@ const HELP_TEXT := """[b]맵 탭 쓰는 법[/b]
 [b]지도 표시[/b]  [color=#3fae5f]● P[/color] 도착 P (★ 기본) · [color=#b89a2a]S[/color] 회차 시작 · [color=#d05050]● 적[/color] · [color=#e8c35a]● 조[/color] 조사 · [color=#5a8fd0]● N[/color] NPC · [color=#5fae6a]● 거[/color] 거점 · [color=#c070d0]● !![/color] 이벤트 (밟으면 컷신) · [color=#a07850]● 문[/color] · [color=#6fa8dc]● 통[/color] 통로 · [color=#c8a060]● 이[/color] 이용 · 맵 바깥 푸른 띠 = 가장자리 이동
 """
 const TYPE_NAME :={"enemy": "적", "investigate": "조사 지점", "npc": "NPC", "camp": "베이스캠프 거점", "exit": "출구(문)",
-	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P", "event": "이벤트 칸", "light": "광원", "prop": "오브젝트 그림", "window": "창문", "furniture": "기타 가구", "respawn": "부활 R"}
+	"passage": "통로", "transit": "이용 (사다리 등)", "arrive": "도착 P", "event": "이벤트 칸", "light": "광원", "prop": "오브젝트 그림", "window": "창문", "furniture": "기타 가구", "respawn": "부활 R", "stairs": "계단"}
 const EDGES := [["up", "위"], ["down", "아래"], ["left", "왼쪽"], ["right", "오른쪽"]]
 
 var dir := MAP_DIR                   # 테스트에서 바꿔 쓴다
@@ -682,7 +683,7 @@ func _edit_object(o: Dictionary) -> void:
 	var link: Array = canvas.link_labels.get(o.object_id, [])
 	if not link.is_empty():
 		_note(("" if link[1] else "⚠ ") + link[0], Color("9cc4ec") if link[1] else Color("ff6060"))
-	if o.type in ["exit", "passage", "transit"] and o.get("ref", "") in _all_maps:
+	if o.type in ["exit", "passage", "transit", "stairs"] and o.get("ref", "") in _all_maps:
 		var go := Button.new()
 		go.text = "→ %s 열기" % o.ref
 		go.tooltip_text = "이어진 맵을 열고 도착하는 P 를 고릅니다 (맵에서 더블클릭해도 됨)"
@@ -822,8 +823,18 @@ func _edit_object(o: Dictionary) -> void:
 			te.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 			te.text_changed.connect(func(): set_field(o, "text", te.text))
 			inspector.add_child(te)
-		"exit", "passage", "transit":
+		"exit", "passage", "transit", "stairs":
 			_section("이동")
+			if o.type == "stairs":
+				_option("방향", [["", "⬆ 올라가는 계단"], ["down", "⬇ 내려가는 계단"]], o.get("dir", ""), func(v):
+					set_field(o, "dir", v)
+					_gfx_dirty = true
+					_edit_object.call_deferred(o))
+				var mk := Button.new()
+				mk.text = "⬇ 아래층 만들기 (이 계단과 이어서)" if str(o.get("dir", "")) == "down" else "⬆ 위층 만들기 (이 계단과 이어서)"
+				mk.tooltip_text = "이 맵과 같은 모양(벽·바닥·칠한 그림)의 새 맵을 만들고, 같은 자리에 반대 방향 계단과 양쪽 도착 P 를 서로 이어 둡니다"
+				mk.pressed.connect(func(): make_floor(o))
+				inspector.add_child(mk)
 			_option("이동할 맵", map_ids.map(func(m): return [m, m]), o.get("ref", ""), func(v):
 				set_field(o, "ref", v)
 				set_field(o, "arrive", "")
@@ -926,7 +937,7 @@ func _edit_object(o: Dictionary) -> void:
 ## map_id 맵으로 들어오는 곳 [[id, 설명]]: 다른 맵 파일들의 문·통로·이용(object_id)과 가장자리("맵:방향")
 func _entrances_to(map_id: String) -> Array:
 	var out := []
-	var type_name := {"exit": "문", "passage": "통로", "transit": "이용"}
+	var type_name := {"exit": "문", "passage": "통로", "transit": "이용", "stairs": "계단"}
 	var edge_name := {"up": "위", "down": "아래", "left": "왼쪽", "right": "오른쪽"}
 	var d := DirAccess.open(dir)
 	if d == null:
@@ -1227,6 +1238,69 @@ func _restore(snap: Dictionary) -> void:
 	dirty = true
 	_refresh_links()
 	_edit_map()
+
+
+## 위층·아래층 만들기: 계단 o 의 방향(dir)대로 이 맵과 같은 모양(타일·벽·바닥·장식 그림, 환경)의 새 맵 <맵>_2f / _b1 을 만들고,
+## 새 맵 같은 자리에 반대 방향 계단 + 양쪽 계단 옆 바닥에 도착 P (이어지는 곳 = 상대 계단) — 계단에서 내리면 바로 옆에 섬
+func make_floor(o: Dictionary) -> void:
+	var down := str(o.get("dir", "")) == "down"
+	var base: String = map.map_id + ("_b1" if down else "_2f")
+	var nid := base
+	var n := 2
+	while FileAccess.file_exists(dir + nid + ".json"):
+		nid = "%s_%d" % [base, n]
+		n += 1
+	var vis: Dictionary = map.get("visual", {}) if map.get("visual") is Dictionary else {}
+	var layers := {}
+	for l in ["floor", "detail", "wall"]:
+		if vis.get("layers", {}).get(l) is Dictionary:
+			layers[l] = vis.layers[l].duplicate(true)
+	var nvis := {"layers": layers}
+	for k in ["default_floor", "default_wall"]:
+		if vis.has(k):
+			nvis[k] = vis[k]
+	var sid: String = nid + "_stairs"
+	var at := Vector2i(int(o.x), int(o.y))
+	var base_obj := {"ref": "", "name": "", "text": "", "patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}
+	var nmap := {"map_id": nid, "tiles": map.tiles.duplicate(), "start": null, "run_start": null, "objects": [], "visual": nvis,
+		"environment": map.environment.duplicate(true) if map.get("environment") is Dictionary else {"profile": "indoor"}}
+	nmap.objects.append(base_obj.merged({"object_id": sid, "type": "stairs", "x": at.x, "y": at.y, "ref": map.map_id,
+		"name": "위로" if down else "아래로", "dir": "" if down else "down"}, true))
+	var np := _beside_floor(nmap, at)
+	nmap.objects.append(base_obj.merged({"object_id": nid + "_p", "type": "arrive", "x": np.x, "y": np.y, "name": "계단 옆", "from": [str(o.object_id)]}, true))
+	nmap.start = [np.x, np.y]
+	checkpoint()
+	o.ref = nid
+	o.arrive = ""
+	var hp := _beside_floor(map, at)
+	map.objects.append(base_obj.merged({"object_id": _new_object_id("arrive"), "type": "arrive", "x": hp.x, "y": hp.y, "name": "계단 옆", "from": [sid]}, true))
+	var f := FileAccess.open(dir + nid + ".json", FileAccess.WRITE)
+	if f == null:
+		_status("새 층 맵을 만들 수 없음: " + nid)
+		return
+	f.store_string(JSON.stringify(nmap, " ", false) + "\n")
+	f.close()
+	dirty = true
+	save()
+	refresh_file_list()
+	_refresh_links()
+	_edit_object(o)
+	_status("%s 만듦: 같은 자리 계단·양쪽 도착 P 를 이어 둠 — 맵 목록에서 열어 꾸미세요 (변환·검사 후 게임에 반영)" % nid)
+
+
+## 계단 옆 빈 바닥 칸 (아래 → 오른쪽 → 왼쪽 → 위). 없으면 그 칸
+func _beside_floor(m: Dictionary, c: Vector2i) -> Vector2i:
+	for d in [Vector2i.DOWN, Vector2i.RIGHT, Vector2i.LEFT, Vector2i.UP]:
+		var t: Vector2i = c + d
+		if t.y < 0 or t.y >= m.tiles.size() or t.x < 0 or t.x >= String(m.tiles[t.y]).length() or String(m.tiles[t.y])[t.x] != ".":
+			continue
+		var used := false
+		for x in m.objects:
+			if int(x.x) == t.x and int(x.y) == t.y:
+				used = true
+		if not used:
+			return t
+	return c
 
 
 ## 월드 맵 이어붙이기: a 의 dir 가장자리 → b 를 '이어지는 맵'(칸 어긋남 off), b 의 반대쪽 → a (어긋남 -off). 양쪽 파일에 바로 저장.
@@ -1869,7 +1943,7 @@ func _refresh_links() -> void:
 	for e in _entrances_to(map.map_id):
 		ents[e[0]] = e[1]
 	for o in map.objects:
-		if o.type in ["exit", "passage", "transit"]:
+		if o.type in ["exit", "passage", "transit", "stairs"]:
 			labels[o.object_id] = _link_out(o.object_id, o.get("ref", ""), o.get("arrive", ""))
 		elif o.type == "arrive":
 			var from: Array = o.get("from", [])
