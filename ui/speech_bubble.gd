@@ -48,7 +48,7 @@ func show_line(text: String, side: String, is_dimmed: bool, speaker_name := "", 
 	_label.text = text
 	_name.text = speaker_name
 	_name.visible = speaker_name != ""
-	_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if side == "left" else HORIZONTAL_ALIGNMENT_RIGHT
+	_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if side == "right" else HORIZONTAL_ALIGNMENT_LEFT   # 주인공(none)은 왼쪽
 	_name.add_theme_color_override("font_color",
 		Color.html(name_color) if Color.html_is_valid(name_color) else DEFAULT_NAME_COLOR)
 	tail_side = side

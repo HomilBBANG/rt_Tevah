@@ -602,10 +602,9 @@ func _show_dialogue(p: Dictionary) -> void:
 
 func _show_line(bubble: Control, line: Dictionary, y: Array, dimmed: bool) -> void:
 	_place(bubble, BUBBLE_X[line.side], y)
-	var is_npc: bool = line.side != "none"
+	# 주인공(가운데·꼬리 없음)도 이름표 (2026-10-19 — 플레이어 이름 루이스가 보이게)
 	bubble.show_line(line.text, line.side, dimmed,
-		DataLoader.character_name(line.speaker_id) if is_npc else "",
-		DataLoader.character_color(line.speaker_id) if is_npc else "")
+		DataLoader.character_name(line.speaker_id), DataLoader.character_color(line.speaker_id))
 
 
 func _place(c: Control, x: Array, y: Array) -> void:
