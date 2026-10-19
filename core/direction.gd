@@ -7,14 +7,16 @@ extends RefCounted
 ##     screen    {color, fade}     색 화면 (검은 화면·아무 색, "#RRGGBB") — 그림 칸처럼 대사 상자 아래, 그 위에 글을 띄울 수 있음
 ##     screen_off {fade}           색 화면 내리기
 ##     fade      {to, time}        to = black / white (화면 덮기) / clear (걷기)
-##     shake     {power, time}     화면 흔들기 (power 1~3)
+##     shake     {power, time, speed, wait}  화면 흔들기 (power 0.1~3, time 초 — 0 = 멈출 때까지 계속(손떨림), speed = 초당 흔들림 수 1~60)
+##     shake_off {}                계속 흔들기 멈춤
 ##     wait      {time}            기다리기 (초)
 ##     sound     {file, volume}    효과음 한 번 (audio/sfx/<file>, volume 0~100 %)
 ##     music     {file, fade, volume}  배경음 틀기 (audio/bgm/<file>, 반복) — 대화가 끝나도 계속, 끄려면 music_off
 ##     music_off {fade}            배경음 끄기
 ##   필드 (탐험 화면이 처리 — 대화 에디터 미리보기에서는 건너뜀):
 ##     walk      {who, to:[x,y], speed, wait}   who = player 또는 맵 물체 object_id(NPC), to 까지 길을 찾아 걷기 (칸/초)
-##     camera    {who 또는 to:[x,y], time, from?:[x,y], ease?}  카메라를 그 칸(또는 그 인물)으로 time 초 동안. from 이 있으면 먼저 그 칸으로 바로.
+##     zoom      {scale, time, wait}  확대·축소 — scale = 도트 배율(그림 1px = 화면 몇 px, 0 = 기본 field_tile/tile_art_px). 딱 떨어지는 배율로만, time 동안 한 단계씩
+##     camera    {who 또는 to:[x,y], time, from?:[x,y], ease?, follow?, wait?}  follow = 그 인물(NPC)을 계속 따라감, wait=false = 기다리지 않고 다음 단계  카메라를 그 칸(또는 그 인물)으로 time 초 동안. from 이 있으면 먼저 그 칸으로 바로.
 ##                                               who = player 면 플레이어까지 움직인 뒤 다시 따라감. ease = smooth(천천히 시작·끝, 기본) / linear
 ##     vanish    {who}                           그 NPC 를 숨김 (이번에 맵에 있는 동안 — 계속 없애려면 플래그 + 나타나는 조건)
 ##     face      {who, dir}                      바라보는 방향 (up / down / left / right). 걸을 때는 가는 쪽을 저절로 봄
@@ -24,14 +26,14 @@ extends RefCounted
 const CUTSCENE_DIR := "res://art/cutscenes/"
 const SFX_DIR := "res://audio/sfx/"
 const BGM_DIR := "res://audio/bgm/"
-const SCREEN_STEPS := ["image", "image_off", "screen", "screen_off", "fade", "shake", "wait", "sound", "music", "music_off"]
-const FIELD_STEPS := ["walk", "camera", "vanish", "face"]
+const SCREEN_STEPS := ["image", "image_off", "screen", "screen_off", "fade", "shake", "shake_off", "wait", "sound", "music", "music_off"]
+const FIELD_STEPS := ["walk", "camera", "zoom", "vanish", "face"]
 const DIRS := ["up", "down", "left", "right"]
 const DIR_VEC := {"up": Vector2.UP, "down": Vector2.DOWN, "left": Vector2.LEFT, "right": Vector2.RIGHT}
 const LABEL := {
-	"image": "🖼 그림 띄우기", "image_off": "그림 내리기", "screen": "■ 색 화면 띄우기", "screen_off": "색 화면 내리기", "fade": "페이드 (검게·하얗게·걷기)", "shake": "화면 흔들기",
+	"image": "🖼 그림 띄우기", "image_off": "그림 내리기", "screen": "■ 색 화면 띄우기", "screen_off": "색 화면 내리기", "fade": "페이드 (검게·하얗게·걷기)", "shake": "화면 흔들기", "shake_off": "흔들기 멈춤",
 	"wait": "기다리기", "sound": "🔊 효과음", "music": "🎵 배경음 틀기", "music_off": "배경음 끄기",
-	"walk": "🚶 걷게 하기 (필드)", "face": "↻ 바라보기 (필드)", "camera": "🎥 카메라 옮기기 (필드)", "vanish": "NPC 숨기기 (필드)",
+	"walk": "🚶 걷게 하기 (필드)", "face": "↻ 바라보기 (필드)", "camera": "🎥 카메라 옮기기 (필드)", "zoom": "🔍 확대·축소 (필드)", "vanish": "NPC 숨기기 (필드)",
 }
 const FADE_TO := ["black", "white", "clear"]
 ## 단계마다 기본값 (에디터에서 새로 추가할 때·빠진 칸 채우기)
@@ -41,14 +43,16 @@ const DEFAULTS := {
 	"screen": {"color": "#000000", "fade": 0.5},
 	"screen_off": {"fade": 0.5},
 	"fade": {"to": "black", "time": 0.6},
-	"shake": {"power": 1.0, "time": 0.4},
+	"shake": {"power": 1.0, "time": 0.4, "speed": 30.0, "wait": true},
+	"shake_off": {},
 	"wait": {"time": 1.0},
 	"sound": {"file": "", "volume": 100.0},
 	"music": {"file": "", "fade": 1.0, "volume": 100.0},
 	"music_off": {"fade": 1.0},
 	"face": {"who": "player", "dir": "down"},
 	"walk": {"who": "player", "to": [0, 0], "speed": 3.0, "wait": true},
-	"camera": {"who": "", "to": [0, 0], "time": 1.0},
+	"camera": {"who": "", "to": [0, 0], "time": 1.0, "wait": true},
+	"zoom": {"scale": 0, "time": 0.5, "wait": true},
 	"vanish": {"who": ""},
 }
 

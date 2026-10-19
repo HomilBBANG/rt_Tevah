@@ -41,7 +41,7 @@ NODE_KINDS = {"", "line", "effect", "branch", "start", "direct"}
 # 시작 카드의 자동 시작 (trigger.when): 로고 / 타이틀 이전 / 타이틀 이후 / 새 게임 시작 후 / 방 진입 후
 TRIGGER_WHENS = {"logo", "before_title", "after_title", "new_game", "map_enter"}
 # direct = 🎬 연출 카드: steps [{do, ...}] 를 차례로 (core/direction.gd 와 같은 규칙)
-DIRECT_STEPS = {"image", "image_off", "screen", "screen_off", "fade", "shake", "wait", "sound", "music", "music_off", "walk", "camera", "vanish", "face"}
+DIRECT_STEPS = {"zoom", "shake_off", "image", "image_off", "screen", "screen_off", "fade", "shake", "wait", "sound", "music", "music_off", "walk", "camera", "vanish", "face"}
 CUTSCENE_DIR = ROOT / "art" / "cutscenes"
 AUDIO_DIRS = {"sound": ROOT / "audio" / "sfx", "music": ROOT / "audio" / "bgm"}
 FACE_DIRS = {"up", "down", "left", "right"}
@@ -1089,6 +1089,10 @@ def check_steps(w, steps, field_objs, rep):
                 rep.err(sw, "플레이어는 숨길 수 없음")
             elif who != "player" and who not in people:
                 rep.err(sw, f"인물(who)은 player 또는 맵의 NPC object_id: '{who}'")
+        if do == "zoom" and not (isinstance(st.get("scale", 0), (int, float)) and 0 <= float(st.get("scale", 0)) <= 40 and float(st.get("scale", 0)) == int(float(st.get("scale", 0)))):
+            rep.err(sw, f"확대 배율(scale)은 0(기본) 또는 1~40 정수: '{st.get('scale')}'")
+        if do == "shake" and "speed" in st and not (_is_number(st["speed"]) and 1 <= float(st["speed"]) <= 60):
+            rep.err(sw, f"떨림 빠르기(speed)는 1~60: '{st['speed']}'")
         if do == "camera" and "from" in st:
             fr = st.get("from")
             if not (isinstance(fr, list) and len(fr) == 2 and all(isinstance(v, (int, float)) and v >= 0 for v in fr)):

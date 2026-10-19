@@ -34,6 +34,7 @@ var over_combat := false
 var start_page := 0
 ## 컷신일 때 '건너뛰기' 버튼을 보일지 (로고는 false — 버튼 없이 Esc 로만 넘김)
 var skip_button := true
+var own_letterbox := true        # 자기 위아래 띠를 보이나 (필드 위에서는 필드가 띠를 밀어 넣음 → false)
 var start_cover := {}            # 덮인 화면으로 시작 (Direction.opening_cover — 자동 시작 컷신·맵 미리보기)
 
 var _pages: Array = []          # [{kind, text, speaker_id}]
@@ -73,6 +74,7 @@ var _tweens: Array = []
 
 
 func _ready() -> void:
+	$Letterbox.visible = own_letterbox
 	_link(StoryRunner.node_shown, _on_node_shown)
 	_link(StoryRunner.choices_shown, _on_choices_shown)
 	_link(StoryRunner.message, func(t): _pending_msgs.append(t))
@@ -374,7 +376,15 @@ func _do_step(s: Dictionary) -> void:
 				return
 			if StoryRunner.field_director.is_valid():
 				StoryRunner.field_director.call(s)   # 맵(카메라)도 같이 — 기다리지 않음
-			await _shake(float(s.power), float(s.time))
+			if float(s.time) <= 0.0:
+				return   # 계속 흔들기(손떨림)는 맵 카메라만 — 대사 상자는 그대로
+			if s.get("wait", true):
+				await _shake(float(s.power), float(s.time))
+			else:
+				_shake(float(s.power), float(s.time))
+		"shake_off":
+			if StoryRunner.field_director.is_valid():
+				StoryRunner.field_director.call(s)
 		"wait":
 			var left := float(s.time)
 			while left > 0.0 and not skipping:

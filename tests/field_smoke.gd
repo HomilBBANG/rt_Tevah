@@ -13,6 +13,8 @@ func _ready() -> void:
 	seed(3)
 	DataLoader.config["text_speed_default"] = "instant"   # 대사가 한 자씩 나오지 않게 (타이핑은 script_play_smoke)
 	DataLoader.config["basecamp_map"] = "basecamp"   # 엑셀 Config 에서 베이스캠프를 바꿔도 테스트는 basecamp 맵으로
+	DataLoader.config["start_map"] = "test_field"   # 엑셀 Config 의 시작 맵을 바꿔도 테스트는 test_field 에서
+	DataLoader.triggers = {}   # 실제 데이터의 자동 시작 컷신(인트로 등)은 빼고
 	DataLoader.config["view_mode"] = "topdown"   # 키 입력을 격자 방향으로 검사 (쿼터뷰의 화면 기준 이동은 graphics_smoke)
 	SaveManager.save_dir = "user://test_saves/"
 	SaveManager.delete_all()

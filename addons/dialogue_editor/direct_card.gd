@@ -163,7 +163,10 @@ func _step_box(i: int) -> Control:
 			_num(row, "시간", s, "time", 0, 10, key)
 		"shake":
 			_num(row, "세기", s, "power", 0.1, 3, key)
-			_num(row, "시간", s, "time", 0, 10, key)
+			_num(row, "시간 (0 = 계속)", s, "time", 0, 60, key)
+			_num(row, "떨림 빠르기", s, "speed", 1, 60, key)
+			_wait_box(vb, s, key, "끝날 때까지 기다림", "끄면 흔들리는 동안 다음 단계 (대사와 함께 흔들기). 시간 0(계속)은 늘 기다리지 않고, '흔들기 멈춤' 단계나 대화 끝에서 멈춤")
+			_hint(vb, "떨림 빠르기: 1~5 = 느리게 출렁(손에 든 카메라) / 30 = 보통 / 60 = 아주 빠르게 덜덜")
 		"wait":
 			_num(row, "초", s, "time", 0, 60, key)
 		"sound", "music":
@@ -235,8 +238,36 @@ func _step_box(i: int) -> Control:
 			row2.add_child(fr)
 			if s.get("from") is Array:
 				_tile(row2, s, key, "from")
+			var row3 := HBoxContainer.new()
+			vb.add_child(row3)
+			_wait_box(row3, s, key, "다 움직일 때까지 기다림", "끄면 카메라가 움직이는 동안 다음 단계 (걷기·대사와 동시에)")
+			if str(s.get("who", "")) not in ["", "player"]:
+				var fo := CheckBox.new()
+				fo.text = "그 인물을 계속 따라감"
+				fo.tooltip_text = "도착한 뒤에도 그 인물이 걸으면 카메라가 따라감 (다음 카메라 단계나 대화 끝까지)"
+				fo.button_pressed = s.get("follow", false)
+				fo.toggled.connect(func(on):
+					s.follow = on
+					changed.emit(key))
+				row3.add_child(fo)
 		"vanish":
 			_who(row, s, [], key)
+		"zoom":
+			var zo := OptionButton.new()
+			var scales := [0, 3, 4, 5, 6, 7, 8, 10, 12]
+			for z in scales:
+				zo.add_item("기본 배율 (원래대로)" if z == 0 else "도트 ×%d%s" % [z, "  (기본)" if z == 5 else ""])
+				if int(s.get("scale", 0)) == z:
+					zo.select(zo.item_count - 1)
+			zo.tooltip_text = "그림 1px 을 화면 몇 px 로 (딱 떨어지는 배율이라 도트가 깨끗함). 기본 = ×5 (타일 16px → 80px)
+×6 이상 = 확대, ×4 이하 = 축소"
+			zo.item_selected.connect(func(idx):
+				s.scale = scales[idx]
+				changed.emit(key))
+			row.add_child(zo)
+			_num(row, "시간", s, "time", 0, 30, key)
+			_wait_box(vb, s, key, "끝날 때까지 기다림", "끄면 확대되는 동안 다음 단계")
+			_hint(vb, "시간 동안 한 단계씩 (×5 → ×6 → ×7) 바뀌어 도트가 흐려지지 않습니다. 대화가 끝나면 원래 배율로 돌아갑니다.")
 	if s.do in Direction.FIELD_STEPS:
 		var hint := Label.new()
 		hint.text = "필드에서만 (미리보기에서는 건너뜀). 칸 x·y 는 맵 탭에서 마우스를 올리면 보입니다."
@@ -244,6 +275,27 @@ func _step_box(i: int) -> Control:
 		hint.modulate = Color(1, 1, 1, 0.5)
 		vb.add_child(hint)
 	return panel
+
+
+## '기다림' 체크 (걷기·카메라·확대·흔들기 공통 — 끄면 다음 단계와 동시에)
+func _wait_box(parent: Control, s: Dictionary, key: String, text: String, tip: String) -> void:
+	var w := CheckBox.new()
+	w.text = text
+	w.tooltip_text = tip
+	w.button_pressed = s.get("wait", true)
+	w.toggled.connect(func(on):
+		s.wait = on
+		changed.emit(key))
+	parent.add_child(w)
+
+
+func _hint(parent: Control, t: String) -> void:
+	var l := Label.new()
+	l.text = t
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.add_theme_font_size_override("font_size", 14)
+	l.modulate = Color(1, 1, 1, 0.5)
+	parent.add_child(l)
 
 
 ## 파일 고르기 (그림·소리 공통)

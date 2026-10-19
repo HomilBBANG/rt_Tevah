@@ -85,14 +85,48 @@ func _ready() -> void:
 	check(not cam_done[0], "그다음 플레이어 쪽으로 '시간' 동안 움직이는 중 (작은 테스트 맵은 화면보다 작아 위치는 같음)")
 	await _until(func(): return cam_done[0], 2.0)
 	check(cam_done[0] and not cam.top_level and cam.position_smoothing_enabled, "플레이어에 닿으면 다시 따라감")
+	# 위아래 띠: 플레이 중엔 없고, 대화·연출 중에만
+	var lb: Control = f.get_node("HUD/Letterbox")
+	check(not lb.is_open(), "플레이 중에는 위아래 띠 없음")
+	# 확대: 도트 배율 한 단계씩 (5 → 7), 기다리지 않기
+	var zdone := [false]
+	var zgo := func():
+		await f._direct_step({"do": "zoom", "scale": 7, "time": 0.4, "wait": true})
+		zdone[0] = true
+	zgo.call()
+	await _wait(0.25)
+	check(f.zoom_px() == 6, "확대 중간: ×6 (딱 떨어지는 배율만 거침) — %d" % f.zoom_px())
+	await _until(func(): return zdone[0], 2.0)
+	check(f.zoom_px() == 7 and is_equal_approx(f._camera().zoom.x, 7.0 / 5.0), "확대 끝: ×7")
+	var cam_t0 := Time.get_ticks_msec()
+	await f._direct_step({"do": "camera", "to": [3, 3], "time": 1.0, "wait": false})
+	check(Time.get_ticks_msec() - cam_t0 < 100, "카메라 '기다리지 않음': 바로 다음 단계")
+	# 계속 흔들기 → 멈춤
+	f._direct_step({"do": "shake", "power": 1.0, "time": 0.0, "speed": 20})
+	await _wait(0.3)
+	var shaking: bool = f._camera().offset != Vector2.ZERO
+	await f._direct_step({"do": "shake_off"})
+	await _wait(0.1)
+	check(shaking and f._camera().offset == Vector2.ZERO, "시간 0 = 계속 흔들림, '흔들기 멈춤'으로 멈춤")
+	# 인물 따라가기: NPC 로 가서 그 NPC 가 걸으면 계속 따라감
+	await f._direct_step({"do": "camera", "who": "tcut_npc", "time": 0.0, "follow": true})
+	check(f._cam_target == npc.node, "카메라가 NPC 를 따라감")
+	f._reset_camera_fx()
+	f._camera_follow()
+	check(f._cam_target == null and f.zoom_px() == 5, "대화가 끝나면 확대·따라가기 원래대로")
 	# 덮인 화면으로 시작: 첫 연출이 검게 덮기면 처음부터 검게 (자동 시작 컷신 — 맵이 먼저 보이지 않게)
 	DataLoader.nodes["tcut_cover"] = {"node_id": "tcut_cover", "kind": "direct", "speaker_id": "", "text": "", "next_node": "EXIT", "on_enter": "",
 		"episode_id": "", "steps": [{"do": "fade", "to": "black", "time": 0.3}, {"do": "fade", "to": "clear", "time": 0.1}]}
 	check(Direction.opening_cover("tcut_cover").get("layer", "") == "fade" and Direction.opening_cover("tcut_b").is_empty(), "덮인 화면 판단: 첫 단계가 검게 덮기")
 	f._start_dialogue({"data": {"ref": "tcut_cover"}}, true)
 	check(f._dialogue_ui.fade.color.a == 1.0, "자동 시작 컷신은 처음 프레임부터 검은 화면")
+	check(lb.is_open() or lb.get_node("Top").anchor_bottom >= 0.0, "대화가 시작되면 띠가 밀려 들어옴")
+	await _wait(0.4)
+	check(lb.is_open() and not f._dialogue_ui.get_node("Letterbox").visible, "대화·연출 중 띠 (필드의 띠 하나만)")
 	await _until(func(): return f._dialogue_ui == null, 3.0)
 	DataLoader.nodes.erase("tcut_cover")
+	await _wait(0.4)
+	check(not lb.is_open(), "대화가 끝나면 띠가 빠짐")
 	# 도착 칸이 이벤트 영역 안이면 들어오자마자 (문을 나서자마자 컷신)
 	f.map.objects.filter(func(o): return o.type == "event")[0].once = false
 	DataLoader.maps["tcut_map"].start = [3, 3]

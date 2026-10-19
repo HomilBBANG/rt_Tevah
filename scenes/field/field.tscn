@@ -54,6 +54,8 @@ theme_override_constants/separation = 3
 [node name="Status" type="RichTextLabel" parent="HUD/TopLeft"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
 theme_override_font_sizes/normal_font_size = 25
 bbcode_enabled = true
 fit_content = true
@@ -64,6 +66,8 @@ autowrap_mode = 0
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 23
 clip_text = true
 
@@ -76,6 +80,8 @@ alignment = 2
 [node name="InventoryButton" type="Button" parent="HUD/TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
 size_flags_vertical = 4
 flat = true
 text = "소지품"
@@ -83,6 +89,8 @@ text = "소지품"
 [node name="TitleButton" type="Button" parent="HUD/TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
 size_flags_vertical = 4
 flat = true
 text = "타이틀로"
@@ -92,7 +100,9 @@ anchor_left = 0.02
 anchor_top = 0.894
 anchor_right = 0.98
 anchor_bottom = 1.0
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 25
 text = "이동: WASD / 방향키   달리기: Shift   조사·대화: E / Space   소지품: I   장비: Q   붉은 원 = 적의 시야"
 horizontal_alignment = 1

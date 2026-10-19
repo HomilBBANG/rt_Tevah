@@ -51,9 +51,13 @@ var tile := 48.0
 var frozen := false
 var events: Array = []          # 이벤트 칸 [{kind:"event", data, pos, tile, done}] — 화면에 안 보임
 var _last_tile := Vector2i(-999, -999)   # 이벤트 칸은 '들어설 때' 한 번
-var _cam_target: Vector2i = Vector2i(-1, -1)
 var _active_tweens: Array = []
 var renderer: Node2D             # core/map_renderer.gd — 픽셀아트 타일·조명·그림자 (보이는 모습만)
+var _cam_target: Node2D          # 연출 카메라가 따라가는 인물 (camera follow)
+var _cam_tween: Tween
+var _cam_from := Vector2.ZERO
+var _shake_run := 0               # 흔들기 세대 (shake_off·새 흔들기·대화 끝이면 앞의 것이 멈춤)
+var _zoom_run := 0
 var _cutscenes: Array = []       # 차례를 기다리는 자동 시작 컷신 (시작 노드) — 새 게임 시작 후, 방 진입 후
 var held_light: PointLight2D     # 손에 든 아이템의 빛 (Items.light, 예: 손전등) — 플레이어를 따라가며 바라보는 쪽을 비춤   # 연출 중인 걷기·카메라 (건너뛰기 때 바로 끝냄)
 var player: CharacterBody2D
@@ -130,6 +134,7 @@ func _ready() -> void:
 	%Inventory.visibility_changed.connect(func(): _set_frozen_by_overlay())
 	%Equipment.visibility_changed.connect(func(): _set_frozen_by_overlay())
 	GameState.equipment_changed.connect(_update_hud)
+	$HUD/Letterbox.set_open(false, 0.0)   # 플레이 중에는 띠 없이 — 대화·연출 때만 밀려 들어옴
 	load_map(GameState.current_map)
 	# 새 게임(캐릭터 생성 직후): 자동 시작 '새 게임 시작 후' (+ 예전 방식 Config opening_dialogue) — 방 진입 컷신보다 먼저
 	if GameState.opening_pending:
@@ -330,8 +335,7 @@ func _build_actors() -> void:
 	_add_circle_shape(player, player.radius)
 	var cam := Camera2D.new()
 	cam.name = "Camera2D"   # 연출(_camera)이 찾는 이름
-	# 위아래 검은 띠(화면의 10.6%)에 맵 가장자리가 가려지지 않게 그만큼 더 움직이게 둔다
-	var bar := int(get_viewport_rect().size.y * 0.106)
+	var bar := 0   # 띠는 대화·연출 중에만 (플레이 중에는 화면 가득 맵) — 맵 끝은 화면 끝까지
 	cam.limit_left = 0
 	cam.limit_top = -bar
 	cam.limit_right = int(map.width * tile)
@@ -1070,6 +1074,8 @@ func _start_dialogue(npc: Dictionary, cover := false) -> void:
 	_near_spot = {}
 	_dialogue_ui = DialogueScene.instantiate()
 	_dialogue_ui.embedded = true
+	_dialogue_ui.own_letterbox = false
+	$HUD/Letterbox.set_open(true)   # 조작할 수 없는 동안(대화·연출)만 위아래 띠
 	if cover:
 		_dialogue_ui.start_cover = Direction.opening_cover(str(npc.data.ref))
 	_dialogue_ui.finished.connect(_on_dialogue_finished)
@@ -1080,6 +1086,8 @@ func _start_dialogue(npc: Dictionary, cover := false) -> void:
 func _on_dialogue_finished() -> void:
 	_dialogue_ui.queue_free()
 	_dialogue_ui = null
+	$HUD/Letterbox.set_open(false)
+	_reset_camera_fx()
 	_camera_follow()   # 컷신에서 옮긴 카메라는 대화가 끝나면 플레이어에게
 	StoryRunner.enter_field()
 	frozen = false
@@ -1128,10 +1136,14 @@ func _direct_step(s: Dictionary) -> void:
 			elif tw and s.get("wait", true):
 				await tw.finished
 		"camera":
-			# 카메라: from(있으면 그 칸에서 바로 시작) → who(인물·player) 또는 to 칸까지 time 초 동안. who=player 면 도착한 뒤 다시 따라감
+			# 카메라: from(있으면 그 칸에서 바로 시작) → who(인물·player) 또는 to 칸까지 time 초 동안.
+			# who=player 면 도착한 뒤 다시 따라감, follow = 그 인물(NPC)을 계속 따라감 (다음 카메라 단계·대화 끝까지). wait=false 면 기다리지 않음
 			var cam := _camera()
 			var who := str(s.get("who", ""))
 			var time := float(s.get("time", 1.0))
+			_cam_target = null
+			if _cam_tween and _cam_tween.is_valid():
+				_cam_tween.kill()
 			if not cam.top_level:
 				var at := cam.get_screen_center_position()
 				cam.top_level = true
@@ -1140,40 +1152,129 @@ func _direct_step(s: Dictionary) -> void:
 			var from = s.get("from")
 			if from is Array and from.size() == 2:
 				cam.global_position = _clamp_cam(view_pos(_tile_center(int(from[0]), int(from[1]))))
-			var target: Vector2
 			var actor: Node2D = player if who == "player" else (_actor(who) if who != "" else null)
+			var target: Vector2
 			if actor:
 				target = actor.global_position
 			else:
 				var to: Array = s.get("to", [0, 0])
 				target = _tile_center(int(to[0]), int(to[1]))
 			target = _clamp_cam(view_pos(target))
+			var follow: bool = actor != null and who != "player" and s.get("follow", false)
 			if time <= 0.0 or instant:
 				cam.global_position = target
-			else:
-				var tw := create_tween()
-				tw.tween_property(cam, "global_position", target, time).set_trans(EASES.get(str(s.get("ease", "smooth")), Tween.TRANS_SINE)) 					.set_ease(Tween.EASE_IN_OUT)
-				_active_tweens.append(tw)
-				await tw.finished
+				_camera_after(who, actor, follow)
+				return
+			_cam_from = cam.global_position
+			var mover := func(k: float) -> void:   # 움직이는 인물이면 목표도 따라 움직임
+				var goal: Vector2 = _clamp_cam(view_pos(actor.global_position)) if actor and is_instance_valid(actor) else target
+				cam.global_position = _cam_from.lerp(goal, k)
+			_cam_tween = create_tween()
+			_cam_tween.tween_method(mover, 0.0, 1.0, time).set_trans(EASES.get(str(s.get("ease", "smooth")), Tween.TRANS_SINE)).set_ease(Tween.EASE_IN_OUT)
+			_active_tweens.append(_cam_tween)
+			var tw := _cam_tween
+			tw.finished.connect(func():
 				_active_tweens.erase(tw)
-			if who == "player":
-				_camera_follow()
+				_camera_after(who, actor, follow))
+			if s.get("wait", true):
+				await tw.finished
+		"zoom":
+			# 확대·축소: 도트 배율(그림 1px = 화면 몇 px, 기본 = field_tile / tile_art_px)로만 — 화질 그대로.
+			# time 동안 한 단계씩 (5 → 6 → 7 …), 0 이면 바로. wait=false 면 기다리지 않음
+			var to_px := int(s.get("scale", 0))
+			if to_px <= 0:
+				to_px = base_px()
+			if instant or float(s.get("time", 0.0)) <= 0.0:
+				_set_zoom_px(to_px)
+				return
+			var run := _zoom_run + 1
+			_zoom_run = run
+			var go := func():
+				var cur := zoom_px()
+				var n := absi(to_px - cur)
+				for k in n:
+					await get_tree().create_timer(float(s.time) / n).timeout
+					if _zoom_run != run or not is_inside_tree():
+						return
+					_set_zoom_px(cur + (k + 1) * signi(to_px - cur))
+			if s.get("wait", true):
+				await go.call()
+			else:
+				go.call()
 		"vanish":
 			for n in npcs:
 				if n.data.object_id == s.get("who", ""):
 					n.vanished = true
 			_refresh_presence()
 		"shake":
+			# 흔들기: power 세기, time 초 (0 = 멈출 때까지 계속 — 손떨림), speed 떨림 빠르기 (초당 흔들림 수), 끝날 때 조금씩 잦아듦
 			if instant:
 				return
+			var run := _shake_run + 1
+			_shake_run = run
 			var cam := _camera()
-			var t := 0.0
 			var time := float(s.get("time", 0.4))
-			while t < time:
-				cam.offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * tile * 0.12 * float(s.get("power", 1.0))
+			var speed := clampf(float(s.get("speed", 30.0)), 1.0, 60.0)
+			var power := float(s.get("power", 1.0))
+			var t := 0.0
+			var next := 0.0
+			var from_off := cam.offset
+			var to_off := Vector2.ZERO
+			while (time <= 0.0 or t < time) and _shake_run == run and is_inside_tree():
+				if t >= next:   # 새 흔들림 목표 (빠르기만큼 자주), 사이는 부드럽게 이어서 — 느린 떨림은 출렁이듯
+					next = t + 1.0 / speed
+					from_off = cam.offset
+					var fade := 1.0 if time <= 0.0 else clampf((time - t) / maxf(0.2, time * 0.3), 0.0, 1.0)
+					to_off = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * tile * 0.12 * power * fade
+				cam.offset = from_off.lerp(to_off, clampf(1.0 - (next - t) * speed, 0.0, 1.0))
 				await get_tree().process_frame
 				t += get_process_delta_time()
-			cam.offset = Vector2.ZERO
+			if _shake_run == run:
+				cam.offset = Vector2.ZERO
+		"shake_off":
+			_shake_run += 1
+			var cam := _camera()
+			if cam:
+				cam.offset = Vector2.ZERO
+
+
+## 카메라 이동이 끝난 뒤: player = 다시 따라감 / follow = 그 인물을 계속 따라감
+func _camera_after(who: String, actor: Node2D, follow: bool) -> void:
+	if who == "player":
+		_camera_follow()
+	elif follow and actor:
+		_cam_target = actor
+
+
+## 지금 도트 배율 (그림 1px 이 화면 몇 px) / 기본 배율
+func zoom_px() -> int:
+	var cam := _camera()
+	return roundi(base_px() * (cam.zoom.x if cam else 1.0))
+
+
+func base_px() -> int:
+	return maxi(1, roundi(tile / float(DataLoader.config.get("tile_art_px", 16))))
+
+
+func _set_zoom_px(px: int) -> void:
+	var cam := _camera()
+	if cam == null:
+		return
+	px = clampi(px, 1, 40)
+	cam.zoom = Vector2.ONE * (float(px) / base_px())
+	if cam.top_level:
+		cam.global_position = _clamp_cam(cam.global_position)
+
+
+## 대화가 끝나면 연출로 바꾼 카메라를 되돌림: 확대 원래대로, 계속 흔들기·인물 따라가기 멈춤
+func _reset_camera_fx() -> void:
+	_cam_target = null
+	_shake_run += 1
+	_zoom_run += 1
+	var cam := _camera()
+	if cam:
+		cam.offset = Vector2.ZERO
+		cam.zoom = Vector2.ONE
 
 
 ## 연출 대상: "player" 또는 이 맵의 NPC object_id
@@ -1421,6 +1522,8 @@ func _update_held_light() -> void:
 
 
 func _process(delta: float) -> void:
+	if _cam_target and is_instance_valid(_cam_target) and _camera() and _camera().top_level:   # 연출: 인물 따라가기
+		_camera().global_position = _clamp_cam(view_pos(_cam_target.global_position))
 	if held_light and is_instance_valid(held_light) and player:
 		held_light.rotation = player.facing.angle()   # 바라보는 쪽을 비춤
 	_update_roof()
