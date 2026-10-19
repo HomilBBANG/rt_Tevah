@@ -120,7 +120,6 @@ FURNITURE_ROLES = {"", "investigate", "pickup", "use", "talk"}   # 장식 / 조�
 PROPS_DIR = ROOT / "art" / "props"
 LIGHT_SHAPES = {"", "point", "cone"}   # light = 광원 (그래픽만)
 # 칠하지 않고 물체에 씀: door = 문(exit) 그림 (닫힘 key, 열림 key_open), marker = 조사 지점 반짝이, window = 창문 (커튼 key_curtain)
-ROOF_SHAPES = {"", "gable", "front", "hip", "flat"}   # 지붕 모양 (core/visual_data.gd ROOF_SHAPES)
 OBJECT_ART_LAYERS = {"door", "marker", "window", "camp", "lamp", "stairs"}   # stairs = 계단 물체 그림   # camp = 거점 그림, lamp = 벽걸이등
 # 그래픽 층: 바닥 / 바닥 장식 / 벽 외형 / 지붕 (인물 위 — 집 안에 들어가면 사라짐) / 전경 가림 (인물 위, 늘 보임 — 충돌·시야·빛 차단 없음)
 TILE_LAYERS = {"floor", "detail", "wall", "roof", "overhead"}
@@ -1308,11 +1307,6 @@ def validate_graphics(d, maps, rep):
         if env and profiles and env not in profiles:
             rep.warn(wm, f"없는 환경 프로필 '{env}' (graphics.xlsx DayNight) — outdoor 로 보임")
         layers = (m.get("visual") or {}).get("layers") or {}
-        for k, v in ((m.get("visual") or {}).get("roof_style") or {}).items():
-            if not isinstance(v, dict) or str(v.get("shape", "")) not in ROOF_SHAPES:
-                rep.warn(wm, f"지붕 모양 {k}: 알 수 없는 모양 '{(v or {}).get('shape', '') if isinstance(v, dict) else v}' (자동으로 보임)")
-            elif k not in (layers.get("roof") or {}):
-                rep.warn(wm, f"지붕 모양 {k}: 그 칸에 지붕이 없음 (안 쓰임)")
         h = len(m["tiles"])
         wdt = max((len(r) for r in m["tiles"]), default=0)
         for layer, cells in layers.items():
@@ -1770,9 +1764,7 @@ def export_maps(d, maps):
                     "visual": {"layers": {k: v for k, v in ((m.get("visual") or {}).get("layers") or {}).items() if k in TILE_LAYERS},
                                # 칠하지 않은 칸의 그림 (맵마다, 비우면 floor_default / wall_default)
                                "default_floor": (m.get("visual") or {}).get("default_floor", ""),
-                               "default_wall": (m.get("visual") or {}).get("default_wall", ""),
-                               # 지붕 모양 {"x,y": {shape, chimney}} — 그 칸이 든 지붕 묶음(집 한 채)의 모양
-                               "roof_style": (m.get("visual") or {}).get("roof_style") or {}},
+                               "default_wall": (m.get("visual") or {}).get("default_wall", "")},
                     "environment": {"profile": (m.get("environment") or {}).get("profile", "") or "outdoor"}})
     return out
 
