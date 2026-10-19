@@ -21,6 +21,7 @@ extends Node2D
 
 const VisualData = preload("res://core/visual_data.gd")
 const WindowView = preload("res://core/window_view.gd")
+const DoorView = preload("res://core/door_view.gd")
 const LIGHT_TEX_SIZE := 256
 
 var map := {}
@@ -210,6 +211,19 @@ func build_markers() -> void:
 		if o.get("type") == "exit":
 			key = str(o.get("look", "")) if str(o.get("look", "")) != "" and VisualData.tiles().has(str(o.get("look", ""))) else door
 			kind = "door"
+			var dmode := VisualData.door_mode(map, o)
+			if dmode == "face_short":   # 1칸 두께 가로벽: 키 큰 문이면 위쪽 방 바닥을 덮으니 1칸 문 그림으로
+				var kt: Dictionary = VisualData.tiles().get(key, {})
+				if int(kt.get("h", 1) if kt.get("h") != null else 1) > 1 and VisualData.short_door_art() != "":
+					key = VisualData.short_door_art()
+				dmode = "face"
+			if dmode != "face" and key != "":   # 옆벽·아래쪽 벽 문: 그 방향에 맞게 그림 (정면 문 그림을 그대로 쓰면 어색)
+				var dv := DoorView.new()
+				dv.position = Vector2(float(o.x), float(o.y)) * tile
+				dv.setup(dmode, tile / px)
+				_marker_root.add_child(dv)
+				markers[str(o.object_id)] = {"view": dv, "kind": "door", "key": key, "frames": 1, "fps": 0.0}
+				continue
 		elif o.get("type") == "investigate":
 			key = spark
 			kind = "spark"
@@ -410,7 +424,9 @@ func _occluder(r: Rect2) -> LightOccluder2D:
 
 ## 문을 열면 빛이 지나가고 닫으면 막힌다 (논리 — 통과·시야 — 는 필드가 따로 처리)
 func set_door_open(object_id: String, open: bool) -> void:
-	if markers.has(object_id) and markers[object_id].kind == "door":   # 문 그림: 열림 = key_open (없으면 같은 그림)
+	if markers.has(object_id) and markers[object_id].has("view"):   # 옆벽·아래쪽 벽 문
+		markers[object_id].view.open = open
+	elif markers.has(object_id) and markers[object_id].kind == "door":   # 문 그림: 열림 = key_open (없으면 같은 그림)
 		var m: Dictionary = markers[object_id]
 		var key: String = m.key + "_open" if open and VisualData.tiles().has(m.key + "_open") else m.key
 		var fr := VisualData.tile_frame(key, 0)

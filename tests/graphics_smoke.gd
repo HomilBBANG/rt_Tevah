@@ -29,6 +29,10 @@ func _ready() -> void:
 	check(noon.ambient.v > 0.95 and night.ambient.v < 0.4 and dusk.ambient.v < noon.ambient.v and dusk.ambient.v > night.ambient.v,
 		"시간대: 정오 밝음 / 밤 어두움 / 저녁은 그 사이 (%.2f / %.2f / %.2f)" % [noon.ambient.v, night.ambient.v, dusk.ambient.v])
 	check(VisualData.ambient("indoor", 0).ambient == VisualData.ambient("indoor", 720).ambient, "실내: 시간과 상관없이 같은 주변광")
+	var dmode := func(rows: Array) -> String: return VisualData.door_mode({"tiles": rows}, {"x": 1, "y": 1})
+	check(dmode.call(["###", "#.#", "..."]) == "face" and dmode.call(["...", "#.#", "..."]) == "face_short"
+		and dmode.call(["###", "...", "###"]) == "side" and dmode.call(["...", "#.#"]) == "bottom",
+		"문이 달린 벽: 뒷벽 = 정면(키 큰 문) / 1칸 가로벽 = 1칸 문 / 옆벽 = 세로 문짝 / 맨 아랫벽 = 아래쪽 문")
 	# ---- 필드: 밤 + 광원 + 벽·문 그림자
 	DataLoader.maps["tgfx"] = _map("outdoor")
 	GameState.clock = 23 * 60.0

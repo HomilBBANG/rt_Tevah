@@ -371,6 +371,35 @@ static func inside_lit(map: Dictionary, o: Dictionary, maps: Dictionary) -> bool
 	return false
 
 
+## 문이 달린 벽: face = 정면 (위가 벽 — 뒷벽, 키 큰 문) / face_short = 정면이지만 위도 바닥 (1칸 두께 가로벽 — 1칸 문) /
+## side = 옆벽 (위아래가 벽) / bottom = 방의 아랫벽 (위가 바닥, 아래가 막힘 — 앞면이 안 보이는 벽).
+## 문 칸 자체는 바닥이므로 이웃 칸으로 판단. 정면만 Tiles 문 그림(2칸 높이), 나머지는 core/door_view.gd
+static func door_mode(map: Dictionary, o: Dictionary) -> String:
+	var rows: Array = map.get("tiles", [])
+	var x := int(o.get("x", 0))
+	var y := int(o.get("y", 0))
+	var wall := func(cx: int, cy: int) -> bool:
+		return cy < 0 or cy >= rows.size() or cx < 0 or cx >= String(rows[cy]).length() or String(rows[cy])[cx] != "."
+	var up: bool = wall.call(x, y - 1)
+	var down: bool = wall.call(x, y + 1)
+	var left: bool = wall.call(x - 1, y)
+	var right: bool = wall.call(x + 1, y)
+	if up and down and not (left and right):
+		return "side"
+	if not up and (left or right):
+		return "face_short" if not down else "bottom"
+	return "face"
+
+
+## 키 1칸짜리 문 그림 (1칸 두께 벽의 정면 문): door 층에서 h 1 인 첫 타일 (열림 제외)
+static func short_door_art() -> String:
+	for k in tiles():
+		var t: Dictionary = tiles()[k]
+		if str(t.get("layer", "")) == "door" and not str(k).ends_with("_open") and int(t.get("h", 1) if t.get("h") != null else 1) <= 1:
+			return k
+	return ""
+
+
 ## 광원이 벽 칸에 있나 (벽걸이등) — 빛은 그 벽 앞 바닥 가장자리에서 (window_light 와 같은 규칙)
 static func light_on_wall(map: Dictionary, o: Dictionary) -> bool:
 	var rows: Array = map.get("tiles", [])
