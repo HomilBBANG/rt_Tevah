@@ -1461,19 +1461,41 @@ func _right_of_cards() -> Vector2:
 	return Vector2(x, 60)
 
 
+## 새 카드 ID: 이 대화의 카드뿐 아니라 **다른 대화 파일의 카드 ID 와도 겹치지 않게** (대화 이름을 바꾸면 카드 ID 는 예전 이름 그대로라
+## 'logo' 대화에 intro_2 가 남아 있고, 새로 만든 'intro' 대화가 또 intro_2 를 만들어 ID 중복이 났었음)
 func _new_node_id() -> String:
 	var base: String = dialogue.get("dialogue_id", "dlg")
+	var others := _other_file_ids()
 	while true:
 		_counter += 1
 		var id := "%s_%d" % [base, _counter]
-		if graph.get_node_or_null(NodePath(id)) == null:
+		if graph.get_node_or_null(NodePath(id)) == null and not others.has(id):
 			return id
 	return ""
+
+
+## 지금 연 대화가 아닌 다른 대화 파일들의 카드·선택지 ID
+func _other_file_ids() -> Dictionary:
+	var out := {}
+	for name in _file_names():
+		if name == dialogue.get("dialogue_id", ""):
+			continue
+		var d = _read_json(dir + name + ".json", {})
+		if not d is Dictionary:
+			continue
+		for n in d.get("nodes", []):
+			if n is Dictionary:
+				out[str(n.get("node_id", ""))] = true
+		for c in d.get("choices", []):
+			if c is Dictionary:
+				out[str(c.get("choice_id", ""))] = true
+	return out
 
 
 func _new_choice_id(extra_used := {}) -> String:
 	var base: String = dialogue.get("dialogue_id", "dlg")
 	var used := extra_used.duplicate()
+	used.merge(_other_file_ids())
 	for card in _cards():
 		for c in card.choices:
 			used[c.choice_id] = true
