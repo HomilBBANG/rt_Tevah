@@ -69,6 +69,19 @@ func _ready() -> void:
 	check(not f._dialogue_ui.skipping and Sound.music_file == "", "선택지에서 건너뛰기 멈춤, 배경음 끄기도 적용됨")
 	await StoryRunner.choose("tcut_long_c")
 	await _until(func(): return f._dialogue_ui == null, 2.0)
+	# 도착 칸이 이벤트 영역 안이면 들어오자마자 (문을 나서자마자 컷신)
+	f.map.objects.filter(func(o): return o.type == "event")[0].once = false
+	DataLoader.maps["tcut_map"].start = [3, 3]
+	f.load_map("tcut_map")
+	await _wait(0.2)
+	check(f._dialogue_ui != null, "맵에 들어오자마자 도착 칸의 이벤트 시작")
+	await _until(func(): return f._dialogue_ui == null or not f._dialogue_ui.directing, 6.0)
+	for i in 20:
+		if f._dialogue_ui == null:
+			break
+		f._dialogue_ui.advance()
+		await _wait(0.2)
+	DataLoader.maps["tcut_map"].start = [2, 4]
 	f.queue_free()
 	await _wait(0.1)
 	# ---- 오프닝 컷신: 캐릭터 생성 직후 필드가 열리면 Config opening_dialogue 를 한 번

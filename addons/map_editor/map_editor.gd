@@ -1401,7 +1401,7 @@ func sync_logic_to_paint() -> int:
 		for x in String(map.tiles[y]).length():
 			var t := Vector2i(x, y)
 			var k := "%d,%d" % [x, y]
-			var o: Dictionary = canvas.object_at(t)
+			var o: Dictionary = canvas.object_at(t, false)
 			if not o.is_empty() or canvas._is_marker(t, "start") or canvas._is_marker(t, "run_start"):
 				continue
 			var ch := String(map.tiles[y])[x]
@@ -1645,7 +1645,7 @@ func paste_at(at: Vector2i) -> void:
 	var made := []
 	for c in _clip.objects:
 		var t := at + Vector2i(int(c.x), int(c.y))
-		if not canvas.fits(str(c.get("type", "")), t, c) or not canvas.object_at(t).is_empty():
+		if not canvas.fits(str(c.get("type", "")), t, c) or (c.get("type", "") != "event" and not canvas.object_at(t, false).is_empty()):
 			continue
 		var o: Dictionary = c.duplicate(true)
 		o.object_id = _new_object_id(o.type)

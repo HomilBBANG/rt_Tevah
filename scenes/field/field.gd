@@ -325,6 +325,7 @@ func _build_actors() -> void:
 	GameState.arrive_edge = {}
 	_travel_lock = Vector2i(int(spawn[0]), int(spawn[1]))
 	_arrive_tile = _travel_lock
+	_last_tile = Vector2i(-999, -999)   # 도착한 칸이 이벤트 영역 안이면 들어오자마자 시작 (문을 나서자마자 컷신)
 	player.position = _tile_center(spawn[0], spawn[1]) if seam_pos == Vector2.INF else seam_pos
 	_add_circle_shape(player, player.radius)
 	var cam := Camera2D.new()

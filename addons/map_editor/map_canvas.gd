@@ -118,12 +118,12 @@ func fits(type: String, t: Vector2i, o: Dictionary = {}) -> bool:
 				return false
 		return is_floor(t)
 	if type == "light" and is_wall(t):   # 벽걸이등: 벽 칸도 됨 (옆이나 아래 뒷벽 너머에 비출 바닥이 있어야)
-		var there := object_at(t)
+		var there := object_at(t, false)
 		return (there.is_empty() or there == o) and VisualData.window_light(map, {"x": t.x, "y": t.y}).dir != Vector2i.ZERO
 	if type == "window":   # 창문: w × h 칸이 모두 벽 + 옆에 바닥이 있거나, 뒷벽(아래로 벽만 이어지다 바닥)
 		var wo := {"x": t.x, "y": t.y, "w": o.get("w", 1), "h": o.get("h", 1)}
 		for c in VisualData.furniture_cells(wo):
-			var there := object_at(c)
+			var there := object_at(c, false)
 			if not is_wall(c) or (not there.is_empty() and there != o):
 				return false
 		return VisualData.window_light(map, wo).dir != Vector2i.ZERO
@@ -143,9 +143,11 @@ func open_wall(t: Vector2i) -> void:
 
 
 ## 그 칸의 물체 (숨긴 것 포함 — 겹치기 검사용). zones = 큰 이벤트 영역의 나머지 칸도 (다른 물체가 먼저)
-## 이벤트 영역은 보이지 않는 밟는 곳이라 그 안에 다른 물체를 놓을 수 있음 (놓기·옮기기 검사는 zones=false)
+## 이벤트(영역)는 보이지 않는 밟는 곳이라 다른 물체·P 와 겹쳐도 됨 (놓기·옮기기·칠하기 검사는 zones=false = 이벤트 무시)
 func object_at(t: Vector2i, zones := true) -> Dictionary:
 	for o in map.get("objects", []):
+		if o.get("type", "") == "event":
+			continue
 		if int(o.x) == t.x and int(o.y) == t.y:
 			return o
 		if o.get("type", "") in ["furniture", "window"] and _in_rect(o, t):
@@ -208,7 +210,13 @@ func apply_tool(t: Vector2i, first := true) -> void:
 				changed.emit()
 		"select":
 			if first:
-				select(visible_object_at(t))
+				var pick := visible_object_at(t)
+				if not pick.is_empty() and pick == selected and pick.get("type", "") != "event":   # 같은 칸을 다시 누르면 그 아래 이벤트 영역
+					for o in map.get("objects", []):
+						if o.get("type", "") == "event" and is_visible_object(o) and _in_rect(o, t):
+							pick = o
+							break
+				select(pick)
 		"erase":
 			if not first:
 				return
@@ -225,9 +233,9 @@ func apply_tool(t: Vector2i, first := true) -> void:
 				map.run_start = null
 				changed.emit()
 		_:
-			if tool in TRAVEL_TYPES and first and object_at(t).is_empty():
+			if tool in TRAVEL_TYPES and first and object_at(t, false).is_empty():
 				open_wall(t)   # 벽에 문·통로를 놓으면 그 칸은 바닥이 됨
-			if tool in OBJECT_TYPES and first and fits(tool, t) and object_at(t, false).is_empty():
+			if tool in OBJECT_TYPES and first and fits(tool, t) and (tool == "event" or object_at(t, false).is_empty()):   # 이벤트는 P·문 위에도
 				var o := {"object_id": id_maker.call(tool) if id_maker.is_valid() else "%s_%d" % [tool, map.objects.size() + 1],
 					"type": tool, "x": t.x, "y": t.y, "ref": "", "name": "", "text": "",
 					"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}
@@ -250,7 +258,7 @@ func apply_tool(t: Vector2i, first := true) -> void:
 
 ## 칠하기 한 칸. 물체·P·S 가 있는 칸은 벽·빈 공간으로 안 바뀜
 func _paint(t: Vector2i, ch: String) -> void:
-	var o := object_at(t)
+	var o := object_at(t, false)
 	if not o.is_empty() and (o.get("type", "") == "window" or (o.get("type", "") == "light" and is_wall(t))):
 		return   # 창문·벽걸이등 칸은 벽 그대로
 	if ch != "." and (not o.is_empty() or _is_marker(t, "start") or _is_marker(t, "run_start")):
@@ -283,7 +291,7 @@ func _paint_tile(t: Vector2i, erase: bool) -> void:
 		layers[tile_layer] = {}
 	var cells: Dictionary = layers[tile_layer]
 	var k := "%d,%d" % [t.x, t.y]
-	var o := object_at(t)
+	var o := object_at(t, false)
 	var blocked: bool = (not o.is_empty() and o.get("type", "") != "window") or _is_marker(t, "start") or _is_marker(t, "run_start")
 	if tile_layer == "wall" and not erase and blocked:
 		if not _lock_noticed:
@@ -551,8 +559,8 @@ func _move_selection(d: Vector2i) -> void:
 	var movers := _move_from.map(func(p): return p[0])
 	for p in _move_from:
 		var to: Vector2i = p[1] + d
-		var there := object_at(to)
-		if not fits(str(p[0].get("type", "")), to, p[0]) or (not there.is_empty() and not there in movers):
+		var there := object_at(to, false)
+		if not fits(str(p[0].get("type", "")), to, p[0]) or (not there.is_empty() and not there in movers and p[0].get("type", "") != "event"):
 			return
 	for p in _move_from:
 		p[0].x = p[1].x + d.x

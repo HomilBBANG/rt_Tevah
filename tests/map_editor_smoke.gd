@@ -684,6 +684,19 @@ func _ready() -> void:
 	ed.map.objects.append(zone)
 	check(ed.canvas.object_at(Vector2i(4, 3)) == zone and ed.canvas.object_at(Vector2i(4, 3), false).is_empty(), "이벤트 영역: 안의 칸을 누르면 그 이벤트, 놓기 검사에서는 빈 칸")
 	check(ed.canvas.fits("event", Vector2i(3, 1), zone) and not ed.canvas.fits("event", Vector2i(3, 1), zone.merged({"w": 99}, true)), "이벤트 크기: 맵 밖으로 나가면 안 됨")
+	var home: Dictionary = ed.map.objects.filter(func(x): return x.type == "arrive")[0]
+	var hp_t := Vector2i(int(home.x), int(home.y))
+	ed.canvas.tool = "event"
+	var n_obj: int = ed.map.objects.size()
+	ed.canvas.apply_tool(hp_t)
+	var on_p: Array = ed.map.objects.filter(func(x): return x.type == "event" and int(x.x) == hp_t.x and int(x.y) == hp_t.y)
+	check(ed.map.objects.size() == n_obj + 1 and on_p.size() == 1, "이벤트는 도착 P 칸 위에도 놓임")
+	ed.canvas.tool = "select"
+	ed.canvas.apply_tool(hp_t)
+	check(ed.canvas.selected == home, "P 위 이벤트: 처음 누르면 P")
+	ed.canvas.apply_tool(hp_t)
+	check(ed.canvas.selected == on_p[0], "같은 칸을 다시 누르면 그 아래 이벤트")
+	ed.map.objects.erase(on_p[0])
 	ed.map.objects.erase(zone)
 
 	# 맵 삭제: 쓰는 곳(다른 맵의 문) 목록 → 파일 지움, 베이스캠프는 못 지움
