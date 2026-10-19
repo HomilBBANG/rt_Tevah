@@ -17,7 +17,7 @@
  "field_enemy_lose_sight": 8,
  "field_flee_grace": 3,
  "protagonist_id": "char_t1",
- "start_map": "test_field",
+ "start_map": "new_america_in_church",
  "basecamp_map": "new_america_in_church",
  "time_scale": 2,
  "start_hour": 8,

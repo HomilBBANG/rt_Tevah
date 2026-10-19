@@ -12,7 +12,7 @@
  {
   "episode_id": "ep_test2",
   "title": "테스트 에피소드 2",
-  "protagonist_id": "char_t2",
+  "protagonist_id": "char_t1",
   "start_node": "t2_npc1",
   "unlock_condition": "wflag:ep_test1_clear",
   "timeout_node": "t2_timeout",

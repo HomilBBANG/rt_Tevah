@@ -37,26 +37,14 @@
   "#########..#########"
  ],
  "start": [
-  10,
-  18
+  9,
+  32
  ],
- "run_start": null,
+ "run_start": [
+  10,
+  14
+ ],
  "objects": [
-  {
-   "object_id": "new_america_in_church_p",
-   "type": "arrive",
-   "x": 10,
-   "y": 18,
-   "ref": "",
-   "name": "",
-   "text": "",
-   "patrol_dir": "",
-   "patrol_len": 0,
-   "condition": "",
-   "schedule": "",
-   "arrive": "",
-   "default": true
-  },
   {
    "object_id": "new_america_in_church_exit_1",
    "type": "exit",
@@ -276,8 +264,8 @@
   {
    "object_id": "new_america_in_church_npc_1",
    "type": "npc",
-   "x": 16,
-   "y": 9,
+   "x": 17,
+   "y": 10,
    "ref": "cat_start",
    "name": "고양이",
    "text": "",
@@ -814,6 +802,20 @@
    "y": 26,
    "ref": "table",
    "name": "탁자",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": ""
+  },
+  {
+   "object_id": "new_america_in_church_respawn_1",
+   "type": "respawn",
+   "x": 10,
+   "y": 14,
+   "ref": "",
+   "name": "",
    "text": "",
    "patrol_dir": "",
    "patrol_len": 0,

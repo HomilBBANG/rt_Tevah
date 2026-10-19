@@ -104,7 +104,7 @@
  {
   "node_id": "t2_a",
   "episode_id": "ep_test2",
-  "speaker_id": "char_t2",
+  "speaker_id": "char_t1",
   "text": "노드 A (에피소드 2)",
   "next_node": "",
   "on_enter": "",
@@ -270,6 +270,137 @@
   "npc_id": ""
  },
  {
+  "node_id": "opening_line",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "사람은 욕망이 충족될수록 더 큰 욕망을 갖는 유일한 동물이며, 결코 만족할 줄 모르는\n유일한 동물이다",
+  "next_node": "opening_out",
+  "on_enter": "",
+  "kind": "",
+  "condition": "",
+  "fail_next": "",
+  "pages": [
+   {
+    "page_id": "p1",
+    "display": "subtitle",
+    "text": "사람은 욕망이 충족될수록 더 큰 욕망을 갖는 유일한 동물이며, 결코 만족할 줄 모르는\n유일한 동물이다",
+    "speed": "instant"
+   }
+  ],
+  "routes": [],
+  "steps": [],
+  "trigger": {},
+  "text_speed": "",
+  "npc_id": ""
+ },
+ {
+  "node_id": "opening_in",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "opening_line",
+  "on_enter": "",
+  "kind": "direct",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "steps": [
+   {
+    "to": "black",
+    "time": 0.5,
+    "do": "fade"
+   },
+   {
+    "file": "intro.png",
+    "fade": 0.5,
+    "do": "image"
+   },
+   {
+    "to": "clear",
+    "time": 1.2,
+    "do": "fade"
+   },
+   {
+    "time": 0.5,
+    "do": "wait"
+   }
+  ],
+  "trigger": {},
+  "text_speed": "",
+  "npc_id": ""
+ },
+ {
+  "node_id": "intro_3",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "intro_1",
+  "on_enter": "",
+  "kind": "direct",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "steps": [
+   {
+    "who": "",
+    "to": [
+     10.0,
+     5.0
+    ],
+    "time": 0.0,
+    "wait": true,
+    "do": "camera"
+   },
+   {
+    "to": "clear",
+    "time": 0.8,
+    "do": "fade"
+   },
+   {
+    "who": "player",
+    "to": [
+     0.0,
+     0.0
+    ],
+    "time": 3.5,
+    "wait": true,
+    "do": "camera"
+   }
+  ],
+  "trigger": {},
+  "text_speed": "",
+  "npc_id": ""
+ },
+ {
+  "node_id": "opening_out",
+  "episode_id": "",
+  "speaker_id": "",
+  "text": "",
+  "next_node": "intro_3",
+  "on_enter": "",
+  "kind": "direct",
+  "condition": "",
+  "fail_next": "",
+  "pages": [],
+  "routes": [],
+  "steps": [
+   {
+    "to": "black",
+    "time": 0.8,
+    "do": "fade"
+   },
+   {
+    "fade": 0.0,
+    "do": "image_off"
+   }
+  ],
+  "trigger": {},
+  "text_speed": "",
+  "npc_id": ""
+ },
+ {
   "node_id": "opening_start",
   "episode_id": "",
   "speaker_id": "",
@@ -291,48 +422,11 @@
   "npc_id": ""
  },
  {
-  "node_id": "opening_in",
+  "node_id": "intro_1",
   "episode_id": "",
-  "speaker_id": "",
-  "text": "",
-  "next_node": "opening_line",
-  "on_enter": "",
-  "kind": "direct",
-  "condition": "",
-  "fail_next": "",
-  "pages": [],
-  "routes": [],
-  "steps": [
-   {
-    "do": "fade",
-    "to": "black",
-    "time": 0.0
-   },
-   {
-    "do": "image",
-    "file": "test_cg.png",
-    "fade": 0.0
-   },
-   {
-    "do": "fade",
-    "to": "clear",
-    "time": 1.2
-   },
-   {
-    "do": "wait",
-    "time": 0.5
-   }
-  ],
-  "trigger": {},
-  "text_speed": "",
-  "npc_id": ""
- },
- {
-  "node_id": "opening_line",
-  "episode_id": "",
-  "speaker_id": "",
-  "text": "(테스트) 오프닝 컷신 — Config opening_dialogue 를 비우면 나오지 않음",
-  "next_node": "opening_out",
+  "speaker_id": "char_t1",
+  "text": "여긴 어디지?",
+  "next_node": "EXIT",
   "on_enter": "",
   "kind": "",
   "condition": "",
@@ -340,44 +434,19 @@
   "pages": [
    {
     "page_id": "p1",
-    "display": "subtitle",
-    "text": "(테스트) 오프닝 컷신 — Config opening_dialogue 를 비우면 나오지 않음"
+    "display": "bubble",
+    "text": "여긴 어디지?",
+    "speaker_id": "char_t1"
+   },
+   {
+    "page_id": "p2",
+    "display": "bubble",
+    "text": "이름 말고는 아무것도 기억나지 않아.",
+    "speaker_id": "char_t1"
    }
   ],
   "routes": [],
   "steps": [],
-  "trigger": {},
-  "text_speed": "",
-  "npc_id": ""
- },
- {
-  "node_id": "opening_out",
-  "episode_id": "",
-  "speaker_id": "",
-  "text": "",
-  "next_node": "EXIT",
-  "on_enter": "",
-  "kind": "direct",
-  "condition": "",
-  "fail_next": "",
-  "pages": [],
-  "routes": [],
-  "steps": [
-   {
-    "do": "fade",
-    "to": "black",
-    "time": 0.8
-   },
-   {
-    "do": "image_off",
-    "fade": 0.0
-   },
-   {
-    "do": "fade",
-    "to": "clear",
-    "time": 0.8
-   }
-  ],
   "trigger": {},
   "text_speed": "",
   "npc_id": ""

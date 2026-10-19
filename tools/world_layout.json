@@ -1,0 +1,60 @@
+{
+	"maps": {
+		"basecamp": [
+			173,
+			-20
+		],
+		"city": [
+			-4,
+			-41
+		],
+		"new_america_church": [
+			65,
+			0
+		],
+		"new_america_in_church": [
+			70,
+			-40
+		],
+		"new_america_vil_1": [
+			65,
+			40
+		],
+		"new_america_vil_1_h_1": [
+			98,
+			25
+		],
+		"new_america_vil_2": [
+			65,
+			60
+		],
+		"new_america_vil_3": [
+			25,
+			40
+		],
+		"new_america_way": [
+			65,
+			20
+		],
+		"test_ai": [
+			144,
+			0
+		],
+		"test_arrive": [
+			172,
+			0
+		],
+		"test_field": [
+			143,
+			-26
+		],
+		"test_overhead": [
+			191,
+			0
+		],
+		"test_travel": [
+			173,
+			-26
+		]
+	}
+}
