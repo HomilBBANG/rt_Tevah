@@ -428,7 +428,7 @@ static func light_on_wall(map: Dictionary, o: Dictionary) -> bool:
 
 ## 크기가 있는 물체(가구·창문)가 차지하는 칸, 나머지는 놓은 칸 하나
 static func object_cells(o: Dictionary) -> Array:
-	if str(o.get("type", "")) in ["furniture", "window"]:
+	if str(o.get("type", "")) in ["furniture", "window", "event"]:   # 크기 있는 물체 (이벤트 = 밟는 영역)
 		return furniture_cells(o)
 	return [Vector2i(int(o.get("x", 0)), int(o.get("y", 0)))]
 

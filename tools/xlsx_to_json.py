@@ -1463,6 +1463,12 @@ def validate_field(d, maps, rep, enemies):
             else:
                 seen[oid] = m["file"]
             x, y = int(o.get("x", -1)), int(o.get("y", -1))
+            if o.get("type") == "event":   # 이벤트 영역: 놓은 칸 = 왼쪽 위, w × h 칸이 맵 안 (안에 다른 물체가 있어도 됨)
+                ew, eh = int(o.get("w", 1) or 1), int(o.get("h", 1) or 1)
+                if ew < 1 or eh < 1:
+                    rep.err(w, f"이벤트 크기 w·h 는 1 이상: {ew}×{eh}")
+                elif x + ew > width or y + eh > len(tiles):
+                    rep.err(w, f"이벤트 영역 {ew}×{eh} 가 맵 밖으로 나감")
             if o.get("type") == "furniture":   # 기타 가구: 놓은 칸 = 왼쪽 위, w × h 칸이 모두 바닥이고 비어 있어야
                 fw, fh = int(o.get("w", 1) or 1), int(o.get("h", 1) or 1)
                 if fw < 1 or fh < 1:
@@ -1731,6 +1737,8 @@ def export_maps(d, maps):
             e["from"] = arrive_from(o)   # 도착 P: 이어지는 곳 (object_id / "맵:방향")
             e["default"] = bool(o.get("default"))   # 기본 도착 P
             e["once"] = bool(o.get("once"))         # 이벤트 칸: 한 번만
+            if o.get("type") == "event":            # 이벤트: 밟는 영역 (놓은 칸 = 왼쪽 위)
+                e.update(w=max(1, int(o.get("w", 1) or 1)), h=max(1, int(o.get("h", 1) or 1)))
             if o.get("type") == "enemy":            # 몬스터 AI: Behavior Tree 와 개체별 Blackboard 시작값 (비우면 예전 AI)
                 e.update(bt=o.get("bt", ""), bb_overrides=o.get("bb_overrides") or {},
                          touch_battle=o.get("touch_battle", ""), follow=o.get("follow", ""))   # follow off = 다른 맵까지 안 따라옴   # 닿으면 바로 전투: "" = BT 설정(없으면 켬) / on / off

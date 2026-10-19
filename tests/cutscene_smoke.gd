@@ -22,7 +22,8 @@ func _ready() -> void:
 	var npc: Dictionary = f.npcs.filter(func(n): return n.data.object_id == "tcut_npc")[0]
 	# ---- 인게임 컷신: 이벤트 칸을 밟으면 시작
 	check(f.events.size() == 1, "이벤트 칸 1개 (화면에 안 보임)")
-	check(f._try_event(Vector2i(2, 2)) and f._dialogue_ui != null and f.frozen, "이벤트 칸 → 대화(컷신) 시작, 플레이어 못 움직임")
+	check(not f._try_event(Vector2i(4, 2)) and not f._try_event(Vector2i(2, 4)), "이벤트 영역(2×2) 밖은 안 밟힘")
+	check(f._try_event(Vector2i(3, 3)) and f._dialogue_ui != null and f.frozen, "이벤트 영역 안 아무 칸 → 대화(컷신) 시작, 플레이어 못 움직임")
 	await _wait(0.15)
 	check(f._dialogue_ui.directing and not f._dialogue_ui.get_node("%Bubble").visible, "연출 중: 대사 상자 숨김")
 	await _wait(0.25)
@@ -99,7 +100,7 @@ func _inject() -> void:
 		return {"object_id": id, "type": type, "ref": ref, "name": id, "text": "", "condition": "", "arrive": "", "from": [],
 			"default": false, "once": type == "event", "map_id": "tcut_map", "x": x, "y": y, "patrol_dir": "", "patrol_len": 0, "schedule": []}
 	DataLoader.maps["tcut_map"] = {"map_id": "tcut_map", "width": 12, "height": 7, "tiles": tiles, "start": [2, 4], "run_start": [2, 4],
-		"objects": [obj.call("tcut_npc", "npc", 9, 2, "tcut_b"), obj.call("tcut_event", "event", 2, 2, "tcut_a")], "edges": {}}
+		"objects": [obj.call("tcut_npc", "npc", 9, 2, "tcut_b"), obj.call("tcut_event", "event", 2, 2, "tcut_a").merged({"w": 2, "h": 2}, true)], "edges": {}}
 	var node := func(id: String, kind: String, next: String, extra := {}) -> Dictionary:
 		var n := {"node_id": id, "kind": kind, "speaker_id": "", "text": "", "next_node": next, "on_enter": "", "pages": [], "episode_id": ""}
 		n.merge(extra, true)

@@ -108,10 +108,15 @@ func is_wall(t: Vector2i) -> bool:
 func fits(type: String, t: Vector2i, o: Dictionary = {}) -> bool:
 	if type == "furniture":   # 가구: 왼쪽 위 t 부터 w × h 칸이 모두 바닥이고 다른 물체가 없어야
 		for c in VisualData.furniture_cells({"x": t.x, "y": t.y, "w": o.get("w", 1), "h": o.get("h", 1)}):
-			var there := object_at(c)
+			var there := object_at(c, false)
 			if not is_floor(c) or (not there.is_empty() and there != o):
 				return false
 		return true
+	if type == "event":   # 이벤트 영역: 왼쪽 위 칸은 바닥, 영역은 맵 안 (안에 다른 물체·벽이 있어도 됨 — 걸을 수 있는 칸에서만 작동)
+		for c in VisualData.furniture_cells({"x": t.x, "y": t.y, "w": o.get("w", 1), "h": o.get("h", 1)}):
+			if not in_bounds(c):
+				return false
+		return is_floor(t)
 	if type == "light" and is_wall(t):   # 벽걸이등: 벽 칸도 됨 (옆이나 아래 뒷벽 너머에 비출 바닥이 있어야)
 		var there := object_at(t)
 		return (there.is_empty() or there == o) and VisualData.window_light(map, {"x": t.x, "y": t.y}).dir != Vector2i.ZERO
@@ -137,14 +142,23 @@ func open_wall(t: Vector2i) -> void:
 				layers[l].erase("%d,%d" % [t.x, t.y])
 
 
-## 그 칸의 물체 (숨긴 것 포함 — 겹치기 검사용)
-func object_at(t: Vector2i) -> Dictionary:
+## 그 칸의 물체 (숨긴 것 포함 — 겹치기 검사용). zones = 큰 이벤트 영역의 나머지 칸도 (다른 물체가 먼저)
+## 이벤트 영역은 보이지 않는 밟는 곳이라 그 안에 다른 물체를 놓을 수 있음 (놓기·옮기기 검사는 zones=false)
+func object_at(t: Vector2i, zones := true) -> Dictionary:
 	for o in map.get("objects", []):
 		if int(o.x) == t.x and int(o.y) == t.y:
 			return o
-		if o.get("type", "") in ["furniture", "window"] and t.x >= int(o.x) and t.y >= int(o.y) 				and t.x < int(o.x) + maxi(1, int(o.get("w", 1))) and t.y < int(o.y) + maxi(1, int(o.get("h", 1))):
+		if o.get("type", "") in ["furniture", "window"] and _in_rect(o, t):
 			return o   # 큰 가구·창문은 차지하는 칸 어디서나
+	if zones:
+		for o in map.get("objects", []):
+			if o.get("type", "") == "event" and _in_rect(o, t):
+				return o
 	return {}
+
+
+func _in_rect(o: Dictionary, t: Vector2i) -> bool:
+	return t.x >= int(o.x) and t.y >= int(o.y) and t.x < int(o.x) + maxi(1, int(o.get("w", 1))) and t.y < int(o.y) + maxi(1, int(o.get("h", 1)))
 
 
 func is_visible_object(o: Dictionary) -> bool:
@@ -213,7 +227,7 @@ func apply_tool(t: Vector2i, first := true) -> void:
 		_:
 			if tool in TRAVEL_TYPES and first and object_at(t).is_empty():
 				open_wall(t)   # 벽에 문·통로를 놓으면 그 칸은 바닥이 됨
-			if tool in OBJECT_TYPES and first and fits(tool, t) and object_at(t).is_empty():
+			if tool in OBJECT_TYPES and first and fits(tool, t) and object_at(t, false).is_empty():
 				var o := {"object_id": id_maker.call(tool) if id_maker.is_valid() else "%s_%d" % [tool, map.objects.size() + 1],
 					"type": tool, "x": t.x, "y": t.y, "ref": "", "name": "", "text": "",
 					"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}
@@ -704,9 +718,17 @@ func _draw() -> void:
 			var r := Rect2(pan + Vector2(p[0], p[1]) * s, Vector2(s, s)).grow(-s * 0.12)
 			draw_rect(r, Color("2f8f4f") if key == "start" else Color("b89a2a"))
 			_label("P" if key == "start" else "S", r.get_center(), Color.WHITE, s * 0.5)
-	# 물체
+	# 물체 (큰 이벤트 영역은 먼저 — 다른 물체 아래에 반투명 보라 사각형)
+	for o in map.objects:
+		if o.type == "event" and is_visible_object(o) and (int(o.get("w", 1)) > 1 or int(o.get("h", 1)) > 1):
+			var er := Rect2(pan + Vector2(o.x, o.y) * s, Vector2(maxi(1, int(o.get("w", 1))), maxi(1, int(o.get("h", 1)))) * s).grow(-2)
+			draw_rect(er, Color(COLORS.event, 0.22))
+			draw_rect(er, Color.WHITE if o in selection else COLORS.event, false, 3.0 if o in selection else 2.0)
+			_label(LETTER.event, er.position + Vector2(s, s) * 0.5, Color.WHITE, s * 0.42)
 	for o in map.objects:
 		if not is_visible_object(o):
+			continue
+		if o.type == "event" and (int(o.get("w", 1)) > 1 or int(o.get("h", 1)) > 1):
 			continue
 		if o.type == "window" and (int(o.get("w", 1)) > 1 or int(o.get("h", 1)) > 1):   # 큰 창문: 차지하는 칸만큼 하늘색 테두리
 			var wr := Rect2(pan + Vector2(o.x, o.y) * s, Vector2(maxi(1, int(o.get("w", 1))), maxi(1, int(o.get("h", 1)))) * s).grow(-2)

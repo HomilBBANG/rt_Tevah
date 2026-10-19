@@ -38,7 +38,7 @@ const TOOL_TIPS := {
 	"investigate": "조사 지점: 놓은 뒤 오른쪽 칸에서 얻는 것(Loot)·조사 문구",
 	"npc": "NPC: 놓은 뒤 오른쪽 칸에서 대화(시작 노드)·나타나는 시간대",
 	"camp": "베이스캠프 거점 (식사·물·씻기·잠 메뉴, 엑셀 CampActions)",
-	"event": "이벤트 칸: 밟으면 대화(컷신) 시작. 게임에서는 안 보임. 오른쪽 칸에서 대화·한 번만·나타나는 조건",
+	"event": "이벤트 칸: 밟으면 대화(컷신) 시작. 게임에서는 안 보임. 오른쪽 칸에서 대화·크기(밟는 영역)·한 번만·나타나는 조건",
 	"exit": "문: E 로 열고, 열린 문으로 걸어 들어가면 이동. 오른쪽 칸에서 이동할 맵. 벽 칸에 놓으면 그 칸이 저절로 바닥이 됨",
 	"passage": "통로: 밟으면 바로 이동 (길·동굴 입구)",
 	"stairs": "계단: 밟으면 이어진 층으로 이동. 오른쪽 칸 '⬆ 위층 만들기'로 같은 모양의 위층 맵과 서로 이어진 계단·도착 P 를 한 번에",
@@ -784,6 +784,8 @@ func _edit_object(o: Dictionary) -> void:
 		"event":
 			_section("이벤트 (밟으면 시작)")
 			_option("대화 (컷신)", dialogue_starts, o.get("ref", ""), func(v): set_field(o, "ref", v))
+			_size_spins(o)
+			_hint("크기 = 밟는 영역 (놓은 칸 = 왼쪽 위). 영역 안 어느 칸을 밟아도 시작, 안에 다른 물체를 놓아도 됨")
 			var once := CheckBox.new()
 			once.text = "한 번만 (한 번 본 뒤에는 다시 밟아도 안 나옴)"
 			once.button_pressed = o.get("once", false)
@@ -1051,7 +1053,7 @@ func _size_spins(o: Dictionary) -> void:
 			o[key] = old
 			if not ok:
 				sp.set_value_no_signal(old)
-				_status("그 크기는 놓을 수 없어요 (가구: 벽·다른 물체와 겹침 / 창문: 벽이 아닌 칸이 들어감)")
+				_status("그 크기는 놓을 수 없어요 (가구: 벽·다른 물체와 겹침 / 창문: 벽이 아닌 칸이 들어감 / 이벤트: 맵 밖)")
 				return
 			set_field(o, key, int(v)))
 

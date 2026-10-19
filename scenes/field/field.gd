@@ -388,6 +388,7 @@ func _build_actors() -> void:
 						"wait": randf_range(0.5, _wander_cfg("npc_wander_wait_max", 6.0))}
 			"event":
 				events.append({"kind": "event", "data": o, "pos": pos, "tile": Vector2i(int(o.x), int(o.y)),
+					"rect": Rect2i(int(o.x), int(o.y), maxi(1, int(o.get("w", 1))), maxi(1, int(o.get("h", 1)))),   # 밟는 영역
 					"done": GameState.field_has(map.map_id, "done", o.object_id)})
 	_refresh_presence()
 
@@ -654,7 +655,7 @@ func _physics_process(delta: float) -> void:
 ## 이벤트 칸을 밟음: 조건이 맞고 (한 번만이면 아직 안 했으면) 그 대화(컷신)를 시작
 func _try_event(t: Vector2i) -> bool:
 	for e in events:
-		if e.tile != t or (e.data.get("once", false) and e.done):
+		if not e.rect.has_point(t) or (e.data.get("once", false) and e.done):
 			continue
 		var cond: String = e.data.get("condition", "")
 		if cond != "" and not Expr.evaluate(cond, GameState):

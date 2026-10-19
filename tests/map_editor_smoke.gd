@@ -678,6 +678,14 @@ func _ready() -> void:
 	ed.show_world(false)
 	DirAccess.remove_absolute("user://world_layout_test.json")
 
+	# 이벤트 영역 크기: 2×3 이면 영역 안 칸 어디서나 고름, 그 안에도 다른 물체를 놓을 수 있음
+	var zone := {"object_id": "zone_ev", "type": "event", "x": 3, "y": 1, "w": 2, "h": 3, "ref": "", "name": "", "text": "",
+		"patrol_dir": "", "patrol_len": 0, "condition": "", "schedule": "", "arrive": ""}
+	ed.map.objects.append(zone)
+	check(ed.canvas.object_at(Vector2i(4, 3)) == zone and ed.canvas.object_at(Vector2i(4, 3), false).is_empty(), "이벤트 영역: 안의 칸을 누르면 그 이벤트, 놓기 검사에서는 빈 칸")
+	check(ed.canvas.fits("event", Vector2i(3, 1), zone) and not ed.canvas.fits("event", Vector2i(3, 1), zone.merged({"w": 99}, true)), "이벤트 크기: 맵 밖으로 나가면 안 됨")
+	ed.map.objects.erase(zone)
+
 	# 맵 삭제: 쓰는 곳(다른 맵의 문) 목록 → 파일 지움, 베이스캠프는 못 지움
 	ed.new_map("test_del", 5, 5)
 	ed.new_map("test_del_src", 5, 5)
