@@ -15,6 +15,7 @@ const StartCard = preload("res://addons/dialogue_editor/start_card.gd")
 const DirectCard = preload("res://addons/dialogue_editor/direct_card.gd")
 const ScriptPanel = preload("res://addons/dialogue_editor/script_panel.gd")
 const ScriptPages = preload("res://core/script_pages.gd")
+const Direction = preload("res://core/direction.gd")
 const ExprRows = preload("res://addons/expr_rows.gd")
 const ToolCommon = preload("res://addons/tool_common.gd")
 ## 카드 만들기 메뉴 / 왼쪽 팔레트 / 그래프 오른쪽 클릭
@@ -35,6 +36,7 @@ const PREVIEW_FILE := "user://dialogue_preview.json"
 const UNDO_LIMIT := 200
 
 var dir := DIALOGUE_DIR              # 테스트에서 바꿔 쓴다
+var preview_map: OptionButton        # 미리볼 맵 ("" = 맵 없이)
 var map_dir := "res://tools/maps/"   # 카드 이름을 바꿀 때 맵의 NPC·이벤트 ref 도 고침 (테스트에서 바꿔 쓴다)
 var dialogue := {}                   # 열린 대화 { dialogue_id, episode_id, text_speed, nodes, choices }
 var path := ""
@@ -108,7 +110,15 @@ func _init() -> void:
 	bar.add_child(_edit_menu)
 	bar.add_child(VSeparator.new())
 	_bar_btn(bar, "변환·검사", run_convert, "저장한 뒤 변환기를 돌려 오류·경고를 검사합니다.\n오류가 없어야 게임에 반영됩니다")
-	_bar_btn(bar, "▶ 미리보기", func(): preview(), "고른 카드(대본 칸에서 고른 페이지)부터 실제 대화 화면으로 실행합니다")
+	_bar_btn(bar, "▶ 미리보기", func(): preview(), "고른 카드(대본 칸에서 고른 페이지)부터 실제 대화 화면으로 실행합니다.
+오른쪽 '미리볼 맵'을 고르면 그 맵 위에서 (걷기·카메라·바라보기 같은 필드 연출까지)")
+	preview_map = OptionButton.new()
+	preview_map.fit_to_longest_item = false
+	preview_map.custom_minimum_size.x = 200
+	preview_map.clip_text = true
+	preview_map.tooltip_text = "미리볼 맵: (맵 없이) = 검은 바탕에 대화 화면만 (필드 연출은 건너뜀)
+맵을 고르면 그 맵의 시작 S(없으면 P)에 서서 고른 카드부터 — 필드 연출도 보임"
+	bar.add_child(preview_map)
 	status = Label.new()
 	status.size_flags_horizontal = SIZE_EXPAND_FILL
 	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -308,7 +318,7 @@ const HELP_TEXT := """[b]대화 탭 쓰는 법[/b] — 대본은 아래 칸에�
 
 [b]4-1. 🎬 연출 (컷신)[/b] — 카드 안 [b]＋ 연출 추가[/b]로 단계를 넣고, 위에서부터 차례로 실행합니다 (그동안 대사 상자는 숨고 플레이어는 못 움직임).
   · 그림 컷신: [b]그림 띄우기[/b] (art/cutscenes/ 에 넣은 그림, 화면 가득) → 대본 블록(그림 위에 대사) → … → [b]그림 내리기[/b]. 페이드·흔들기·기다리기도.
-  · 인게임 컷신: [b]걷게 하기[/b](플레이어·맵의 NPC → 칸 x·y, 벽은 돌아감) · [b]카메라 옮기기[/b] · [b]NPC 숨기기[/b] — 탐험 필드에서만 (미리보기에서는 건너뜀).
+  · 인게임 컷신: [b]걷게 하기[/b](플레이어·맵의 NPC → 칸 x·y, 벽은 돌아감) · [b]카메라 옮기기[/b] · [b]NPC 숨기기[/b] — 탐험 필드에서만 (미리보기는 위 줄 [b]미리볼 맵[/b]을 고르면 그 맵에서 보임).
     칸 x·y 는 맵 탭에서 마우스를 올리면 보입니다. '다 걸을 때까지 기다림'을 끄면 여럿이 같이 걷습니다.
   · 시작: 맵 탭의 [b]이벤트[/b] 칸을 밟으면 (한 번만·나타나는 조건 가능), 또는 NPC 대화 중에.
   · NPC 를 컷신 도중 등장시키려면: NPC 에 '나타나는 조건 = 플래그'를 걸고, 효과 카드로 그 플래그를 켜면 바로 나타납니다.
@@ -1495,7 +1505,12 @@ func preview(page := -1) -> void:
 	if page < 0:
 		page = 0
 	var f := FileAccess.open(PREVIEW_FILE, FileAccess.WRITE)
-	f.store_string(JSON.stringify({"node": card.data.node_id, "page": page}))
+	var pm := ""
+	if preview_map and preview_map.selected > 0:
+		pm = preview_map.get_item_text(preview_map.selected)
+	f.store_string(JSON.stringify({"node": card.data.node_id, "page": page, "map": pm}))
+	if pm == "" and _cards().any(func(c): return c is DirectCard and c.data.get("steps", []).any(func(st): return str(st.get("do", "")) in Direction.FIELD_STEPS)):
+		_status("이 대화의 걷기·카메라·바라보기 같은 필드 연출은 '맵 없이'에서는 건너뜀 — 위 줄 '미리볼 맵'을 고르면 그 맵에서 보입니다")
 	f.close()
 	if Engine.is_editor_hint():
 		EditorInterface.play_custom_scene("res://addons/dialogue_editor/preview.tscn")
@@ -1627,6 +1642,14 @@ func _load_lookups() -> void:
 		enemies.append([e.enemy_id, "%s  (%s)" % [e.name, e.enemy_id]])
 	if script_panel:
 		script_panel.speakers = speakers.slice(1)
+	if preview_map:   # 미리볼 맵 목록 (변환된 data/maps.json), 고른 것은 유지
+		var keep := preview_map.get_item_text(preview_map.selected) if preview_map.selected > 0 else ""
+		preview_map.clear()
+		preview_map.add_item("(맵 없이)")
+		for m in _read_json("res://data/maps.json", []):
+			preview_map.add_item(str(m.get("map_id", "")))
+			if str(m.get("map_id", "")) == keep:
+				preview_map.select(preview_map.item_count - 1)
 
 
 func _read_json(p: String, default: Variant) -> Variant:

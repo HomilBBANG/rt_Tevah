@@ -257,7 +257,7 @@ tools/
 - 왼쪽 대화 목록: 더블클릭(또는 오른쪽 클릭 메뉴) = 대화 이름(dialogue_id·파일 이름) 바꾸기 — 카드 ID 는 그대로라 연결 유지. 끌어 놓기·오른쪽 클릭 위로/아래로 = 순서, `tools/dialogues/_order.json` 에 저장(`_` 로 시작하는 파일은 대화 아님). 변환기도 이 순서로 읽어서 같은 시점의 자동 시작 컷신이 이 순서로 나온다.
 - Godot 위쪽 **'대화' 탭** (EditorPlugin 메인 화면). 대사 카드(GraphNode)를 선으로 이어 next_node / 선택지 next_node / 판정 fail_next 를 정한다. 대화 끝(EXIT)·엔딩(END:id) 카드. 다른 파일·엑셀 노드로는 오른쪽 칸 '이동(직접 입력)'.
   - 연결선은 데이터(next_node 등)를 따른다: 연결/끊기 → 데이터 수정 → 다시 그림 (`_sync_connections`).
-  - 버튼: 새 대화 / 대사 추가 / 엔딩 카드 / 저장 / 변환·검사(`tools/xlsx_to_json.py --log`, 결과는 UTF-8 로그 파일로 받음) / 미리보기(`addons/dialogue_editor/preview.tscn`, 고른 카드부터 실제 대화 화면, save 효과는 저장 안 함).
+  - 버튼: 새 대화 / 대사 추가 / 엔딩 카드 / 저장 / 변환·검사(`tools/xlsx_to_json.py --log`, 결과는 UTF-8 로그 파일로 받음) / 미리보기(`addons/dialogue_editor/preview.tscn`, 고른 카드부터 실제 대화 화면, save 효과는 저장 안 함). **미리볼 맵** (2026-10-19, 위 줄 미리보기 옆): '(맵 없이)' = 검은 바탕(필드 연출 건너뜀) / 맵을 고르면 그 맵을 필드로 열고 시작 S(없으면 P)에서 고른 카드부터 — 걷기·카메라·바라보기도 보임, 저장은 user://playtest_saves/, 자동 시작 컷신 끔, 서 있는 칸의 이벤트는 안 터짐 (preview.gd `_start_on_map`). 맵 없이 미리보는데 필드 연출이 있으면 상태 글자로 알림.
   - 맥은 `python3`, 윈도우는 `python` 으로 변환기를 실행.
 - **기능 카드** (노드 `kind`, 엑셀 Nodes 에서도 선택 열): `effect` = on_enter 효과만 실행하고 next_node 로 (화면에 안 보임) / `branch` = `condition` 이 맞으면 next_node, 아니면 `fail_next`. 기본(빈 값·line) = 대사. 도구줄 '＋ 기능 카드' 또는 그래프 오른쪽 클릭.
 - **직접 입력 대신 고르기**: 조건·효과 칸은 `addons/expr_rows.gd` (줄마다 종류·아이템·수치를 목록에서 고름, 괄호 식·goto 는 '직접 입력 보기'로만). 이동 칸은 갈 곳 목록. 목록 이름표는 `ToolCommon.load_lookups()` (data/*.json, 쓰이는 플래그 이름 포함). 맵 탭 물체의 '나타나는 조건'도 같은 부품. 문법을 바꾸면 expr_rows 의 EFFECTS·CONDS 도 맞출 것.
