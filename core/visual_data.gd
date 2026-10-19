@@ -170,6 +170,16 @@ static func cell_keys(map: Dictionary, x: int, y: int) -> Dictionary:
 	return out
 
 
+## 앞면(벽면) 타일 이름들 — 어떤 벽 타일의 face 로 쓰이는 것 (칠해서 직접 쓴 것도 앞면)
+static func face_keys() -> Dictionary:
+	var out := {}
+	for k in tiles():
+		var f = tiles()[k].get("face")
+		if f != null and str(f) != "":
+			out[str(f)] = true
+	return out
+
+
 ## 비스듬한 탑뷰 (피어앤헝거·RPG Maker 식): 벽 타일에 face(앞면 타일)가 있고, 아래(남쪽) face_rows 칸 안에 바닥이 있으면
 ## 그 칸은 앞면 그림 (벽 사이에 끼인 칸도 — 건물 정면 2줄 등). 아니면 윗면(원래 타일). 보이는 모습만, 판정은 그대로.
 static func _face_of(key: String, rows: Array, x: int, y: int) -> String:

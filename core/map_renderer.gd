@@ -122,6 +122,8 @@ func rebuild_tiles() -> void:
 		tl.scale = Vector2(scale_k, scale_k)
 		tl.clear()
 	var shadow_cells := {}
+	var face_cells := {}   # 벽 앞면(방 쪽 세로 면): 빛을 받는 면이라 칸 전체로는 안 막고, 맨 위 경계에 얇은 그림자 선만
+	var faces := VisualData.face_keys()
 	for y in rows.size():
 		for x in String(rows[y]).length():
 			var keys := VisualData.cell_keys(map, x, y)
@@ -129,7 +131,9 @@ func rebuild_tiles() -> void:
 				var key: String = keys[l]
 				if key != "" and _keys.has(key):
 					layers[l].set_cell(Vector2i(x, y), _keys[key][0], _keys[key][1])
-			if keys.wall != "" and VisualData.tiles().get(keys.wall, {}).get("casts_shadow", false):
+			if keys.wall != "" and faces.has(keys.wall):
+				face_cells[Vector2i(x, y)] = true
+			elif keys.wall != "" and VisualData.tiles().get(keys.wall, {}).get("casts_shadow", false):
 				shadow_cells[Vector2i(x, y)] = true
 	_rebuild_roofs(ts, scale_k)
 	overhead.tile_set = ts
@@ -148,7 +152,11 @@ func rebuild_tiles() -> void:
 	for c in pc:
 		if pc[c].get("casts_shadow", false):
 			shadow_cells[c] = true   # 빛을 막는 오브젝트 (나무·상자) — 차지하는 칸
-	_build_occluders(shadow_cells, rows.size(), w)
+	var face_tops := {}   # 앞면 묶음의 맨 위 칸 (위가 앞면이 아님) — 벽 너머 방의 빛이 새지 않게
+	for c in face_cells:
+		if not face_cells.has(c + Vector2i.UP):
+			face_tops[c] = true
+	_build_occluders(shadow_cells, rows.size(), w, face_tops)
 
 
 ## 지붕: 이어진 칸(상하좌우)끼리 묶음 → 묶음마다 TileMapLayer
@@ -355,7 +363,7 @@ func _tileset() -> TileSet:
 
 
 ## 벽 그림자: 가로로 이어진 칸을 사각형 하나로. 문(exit)은 따로 (닫혀 있을 때만)
-func _build_occluders(cells: Dictionary, h: int, w: int) -> void:
+func _build_occluders(cells: Dictionary, h: int, w: int, thin: Dictionary = {}) -> void:
 	for c in _occ_root.get_children():
 		_occ_root.remove_child(c)
 		c.queue_free()
@@ -371,6 +379,16 @@ func _build_occluders(cells: Dictionary, h: int, w: int) -> void:
 			while x < w and cells.has(Vector2i(x, y)):
 				x += 1
 			_occ_root.add_child(_occluder(Rect2(start * tile, y * tile, (x - start) * tile, tile)))
+			occluder_count += 1
+		x = 0
+		while x < w:   # 벽 앞면 맨 위의 얇은 선 (가로로 이어 붙임)
+			if not thin.has(Vector2i(x, y)):
+				x += 1
+				continue
+			var t0 := x
+			while x < w and thin.has(Vector2i(x, y)):
+				x += 1
+			_occ_root.add_child(_occluder(Rect2(t0 * tile, y * tile, (x - t0) * tile, tile * 0.1)))
 			occluder_count += 1
 	for o in map.get("objects", []):
 		if o.get("type", "") == "exit":
