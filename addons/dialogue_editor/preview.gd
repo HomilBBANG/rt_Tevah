@@ -57,6 +57,8 @@ func _start_on_map(node_id: String) -> void:
 	%Info.anchor_top = 0.105
 	%Info.anchor_bottom = 0.15
 	_field._start_dialogue({"data": {"ref": node_id}}, true)   # 첫 연출이 검게 덮기면 처음부터 덮인 화면 (게임의 자동 시작 컷신처럼)
+	if _field._dialogue_ui:
+		_field._dialogue_ui.get_node("%InventoryButton").visible = false   # 미리보기에는 소지품 버튼 없이
 	_watch_end()
 
 
@@ -76,6 +78,7 @@ func _start(node_id: String) -> void:
 	_ui.skip_button = not Triggers.is_logo(node_id)   # 로고는 게임처럼 건너뛰기 버튼 없이
 	_ui.finished.connect(func(): %Info.text = "대화 끝 (EXIT).  Esc 로 다시 시작, 창을 닫으면 에디터로.")
 	%Stage.add_child(_ui)
+	_ui.get_node("%InventoryButton").visible = false   # 미리보기에는 소지품 버튼 없이
 	StoryRunner.start_dialogue(node_id)
 	Engine.set_meta("preview_talk_counts", GameState.talk_counts.duplicate())
 	%Info.text += "   · 대화 횟수(count:talk) = %d" % GameState.talk_now
