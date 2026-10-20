@@ -4,17 +4,25 @@
 			173,
 			-20
 		],
-		"city": [
-			-4,
-			-41
-		],
 		"new_america_church": [
 			65,
 			0
 		],
+		"new_america_forest_w": [
+			-11,
+			40
+		],
 		"new_america_in_church": [
 			70,
 			-40
+		],
+		"new_america_lake": [
+			25,
+			20
+		],
+		"new_america_lake_h_1": [
+			-36,
+			21
 		],
 		"new_america_vil_1": [
 			65,
@@ -32,9 +40,57 @@
 			25,
 			40
 		],
+		"new_america_vil_3_h_1": [
+			-30,
+			47
+		],
+		"new_america_vil_3_h_10": [
+			113,
+			59
+		],
+		"new_america_vil_3_h_2": [
+			33,
+			98
+		],
+		"new_america_vil_3_h_3": [
+			46,
+			98
+		],
+		"new_america_vil_3_h_4": [
+			146,
+			47
+		],
+		"new_america_vil_3_h_5": [
+			-49,
+			36
+		],
+		"new_america_vil_3_h_6": [
+			130,
+			39
+		],
+		"new_america_vil_3_h_7": [
+			-50,
+			57
+		],
+		"new_america_vil_3_h_8": [
+			34,
+			116
+		],
+		"new_america_vil_3_h_9": [
+			44,
+			131
+		],
 		"new_america_way": [
 			65,
 			20
+		],
+		"new_america_wynola": [
+			25,
+			0
+		],
+		"new_america_wynola_h_1": [
+			30,
+			-19
 		],
 		"test_ai": [
 			144,
@@ -55,14 +111,6 @@
 		"test_travel": [
 			173,
 			-26
-		],
-		"new_america_lake": [
-			25,
-			20
-		],
-		"new_america_wynola": [
-			25,
-			0
 		]
 	}
 }

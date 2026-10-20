@@ -822,6 +822,29 @@
    "condition": "",
    "schedule": "",
    "arrive": ""
+  },
+  {
+   "object_id": "new_america_in_church_furniture_2",
+   "type": "furniture",
+   "x": 7,
+   "y": 14,
+   "ref": "",
+   "name": "",
+   "text": "손전등을 주웠다.",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": "",
+   "w": 1,
+   "h": 1,
+   "label": "",
+   "color": "#FFFFFF",
+   "solid": true,
+   "role": "pickup",
+   "use_condition": "",
+   "use_fail_text": "",
+   "effects": "item:+flashlight"
   }
  ],
  "visual": {

@@ -1,54 +1,38 @@
 {
  "map_id": "new_america_wynola",
  "tiles": [
-  "#######################################.",
-  "#####################################...",
-  "........................................",
-  "........................................",
-  "........................................",
-  "........................................",
-  "........................................",
-  "........................................",
-  "........................................",
-  "........########........................",
-  "........########........................",
-  "........########........................",
-  "........########........................",
-  "........########........................",
-  "........####.###........................",
-  "........................................",
-  "........................................",
-  "........................................",
-  "........................................",
-  "........................................"
+  "########################################",
+  "########################################",
+  "...........................#############",
+  "..............................##########",
+  "...............................#########",
+  ".................................#######",
+  "..................................######",
+  "...................................#####",
+  ".....................................###",
+  "........########......................##",
+  "........########.......................#",
+  "........########.......................#",
+  "........########.......................#",
+  "........########.......................#",
+  "........####.###.......................#",
+  ".......................................#",
+  ".......................................#",
+  "......................................##",
+  ".....................................###",
+  "....................................####"
  ],
- "start": null,
+ "start": [
+  12,
+  15
+ ],
  "run_start": null,
- "edges": {
-  "down": {
-   "ref": "new_america_lake",
-   "arrive": "",
-   "seamless": true
-  }
- },
  "objects": [
   {
-   "ref": "",
-   "name": "",
-   "text": "",
-   "patrol_dir": "",
-   "patrol_len": 0,
-   "condition": "",
-   "schedule": "",
-   "arrive": "",
    "object_id": "new_america_wynola_window_1",
    "type": "window",
    "x": 9,
    "y": 12,
-   "look": "window_wood",
-   "h": 2
-  },
-  {
    "ref": "",
    "name": "",
    "text": "",
@@ -57,14 +41,30 @@
    "condition": "",
    "schedule": "",
    "arrive": "",
+   "look": "window_wood",
+   "h": 2.0
+  },
+  {
    "object_id": "new_america_wynola_window_2",
    "type": "window",
    "x": 14,
    "y": 12,
+   "ref": "",
+   "name": "",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": "",
    "look": "window_wood",
-   "h": 2
+   "h": 2.0
   },
   {
+   "object_id": "new_america_wynola_arrive_1",
+   "type": "arrive",
+   "x": 12,
+   "y": 15,
    "ref": "",
    "name": "집 앞",
    "text": "",
@@ -72,13 +72,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
-   "object_id": "new_america_wynola_arrive_1",
-   "type": "arrive",
-   "x": 12,
-   "y": 15
+   "arrive": ""
   },
   {
+   "object_id": "new_america_wynola_exit_1",
+   "type": "exit",
+   "x": 12,
+   "y": 14,
    "ref": "new_america_wynola_h_1",
    "name": "집",
    "text": "",
@@ -86,13 +86,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "new_america_wynola_h_1_arrive_1",
-   "object_id": "new_america_wynola_exit_1",
-   "type": "exit",
-   "x": 12,
-   "y": 14
+   "arrive": "new_america_wynola_h_1_arrive_1"
   },
   {
+   "object_id": "new_america_wynola_lamp_1",
+   "type": "prop",
+   "x": 17,
+   "y": 7,
    "ref": "lamp_post",
    "name": "가로등",
    "text": "",
@@ -100,13 +100,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
-   "object_id": "new_america_wynola_lamp_1",
-   "type": "prop",
-   "x": 17,
-   "y": 7
+   "arrive": ""
   },
   {
+   "object_id": "new_america_wynola_light_1",
+   "type": "light",
+   "x": 18,
+   "y": 7,
    "ref": "",
    "name": "가로등 불빛",
    "text": "",
@@ -115,10 +115,6 @@
    "condition": "",
    "schedule": "",
    "arrive": "",
-   "object_id": "new_america_wynola_light_1",
-   "type": "light",
-   "x": 18,
-   "y": 7,
    "preset": "street_lamp",
    "color": "#FFE0B0",
    "energy": 1.2,
@@ -127,20 +123,10 @@
    "enabled": true
   },
   {
-   "ref": "tree",
-   "name": "나무",
-   "text": "",
-   "patrol_dir": "",
-   "patrol_len": 0,
-   "condition": "",
-   "schedule": "",
-   "arrive": "",
    "object_id": "new_america_wynola_tree_1",
    "type": "prop",
    "x": 15,
-   "y": 17
-  },
-  {
+   "y": 17,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -148,13 +134,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_2",
    "type": "prop",
    "x": 8,
-   "y": 17
-  },
-  {
+   "y": 17,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -162,13 +148,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_3",
    "type": "prop",
    "x": 28,
-   "y": 14
-  },
-  {
+   "y": 14,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -176,27 +162,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
-   "object_id": "new_america_wynola_tree_4",
-   "type": "prop",
-   "x": 38,
-   "y": 8
+   "arrive": ""
   },
   {
-   "ref": "tree",
-   "name": "나무",
-   "text": "",
-   "patrol_dir": "",
-   "patrol_len": 0,
-   "condition": "",
-   "schedule": "",
-   "arrive": "",
    "object_id": "new_america_wynola_tree_5",
    "type": "prop",
    "x": 34,
-   "y": 13
-  },
-  {
+   "y": 13,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -204,13 +176,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_6",
    "type": "prop",
    "x": 1,
-   "y": 17
-  },
-  {
+   "y": 17,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -218,13 +190,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_7",
    "type": "prop",
    "x": 28,
-   "y": 10
-  },
-  {
+   "y": 10,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -232,13 +204,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_8",
    "type": "prop",
    "x": 24,
-   "y": 3
-  },
-  {
+   "y": 3,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -246,13 +218,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_9",
    "type": "prop",
    "x": 23,
-   "y": 12
-  },
-  {
+   "y": 12,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -260,27 +232,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
-   "object_id": "new_america_wynola_tree_10",
-   "type": "prop",
-   "x": 35,
-   "y": 6
+   "arrive": ""
   },
   {
-   "ref": "tree",
-   "name": "나무",
-   "text": "",
-   "patrol_dir": "",
-   "patrol_len": 0,
-   "condition": "",
-   "schedule": "",
-   "arrive": "",
    "object_id": "new_america_wynola_tree_11",
    "type": "prop",
    "x": 13,
-   "y": 18
-  },
-  {
+   "y": 18,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -288,13 +246,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_12",
    "type": "prop",
    "x": 31,
-   "y": 15
-  },
-  {
+   "y": 15,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -302,13 +260,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_13",
    "type": "prop",
    "x": 3,
-   "y": 16
-  },
-  {
+   "y": 16,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -316,13 +274,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_14",
    "type": "prop",
    "x": 14,
-   "y": 3
-  },
-  {
+   "y": 3,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -330,13 +288,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_15",
    "type": "prop",
    "x": 22,
-   "y": 16
-  },
-  {
+   "y": 16,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -344,13 +302,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_16",
    "type": "prop",
    "x": 31,
-   "y": 17
-  },
-  {
+   "y": 17,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -358,13 +316,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_17",
    "type": "prop",
    "x": 26,
-   "y": 14
-  },
-  {
+   "y": 14,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -372,13 +330,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_18",
    "type": "prop",
    "x": 25,
-   "y": 9
-  },
-  {
+   "y": 9,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -386,13 +344,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_19",
    "type": "prop",
    "x": 23,
-   "y": 10
-  },
-  {
+   "y": 10,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -400,13 +358,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_20",
    "type": "prop",
    "x": 4,
-   "y": 12
-  },
-  {
+   "y": 12,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -414,13 +372,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_21",
    "type": "prop",
    "x": 37,
-   "y": 16
-  },
-  {
+   "y": 16,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -428,13 +386,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_22",
    "type": "prop",
    "x": 33,
-   "y": 8
-  },
-  {
+   "y": 8,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -442,13 +400,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_23",
    "type": "prop",
    "x": 33,
-   "y": 16
-  },
-  {
+   "y": 16,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -456,13 +414,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_24",
    "type": "prop",
    "x": 31,
-   "y": 11
-  },
-  {
+   "y": 11,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -470,27 +428,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
-   "object_id": "new_america_wynola_tree_25",
-   "type": "prop",
-   "x": 36,
-   "y": 8
+   "arrive": ""
   },
   {
-   "ref": "tree",
-   "name": "나무",
-   "text": "",
-   "patrol_dir": "",
-   "patrol_len": 0,
-   "condition": "",
-   "schedule": "",
-   "arrive": "",
    "object_id": "new_america_wynola_tree_26",
    "type": "prop",
    "x": 38,
-   "y": 13
-  },
-  {
+   "y": 13,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -498,13 +442,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_27",
    "type": "prop",
    "x": 4,
-   "y": 18
-  },
-  {
+   "y": 18,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -512,13 +456,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_28",
    "type": "prop",
    "x": 5,
-   "y": 16
-  },
-  {
+   "y": 16,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -526,13 +470,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_29",
    "type": "prop",
    "x": 29,
-   "y": 12
-  },
-  {
+   "y": 12,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -540,13 +484,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_30",
    "type": "prop",
    "x": 24,
-   "y": 17
-  },
-  {
+   "y": 17,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -554,13 +498,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_31",
    "type": "prop",
    "x": 2,
-   "y": 3
-  },
-  {
+   "y": 3,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -568,13 +512,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_32",
    "type": "prop",
    "x": 26,
-   "y": 3
-  },
-  {
+   "y": 3,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -582,13 +526,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_33",
    "type": "prop",
    "x": 4,
-   "y": 9
-  },
-  {
+   "y": 9,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -596,13 +540,13 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_34",
    "type": "prop",
    "x": 18,
-   "y": 3
-  },
-  {
+   "y": 3,
    "ref": "tree",
    "name": "나무",
    "text": "",
@@ -610,13 +554,30 @@
    "patrol_len": 0,
    "condition": "",
    "schedule": "",
-   "arrive": "",
+   "arrive": ""
+  },
+  {
    "object_id": "new_america_wynola_tree_35",
    "type": "prop",
    "x": 36,
-   "y": 11
+   "y": 11,
+   "ref": "tree",
+   "name": "나무",
+   "text": "",
+   "patrol_dir": "",
+   "patrol_len": 0,
+   "condition": "",
+   "schedule": "",
+   "arrive": ""
   }
  ],
+ "edges": {
+  "down": {
+   "ref": "new_america_lake",
+   "arrive": "",
+   "seamless": true
+  }
+ },
  "visual": {
   "layers": {
    "floor": {
@@ -640,17 +601,17 @@
     "17,5": "floor_dirt",
     "18,5": "floor_dirt",
     "19,5": "floor_dirt",
-    "20,5": "floor_dirt",
-    "21,5": "floor_dirt",
-    "22,5": "floor_dirt",
-    "23,5": "floor_dirt",
-    "24,5": "floor_dirt",
-    "25,5": "floor_dirt",
-    "26,5": "floor_dirt",
-    "27,5": "floor_dirt",
-    "28,5": "floor_dirt",
-    "29,5": "floor_dirt",
-    "30,5": "floor_dirt",
+    "20,5": "road_curve_ws",
+    "21,5": "floor_grass",
+    "22,5": "floor_grass",
+    "23,5": "floor_grass",
+    "24,5": "floor_grass",
+    "25,5": "floor_grass",
+    "26,5": "floor_grass",
+    "27,5": "floor_grass",
+    "28,5": "floor_grass",
+    "29,5": "floor_grass",
+    "30,5": "floor_grass",
     "0,6": "floor_dirt",
     "1,6": "floor_dirt",
     "2,6": "floor_dirt",
@@ -672,34 +633,34 @@
     "18,6": "floor_dirt",
     "19,6": "floor_dirt",
     "20,6": "floor_dirt",
-    "21,6": "floor_dirt",
-    "22,6": "floor_dirt",
-    "23,6": "floor_dirt",
-    "24,6": "floor_dirt",
-    "25,6": "floor_dirt",
-    "26,6": "floor_dirt",
-    "27,6": "floor_dirt",
-    "28,6": "floor_dirt",
-    "29,6": "floor_dirt",
-    "30,6": "floor_dirt",
-    "31,4": "floor_dirt",
-    "32,4": "floor_dirt",
-    "31,5": "floor_dirt",
-    "32,5": "floor_dirt",
-    "33,3": "floor_dirt",
-    "34,3": "floor_dirt",
-    "33,4": "floor_dirt",
-    "34,4": "floor_dirt",
-    "35,2": "floor_dirt",
-    "36,2": "floor_dirt",
-    "35,3": "floor_dirt",
-    "36,3": "floor_dirt",
-    "37,1": "floor_dirt",
-    "38,1": "floor_dirt",
-    "37,2": "floor_dirt",
-    "38,2": "floor_dirt",
-    "39,0": "floor_dirt",
-    "39,1": "floor_dirt",
+    "21,6": "floor_grass",
+    "22,6": "floor_grass",
+    "23,6": "floor_grass",
+    "24,6": "floor_grass",
+    "25,6": "floor_grass",
+    "26,6": "floor_grass",
+    "27,6": "floor_grass",
+    "28,6": "floor_grass",
+    "29,6": "floor_grass",
+    "30,6": "floor_grass",
+    "31,4": "floor_grass",
+    "32,4": "floor_grass",
+    "31,5": "floor_grass",
+    "32,5": "floor_grass",
+    "33,3": "floor_grass",
+    "34,3": "floor_grass",
+    "33,4": "floor_grass",
+    "34,4": "floor_grass",
+    "35,2": "floor_grass",
+    "36,2": "floor_grass",
+    "35,3": "floor_grass",
+    "36,3": "floor_grass",
+    "37,1": "floor_grass",
+    "38,1": "floor_grass",
+    "37,2": "floor_grass",
+    "38,2": "floor_grass",
+    "39,0": "floor_grass",
+    "39,1": "floor_grass",
     "19,7": "floor_dirt",
     "20,7": "floor_dirt",
     "19,8": "floor_dirt",
@@ -733,7 +694,16 @@
     "15,15": "floor_dirt",
     "16,15": "floor_dirt",
     "17,15": "floor_dirt",
-    "18,15": "floor_dirt"
+    "18,15": "floor_dirt",
+    "35,4": "floor_grass",
+    "36,4": "floor_grass",
+    "36,1": "floor_grass",
+    "37,0": "floor_grass",
+    "38,0": "floor_grass",
+    "36,0": "floor_grass",
+    "35,1": "floor_grass",
+    "34,1": "floor_grass",
+    "34,2": "floor_grass"
    },
    "wall": {
     "8,12": "wall_wood_face",
@@ -834,7 +804,82 @@
     "36,0": "forest",
     "36,1": "forest",
     "37,0": "forest",
-    "38,0": "forest"
+    "38,0": "forest",
+    "39,0": "forest",
+    "39,1": "forest",
+    "38,1": "forest",
+    "37,1": "forest",
+    "37,2": "forest",
+    "39,2": "forest",
+    "38,2": "forest",
+    "38,3": "forest",
+    "39,3": "forest",
+    "39,4": "forest",
+    "36,2": "forest",
+    "37,3": "forest",
+    "38,4": "forest",
+    "39,5": "forest",
+    "32,2": "forest",
+    "33,2": "forest",
+    "34,2": "forest",
+    "35,2": "forest",
+    "34,3": "forest",
+    "35,3": "forest",
+    "36,3": "forest",
+    "36,4": "forest",
+    "37,4": "forest",
+    "37,5": "forest",
+    "38,5": "forest",
+    "39,6": "forest",
+    "38,6": "forest",
+    "28,2": "forest",
+    "29,2": "forest",
+    "30,2": "forest",
+    "31,2": "forest",
+    "30,3": "forest",
+    "31,3": "forest",
+    "32,3": "forest",
+    "33,3": "forest",
+    "33,4": "forest",
+    "34,4": "forest",
+    "35,4": "forest",
+    "35,5": "forest",
+    "36,5": "forest",
+    "36,6": "forest",
+    "37,6": "forest",
+    "37,7": "forest",
+    "38,7": "forest",
+    "39,7": "forest",
+    "39,8": "forest",
+    "39,9": "forest",
+    "39,10": "forest",
+    "38,9": "forest",
+    "37,8": "forest",
+    "36,7": "forest",
+    "31,4": "forest",
+    "32,4": "forest",
+    "33,5": "forest",
+    "34,5": "forest",
+    "34,6": "forest",
+    "35,7": "forest",
+    "35,6": "forest",
+    "38,8": "forest",
+    "27,2": "forest",
+    "39,11": "forest",
+    "39,12": "forest",
+    "39,13": "forest",
+    "39,14": "forest",
+    "39,15": "forest",
+    "39,16": "forest",
+    "39,17": "forest",
+    "38,18": "forest",
+    "37,19": "forest",
+    "38,19": "forest",
+    "39,19": "forest",
+    "39,18": "forest",
+    "38,17": "forest",
+    "37,18": "forest",
+    "36,19": "forest"
    },
    "roof": {
     "8,9": "roof_brown",
