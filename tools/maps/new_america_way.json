@@ -35,6 +35,11 @@
    "ref": "new_america_vil_1",
    "arrive": "",
    "seamless": true
+  },
+  "left": {
+   "ref": "new_america_lake",
+   "arrive": "",
+   "seamless": true
   }
  },
  "visual": {

@@ -55,6 +55,14 @@
 		"test_travel": [
 			173,
 			-26
+		],
+		"new_america_lake": [
+			25,
+			20
+		],
+		"new_america_wynola": [
+			25,
+			0
 		]
 	}
 }
