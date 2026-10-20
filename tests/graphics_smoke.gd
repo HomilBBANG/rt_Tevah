@@ -79,6 +79,10 @@ func _ready() -> void:
 	f.player.facing = Vector2.UP
 	await _wait(0.1)
 	check(is_equal_approx(f.held_light.rotation, -PI / 2), "위를 보면 빛도 위로")
+	var tl: TileMapLayer = f.renderer.find_children("*", "TileMapLayer", true, false)[0]
+	check(f.held_light.position.y < -10.0 and f.held_light.position.is_equal_approx(f.player.body_center())
+		and f.held_light.range_item_cull_mask == f.HELD_LIGHT_BIT and (f.player.sprite == null or f.player.sprite.light_mask & f.HELD_LIGHT_BIT == 0)
+		and tl.light_mask & f.HELD_LIGHT_BIT != 0, "손전등: 몸 가운데에서, 주인공 자신은 비추지 않고 바닥·벽은 비춤")
 	f.player.position = f._tile_center(2, 4)
 	f.player.facing = Vector2.RIGHT
 	await _wait(0.1)
@@ -121,6 +125,8 @@ func _ready() -> void:
 
 	# ---- 지붕: 도시 맵 — 밖에서는 집 안이 지붕에 가려 안 보이고, 들어간 집만 지붕이 사라짐
 	GameState.clock = 12 * 60.0
+	# 도시 맵은 테스트 복사본 (tools/maps 의 city 는 지웠음 — 2026-10-20)
+	DataLoader.maps["city"] = JSON.parse_string(FileAccess.get_file_as_string("res://tests/fixtures/maps/city_converted.json"))
 	f.load_map("city")
 	await _wait(0.3)
 	var rr: Node2D = f.renderer

@@ -55,6 +55,13 @@ func setup_sprite() -> void:
 	queue_redraw()
 
 
+## 몸 가운데 (손에 든 빛이 나오는 자리) — 그림의 세로 가운데, 그림이 없으면 원 가운데
+func body_center() -> Vector2:
+	if sprite == null or sprite.texture == null:
+		return Vector2.ZERO
+	return Vector2(0, sprite.position.y - sprite.texture.get_height() * sprite.scale.y * 0.5)
+
+
 func _animate(delta: float, moving: bool) -> void:
 	if sprite == null:
 		return

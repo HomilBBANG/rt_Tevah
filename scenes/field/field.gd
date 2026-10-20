@@ -1355,6 +1355,7 @@ func _spawn_enemy(o: Dictionary) -> Node:
 			e.bt.breakpoints[id] = true
 	_add_circle_shape(e, e.radius * 0.8)
 	%World.add_child(e)
+	_mark_held_light_targets(e)   # 나중에 들어온 몬스터도 손전등 빛을 받게
 	enemies.append(e)
 	return e
 
@@ -1517,8 +1518,22 @@ func _update_held_light() -> void:
 		return
 	held_light = MapRenderer.make_light(p, tile)
 	held_light.name = "HeldLight"
+	held_light.position = player.body_center()   # 몸 가운데에서 (발이 아니라)
+	# 주인공 자신은 손에 든 빛을 받지 않음: 이 빛은 HELD_LIGHT_BIT 를 가진 것만 비춤 — 맵·인물·물건에는 그 비트를 붙이고 주인공만 뺌
+	held_light.range_item_cull_mask = HELD_LIGHT_BIT
+	_mark_held_light_targets(self)
 	player.add_child(held_light)
 	held_light.rotation = player.facing.angle()
+
+
+## 손에 든 빛을 받을 그림들 (주인공 빼고 모두)에 HELD_LIGHT_BIT 를 붙임. 맵을 열 때·빛을 들 때
+func _mark_held_light_targets(n: Node) -> void:
+	if n == player:
+		return
+	if n is CanvasItem:
+		n.light_mask |= HELD_LIGHT_BIT
+	for c in n.get_children():
+		_mark_held_light_targets(c)
 
 
 func _process(delta: float) -> void:
@@ -1587,6 +1602,9 @@ func _camera() -> Camera2D:
 	if iso and iso.camera and is_instance_valid(iso.camera):
 		return iso.camera
 	return player.get_node_or_null("Camera2D") if player else null
+
+
+const HELD_LIGHT_BIT := 2   # 손에 든 빛(손전등)만 쓰는 빛 비트 — 주인공 그림에는 없음
 
 
 ## 카메라 움직임 곡선 (연출 camera 의 ease): smooth = 천천히 시작·끝 / linear = 일정한 속도
